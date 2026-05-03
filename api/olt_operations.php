@@ -85,6 +85,15 @@ switch ($action) {
         if($ok) log_admin_activity($conn,'olt_status','Update status OLT ID '.$id.' ke '.$status, intval($_SESSION['admin_id'] ?? 0));
         echo json_encode(['success'=>$ok,'message'=>$ok?'Status OLT diperbarui':$conn->error]);
         break;
+    case 'snmp_probe':
+        $d = input_data(); $id = intval($d['id'] ?? 0);
+        $stmt = $conn->prepare('SELECT id,name,host,snmp_community FROM olts WHERE id=? LIMIT 1');
+        $stmt->bind_param('i', $id); $stmt->execute(); $olt = $stmt->get_result()->fetch_assoc();
+        if (!$olt) { echo json_encode(['success'=>false,'message'=>'OLT tidak ditemukan']); break; }
+        $probe = olt_snmp_probe($olt['host'], $olt['snmp_community'] ?: 'public');
+        if ($probe['success']) log_admin_activity($conn,'olt_snmp_probe','SNMP probe OLT ID '.$id, intval($_SESSION['admin_id'] ?? 0));
+        echo json_encode($probe);
+        break;
     case 'snmp_walk':
         $d = input_data(); $id = intval($d['id'] ?? 0); $baseOid = trim($d['oid'] ?? '1.3.6.1.2.1.1'); $limit = max(1, min(200, intval($d['limit'] ?? 50)));
         $stmt = $conn->prepare('SELECT id,name,host,snmp_community FROM olts WHERE id=? LIMIT 1');
@@ -135,6 +144,31 @@ function ensure_column(mysqli $conn, string $table, string $column, string $defi
     $safeColumn = preg_replace('/[^A-Za-z0-9_]/', '', $column);
     $res = $conn->query("SHOW COLUMNS FROM `$safeTable` LIKE '$safeColumn'");
     if ($res && $res->num_rows === 0) $conn->query("ALTER TABLE `$safeTable` ADD COLUMN `$safeColumn` $definition");
+}
+
+function olt_snmp_probe(string $host, string $community): array {
+    $candidates = [
+        '1.3.6.1.2.1.1.1.0' => 'Standard sysDescr',
+        '1.3.6.1.2.1.1.2.0' => 'Standard sysObjectID / enterprise hint',
+        '1.3.6.1.2.1.2.1.0' => 'Standard ifNumber / jumlah interface',
+        '1.3.6.1.2.1.2.2.1.2.1' => 'ifDescr index 1',
+        '1.3.6.1.2.1.2.2.1.8.1' => 'ifOperStatus index 1',
+        '1.3.6.1.4.1.3320.1.1.1.0' => 'BDCOM/EPON candidate',
+        '1.3.6.1.4.1.3320.101.10.1.1.1.1' => 'BDCOM ONU candidate',
+        '1.3.6.1.4.1.17409.2.3.1.1.1.1' => 'C-Data/EPON candidate',
+        '1.3.6.1.4.1.5875.800.3.9.3.3.1.1.2.1' => 'Fiberhome candidate',
+        '1.3.6.1.4.1.34592.1.3.1.1.1.1' => 'VSOL/HSGQ candidate',
+        '1.3.6.1.4.1.37950.1.1.5.1.1.1.1' => 'HSGQ/XPON candidate',
+        '1.3.6.1.4.1.3902.1012.3.50.11.2.1.1.1' => 'ZTE GPON candidate',
+        '1.3.6.1.4.1.2011.6.128.1.1.2.21.1.1.1' => 'Huawei GPON candidate',
+    ];
+    $rows = [];
+    foreach ($candidates as $oid => $label) {
+        $value = raw_snmp_get($host, $community, $oid);
+        $rows[] = ['oid'=>$oid, 'label'=>$label, 'status'=>($value !== false && $value !== '') ? 'reply' : 'no_response', 'value'=>($value !== false ? (string)$value : '')];
+    }
+    $hits = array_values(array_filter($rows, fn($r) => $r['status'] === 'reply'));
+    return ['success'=>true,'message'=>'SNMP probe selesai','count'=>count($rows),'hits'=>count($hits),'data'=>$rows];
 }
 
 function olt_snmp_walk_limited(string $host, string $community, string $baseOid, int $limit = 50): array {
