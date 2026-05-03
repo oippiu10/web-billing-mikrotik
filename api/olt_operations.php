@@ -260,7 +260,7 @@ function olt_snmp_interfaces(string $host, string $community): array {
         $type = raw_snmp_get($host, $community, '1.3.6.1.2.1.2.2.1.3.'.$i, 0.25);
         $speed = raw_snmp_get($host, $community, '1.3.6.1.2.1.2.2.1.5.'.$i, 0.25);
         $name = trim((string)$descr);
-        if (preg_match('/^1\.3\.6\.1\./', $name)) continue;
+        if (preg_match('/^1\.3\.6\.1\./', $name) || $name === '0') continue;
         $kind = preg_match('/^GE/i', $name) ? 'GE/Uplink' : (preg_match('/^PON|GPON|EPON|ONU\d+/i', $name) ? 'PON/ONU port' : (strpos($name, '@') !== false ? 'ONU/Customer logical' : 'Other'));
         $rows[] = ['index'=>$i,'name'=>$name,'kind'=>$kind,'admin_status'=>(string)$admin,'oper_status'=>(string)$oper,'type'=>(string)$type,'speed'=>(string)$speed,'online'=>((string)$oper === '1')];
     }
