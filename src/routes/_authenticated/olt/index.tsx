@@ -25,6 +25,8 @@ function OltCenter() {
   const [walkResult, setWalkResult] = useState<any>(null)
   const [probeResult, setProbeResult] = useState<any>(null)
   const [interfaceResult, setInterfaceResult] = useState<any>(null)
+  const [interfaceFilter, setInterfaceFilter] = useState('')
+  const [interfaceOnlyOffline, setInterfaceOnlyOffline] = useState(false)
   const [form, setForm] = useState({ name: '', brand: 'Generic', host: '', port: '23', protocol: 'snmp', snmp_community: 'public', pon_ports: '0', total_onu: '0', online_onu: '0', status: 'unknown', location: '', note: '' })
   const { data, isLoading } = useQuery({ queryKey: ['olts'], queryFn: async () => (await api.get('/olt_operations.php', { params: { action: 'list' } })).data })
   const add = useMutation({ mutationFn: async () => {
@@ -44,6 +46,12 @@ function OltCenter() {
   const snmpInterfaces = useMutation({ mutationFn: async (id: number) => (await api.post('/olt_operations.php?action=snmp_interfaces', { id })).data, onSuccess: (d) => { d.success ? (setInterfaceResult(d), toast.success(`Interface: ${d.online}/${d.count} online`)) : toast.error(d.message || 'Interface gagal') }, onError: (e: any) => toast.error(e?.message || 'Interface gagal') })
   const olts = data?.data || []
   const s = data?.summary || {}
+  const interfaceRows = interfaceResult?.data || []
+  const filteredInterfaceRows = interfaceRows.filter((r: any) => {
+    const q = interfaceFilter.trim().toLowerCase()
+    const match = !q || `${r.name} ${r.kind} ${r.index}`.toLowerCase().includes(q)
+    return match && (!interfaceOnlyOffline || !r.online)
+  })
 
   const statusBadge = (st: string) => st === 'online' ? 'default' : st === 'offline' ? 'destructive' : 'secondary'
 
@@ -79,7 +87,8 @@ function OltCenter() {
           <div className='flex items-center justify-between gap-2'><div><p className='font-bold'>OLT Interface Monitor</p><p className='text-xs text-muted-foreground'>{interfaceResult.online}/{interfaceResult.count} interface online · customer {interfaceResult.customer_online}/{interfaceResult.customer_total} · GE {interfaceResult.ge_online}/{interfaceResult.ge_total} · read-only SNMP</p></div><Button size='sm' variant='outline' onClick={() => setInterfaceResult(null)}>Tutup</Button></div>
           <div className='grid gap-2 md:grid-cols-4'><Card><CardContent className='py-3'><p className='text-xs text-muted-foreground'>Customer Online</p><p className='text-xl font-black'>{interfaceResult.customer_online}/{interfaceResult.customer_total}</p></CardContent></Card><Card><CardContent className='py-3'><p className='text-xs text-muted-foreground'>GE Online</p><p className='text-xl font-black'>{interfaceResult.ge_online}/{interfaceResult.ge_total}</p></CardContent></Card><Card><CardContent className='py-3'><p className='text-xs text-muted-foreground'>PON/ONU Port</p><p className='text-xl font-black'>{interfaceResult.pon_total || 0}</p></CardContent></Card><Card><CardContent className='py-3'><p className='text-xs text-muted-foreground'>Offline</p><p className='text-xl font-black text-red-600'>{interfaceResult.offline}</p></CardContent></Card></div>
           {interfaceResult.data?.some((r: any) => !r.online) && <div className='rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-800'><b>Offline terdeteksi:</b> {interfaceResult.data.filter((r: any) => !r.online).map((r: any) => r.name).join(', ')}</div>}
-          <div className='max-h-96 overflow-auto rounded-md border'><Table><TableHeader><TableRow><TableHead>Index</TableHead><TableHead>Nama</TableHead><TableHead>Jenis</TableHead><TableHead>Admin</TableHead><TableHead>Oper</TableHead><TableHead>Speed</TableHead></TableRow></TableHeader><TableBody>{interfaceResult.data?.map((r: any) => <TableRow key={r.index}><TableCell>{r.index}</TableCell><TableCell className='font-mono text-xs'>{r.name}</TableCell><TableCell><Badge variant={r.kind === 'ONU/Customer logical' ? 'default' : 'secondary'}>{r.kind}</Badge></TableCell><TableCell>{r.admin_status}</TableCell><TableCell><Badge variant={r.online ? 'default' : 'destructive'}>{r.online ? 'online' : 'offline'}</Badge></TableCell><TableCell>{r.speed}</TableCell></TableRow>)}</TableBody></Table></div>
+          <div className='flex flex-col gap-2 md:flex-row md:items-center md:justify-between'><Input className='md:w-80' placeholder='Cari ONU/nama/index: pck@, kdgm@, 1/14...' value={interfaceFilter} onChange={(e) => setInterfaceFilter(e.target.value)} /><Button size='sm' variant={interfaceOnlyOffline ? 'destructive' : 'outline'} onClick={() => setInterfaceOnlyOffline(!interfaceOnlyOffline)}>{interfaceOnlyOffline ? 'Tampilkan Semua' : 'Offline Saja'}</Button></div>
+          <div className='max-h-[650px] overflow-auto rounded-md border'><Table><TableHeader><TableRow><TableHead>Index</TableHead><TableHead>Nama</TableHead><TableHead>Jenis</TableHead><TableHead>Admin</TableHead><TableHead>Oper</TableHead><TableHead>Speed</TableHead></TableRow></TableHeader><TableBody>{filteredInterfaceRows.map((r: any) => <TableRow key={r.index}><TableCell>{r.index}</TableCell><TableCell className='font-mono text-xs'>{r.name}</TableCell><TableCell><Badge variant={r.kind === 'ONU/Customer logical' ? 'default' : 'secondary'}>{r.kind}</Badge></TableCell><TableCell>{r.admin_status}</TableCell><TableCell><Badge variant={r.online ? 'default' : 'destructive'}>{r.online ? 'online' : 'offline'}</Badge></TableCell><TableCell>{r.speed}</TableCell></TableRow>)}</TableBody></Table></div>
         </CardContent>
       </Card>}
       <Card className='overflow-hidden'><Table><TableHeader><TableRow><TableHead>OLT</TableHead><TableHead>Host</TableHead><TableHead>Protocol</TableHead><TableHead>PON</TableHead><TableHead>ONU</TableHead><TableHead>Status</TableHead><TableHead>Lokasi</TableHead><TableHead>Last Check</TableHead><TableHead className='text-right'>Aksi</TableHead></TableRow></TableHeader><TableBody>

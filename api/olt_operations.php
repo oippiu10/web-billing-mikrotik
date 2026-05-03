@@ -252,7 +252,7 @@ function olt_snmp_walk_limited(string $host, string $community, string $baseOid,
 
 function olt_snmp_interfaces(string $host, string $community): array {
     $rows = [];
-    for ($i=1; $i<=128; $i++) {
+    for ($i=1; $i<=256; $i++) {
         $descr = raw_snmp_get($host, $community, '1.3.6.1.2.1.2.2.1.2.'.$i, 0.35);
         if ($descr === false || $descr === '') continue;
         $oper = raw_snmp_get($host, $community, '1.3.6.1.2.1.2.2.1.8.'.$i, 0.25);
