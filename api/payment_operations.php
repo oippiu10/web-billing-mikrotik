@@ -12,6 +12,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
 require_once __DIR__ . '/config.php';
 require_once __DIR__ . '/auth/require_auth.php';
 require_once __DIR__ . '/auth/activity_log.php';
+require_once __DIR__ . '/routerosAPI.php';
+require_once __DIR__ . '/mikrotik_cache.php';
 
 require_admin_role(['admin', 'administrator', 'finance'], 'Akses ditolak. Hanya admin/finance yang boleh mengelola pembayaran.');
 
@@ -130,7 +132,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         
         if ($stmt->execute()) {
             log_admin_activity($conn, 'payment_mark_paid', "Menandai lunas user_id {$user_id} periode {$month}/{$year}", (int)($_SESSION['admin_id'] ?? 0));
-            echo json_encode(['success' => true]);
+            $openResult = open_isolated_customer($conn, $router_id, $user_id, $username);
+            echo json_encode(['success' => true, 'open_isolate' => $openResult]);
         } else {
             echo json_encode(['success' => false, 'message' => $stmt->error]);
         }
@@ -156,5 +159,42 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     } else {
         echo json_encode(['success' => false, 'message' => 'Unknown action']);
     }
+}
+
+function open_isolated_customer(mysqli $conn, string $router_id, int $user_id, string $username = ''): array
+{
+    $stmt = $conn->prepare('SELECT id, host, port, username, password, software_id FROM mikrotik_routers WHERE id = ? OR software_id = ? LIMIT 1');
+    $ridInt = intval($router_id);
+    $stmt->bind_param('is', $ridInt, $router_id);
+    $stmt->execute();
+    $router = $stmt->get_result()->fetch_assoc();
+    if (!$router) return ['success' => false, 'message' => 'Router tidak ditemukan'];
+
+    if ($username === '') {
+        $softwareId = $router['software_id'] ?: (string)$router['id'];
+        $u = $conn->prepare('SELECT username FROM users WHERE id = ? AND (router_id = ? OR router_id = ?) LIMIT 1');
+        $u->bind_param('iss', $user_id, $softwareId, $router_id);
+        $u->execute();
+        $username = trim($u->get_result()->fetch_assoc()['username'] ?? '');
+    }
+    if ($username === '') return ['success' => false, 'message' => 'Username tidak ditemukan'];
+
+    $api = new RouterosAPI();
+    $api->port = intval($router['port']) ?: 8728;
+    $api->timeout = 8;
+    if (!$api->connect($router['host'], $router['username'], $router['password'])) return ['success' => false, 'message' => 'Gagal koneksi MikroTik'];
+
+    $found = $api->comm('/ppp/secret/print', ['?name' => $username]);
+    $secretId = $found[0]['.id'] ?? null;
+    if (!$secretId) { $api->disconnect(); return ['success' => false, 'message' => 'PPP secret tidak ditemukan']; }
+
+    $disabled = (($found[0]['disabled'] ?? 'false') === 'true');
+    if ($disabled) $api->comm('/ppp/secret/enable', ['.id' => $secretId]);
+    $api->disconnect();
+
+    $cache = new MikrotikCache($conn);
+    $cache->invalidate('mt_' . $router['host'] . '_' . (intval($router['port']) ?: 8728) . '_ppp_secret');
+    log_admin_activity($conn, 'auto_open_isolate', 'Auto buka isolir setelah bayar: ' . $username, (int)($_SESSION['admin_id'] ?? 0));
+    return ['success' => true, 'message' => $disabled ? 'PPP secret di-enable' : 'PPP secret sudah aktif', 'username' => $username, 'was_disabled' => $disabled];
 }
 ?>

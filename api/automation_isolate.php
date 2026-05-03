@@ -43,9 +43,15 @@ if ($routerRes->num_rows === 0) {
 }
 $router = $routerRes->fetch_assoc();
 
-$sql = "SELECT u.id, u.username, u.profile, COALESCE(u.harga, u.amount, 0) AS harga
+// payments schema project ini memakai payment_month/payment_year.
+// Fallback harga mengambil kolom users.harga/users.amount jika ada, jika tidak 0.
+$hasHarga = ($conn->query("SHOW COLUMNS FROM users LIKE 'harga'")?->num_rows ?? 0) > 0;
+$hasAmount = ($conn->query("SHOW COLUMNS FROM users LIKE 'amount'")?->num_rows ?? 0) > 0;
+$hargaExpr = $hasHarga ? 'u.harga' : ($hasAmount ? 'u.amount' : '0');
+
+$sql = "SELECT u.id, u.username, u.profile, COALESCE($hargaExpr, 0) AS harga
         FROM users u
-        LEFT JOIN payments p ON (p.user_id = u.id AND p.month = ? AND p.year = ? AND p.status = 'paid')
+        LEFT JOIN payments p ON (p.user_id = u.id AND p.payment_month = ? AND p.payment_year = ?)
         WHERE p.id IS NULL
           AND u.username IS NOT NULL
           AND u.username <> ''";
