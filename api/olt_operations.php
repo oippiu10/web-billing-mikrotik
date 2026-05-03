@@ -94,6 +94,15 @@ switch ($action) {
         if ($probe['success']) log_admin_activity($conn,'olt_snmp_probe','SNMP probe OLT ID '.$id.' group '.$group, intval($_SESSION['admin_id'] ?? 0));
         echo json_encode($probe);
         break;
+    case 'snmp_interfaces':
+        $d = input_data(); $id = intval($d['id'] ?? 0);
+        $stmt = $conn->prepare('SELECT id,name,host,snmp_community FROM olts WHERE id=? LIMIT 1');
+        $stmt->bind_param('i', $id); $stmt->execute(); $olt = $stmt->get_result()->fetch_assoc();
+        if (!$olt) { echo json_encode(['success'=>false,'message'=>'OLT tidak ditemukan']); break; }
+        $ifs = olt_snmp_interfaces($olt['host'], $olt['snmp_community'] ?: 'public');
+        if ($ifs['success']) log_admin_activity($conn,'olt_snmp_interfaces','SNMP interfaces OLT ID '.$id, intval($_SESSION['admin_id'] ?? 0));
+        echo json_encode($ifs);
+        break;
     case 'snmp_walk':
         $d = input_data(); $id = intval($d['id'] ?? 0); $baseOid = trim($d['oid'] ?? '1.3.6.1.2.1.1'); $limit = max(1, min(200, intval($d['limit'] ?? 50)));
         $stmt = $conn->prepare('SELECT id,name,host,snmp_community FROM olts WHERE id=? LIMIT 1');
@@ -232,6 +241,23 @@ function olt_snmp_walk_limited(string $host, string $community, string $baseOid,
     }
     if (empty($rows)) return ['success'=>false,'message'=>'SNMP walk belum menemukan data pada OID '.$baseOid.'. System OID sudah OK, tapi walk vendor penuh tetap paling akurat jika install Net-SNMP/PHP SNMP.'];
     return ['success'=>true,'message'=>'SNMP walk OK','oid'=>$baseOid,'count'=>count($rows),'data'=>$rows];
+}
+
+function olt_snmp_interfaces(string $host, string $community): array {
+    $rows = [];
+    for ($i=1; $i<=128; $i++) {
+        $descr = raw_snmp_get($host, $community, '1.3.6.1.2.1.2.2.1.2.'.$i, 0.35);
+        if ($descr === false || $descr === '') continue;
+        $oper = raw_snmp_get($host, $community, '1.3.6.1.2.1.2.2.1.8.'.$i, 0.25);
+        $admin = raw_snmp_get($host, $community, '1.3.6.1.2.1.2.2.1.7.'.$i, 0.25);
+        $type = raw_snmp_get($host, $community, '1.3.6.1.2.1.2.2.1.3.'.$i, 0.25);
+        $speed = raw_snmp_get($host, $community, '1.3.6.1.2.1.2.2.1.5.'.$i, 0.25);
+        $name = trim((string)$descr);
+        $kind = preg_match('/^GE/i', $name) ? 'GE/Uplink' : (preg_match('/^PON|GPON|EPON/i', $name) ? 'PON' : (strpos($name, 'pck@') === 0 ? 'ONU/Customer logical' : 'Other'));
+        $rows[] = ['index'=>$i,'name'=>$name,'kind'=>$kind,'admin_status'=>(string)$admin,'oper_status'=>(string)$oper,'type'=>(string)$type,'speed'=>(string)$speed,'online'=>((string)$oper === '1')];
+    }
+    $online = count(array_filter($rows, fn($r) => $r['online']));
+    return ['success'=>true,'message'=>'Interface monitor OK','count'=>count($rows),'online'=>$online,'offline'=>count($rows)-$online,'data'=>$rows];
 }
 
 function olt_native_known_oid_scan(string $host, string $community, string $baseOid, int $limit = 80): array {
