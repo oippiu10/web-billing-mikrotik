@@ -27,17 +27,23 @@ function ensure_tables(mysqli $conn) {
         status ENUM('unknown','online','offline','maintenance') NOT NULL DEFAULT 'unknown',
         location VARCHAR(190) NULL,
         note TEXT NULL,
+        last_checked_at DATETIME NULL,
+        last_check_message VARCHAR(255) NULL,
+        response_ms INT NULL,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
         INDEX idx_status (status), INDEX idx_brand (brand)
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
 }
 ensure_tables($conn);
+ensure_column($conn, 'olts', 'last_checked_at', 'DATETIME NULL');
+ensure_column($conn, 'olts', 'last_check_message', 'VARCHAR(255) NULL');
+ensure_column($conn, 'olts', 'response_ms', 'INT NULL');
 $action = $_GET['action'] ?? $_POST['action'] ?? 'list';
 
 switch ($action) {
     case 'list':
-        $res = $conn->query('SELECT id,name,brand,host,port,protocol,pon_ports,total_onu,online_onu,offline_onu,status,location,note,created_at,updated_at FROM olts ORDER BY id DESC');
+        $res = $conn->query('SELECT id,name,brand,host,port,protocol,pon_ports,total_onu,online_onu,offline_onu,status,location,note,last_checked_at,last_check_message,response_ms,created_at,updated_at FROM olts ORDER BY id DESC');
         $rows = [];$summary = ['total'=>0,'online'=>0,'offline'=>0,'maintenance'=>0,'unknown'=>0,'onu_total'=>0,'onu_online'=>0,'onu_offline'=>0];
         while ($row = $res->fetch_assoc()) { $summary['total']++; if(isset($summary[$row['status']])) $summary[$row['status']]++; $summary['onu_total'] += intval($row['total_onu']); $summary['onu_online'] += intval($row['online_onu']); $summary['onu_offline'] += intval($row['offline_onu']); $rows[]=$row; }
         echo json_encode(['success'=>true,'data'=>$rows,'summary'=>$summary]);
@@ -61,10 +67,33 @@ switch ($action) {
         if($ok) log_admin_activity($conn,'olt_status','Update status OLT ID '.$id.' ke '.$status, intval($_SESSION['admin_id'] ?? 0));
         echo json_encode(['success'=>$ok,'message'=>$ok?'Status OLT diperbarui':$conn->error]);
         break;
+    case 'check_status':
+        $d = input_data(); $id = intval($d['id'] ?? 0);
+        $stmt = $conn->prepare('SELECT id,name,host,port,protocol,status FROM olts WHERE id=? LIMIT 1');
+        $stmt->bind_param('i', $id); $stmt->execute(); $olt = $stmt->get_result()->fetch_assoc();
+        if (!$olt) { echo json_encode(['success'=>false,'message'=>'OLT tidak ditemukan']); break; }
+        $start = microtime(true); $errno = 0; $errstr = '';
+        $port = intval($olt['port']) ?: (($olt['protocol'] === 'snmp') ? 161 : 23);
+        $fp = @fsockopen($olt['host'], $port, $errno, $errstr, 3.0);
+        $ms = intval((microtime(true) - $start) * 1000);
+        $status = $fp ? 'online' : 'offline'; if ($fp) fclose($fp);
+        $message = $fp ? 'TCP port reachable' : ('Tidak terhubung: '.($errstr ?: 'timeout'));
+        $up = $conn->prepare('UPDATE olts SET status=?, last_checked_at=NOW(), last_check_message=?, response_ms=? WHERE id=?');
+        $up->bind_param('ssii', $status, $message, $ms, $id); $ok = $up->execute();
+        if($ok) log_admin_activity($conn,'olt_check','Check OLT ID '.$id.' hasil '.$status, intval($_SESSION['admin_id'] ?? 0));
+        echo json_encode(['success'=>$ok,'status'=>$status,'response_ms'=>$ms,'message'=>$message]);
+        break;
     case 'delete':
         $d = input_data(); $id = intval($d['id'] ?? 0); $stmt = $conn->prepare('DELETE FROM olts WHERE id=?'); $stmt->bind_param('i',$id); $ok=$stmt->execute();
         if($ok) log_admin_activity($conn,'olt_delete','Hapus OLT ID '.$id, intval($_SESSION['admin_id'] ?? 0));
         echo json_encode(['success'=>$ok,'message'=>$ok?'OLT dihapus':$conn->error]);
         break;
     default: echo json_encode(['success'=>false,'message'=>'Aksi tidak valid']);
+}
+
+function ensure_column(mysqli $conn, string $table, string $column, string $definition): void {
+    $safeTable = preg_replace('/[^A-Za-z0-9_]/', '', $table);
+    $safeColumn = preg_replace('/[^A-Za-z0-9_]/', '', $column);
+    $res = $conn->query("SHOW COLUMNS FROM `$safeTable` LIKE '$safeColumn'");
+    if ($res && $res->num_rows === 0) $conn->query("ALTER TABLE `$safeTable` ADD COLUMN `$safeColumn` $definition");
 }
