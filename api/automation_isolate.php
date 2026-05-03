@@ -10,6 +10,7 @@ header('Content-Type: application/json; charset=UTF-8');
 header('Cache-Control: no-store');
 
 require_admin_role(['admin', 'administrator', 'super_admin', 'super admin', 'superadministrator'], 'Akses ditolak. Auto isolir hanya untuk admin.');
+ensure_automation_logs_table($conn);
 
 $input = json_decode(file_get_contents('php://input'), true) ?: [];
 $router_id = intval($input['router_id'] ?? 0);
@@ -99,9 +100,12 @@ if (!$dry_run && count($candidates) > 0) {
                 $r = $api->comm('/ppp/secret/disable', ['.id' => $secretId]);
                 if (!isset($r['!trap'])) $processed++;
             }
-            $responseRows[] = ['username' => $row['username'], 'secret_id' => $secretId, 'status' => $disabled ? 'already_disabled' : 'disabled'];
+            $status = $disabled ? 'already_disabled' : 'disabled';
+            $responseRows[] = ['username' => $row['username'], 'secret_id' => $secretId, 'status' => $status];
+            insert_automation_log($conn, $router_id, $month, $year, 'isolate', $dry_run, $row['username'], $status, intval($_SESSION['admin_id'] ?? 0), $secretId);
         } else {
             $responseRows[] = ['username' => $row['username'], 'secret_id' => null, 'status' => 'secret_not_found'];
+            insert_automation_log($conn, $router_id, $month, $year, 'isolate', $dry_run, $row['username'], 'secret_not_found', intval($_SESSION['admin_id'] ?? 0), null);
         }
     }
     $api->disconnect();
@@ -112,6 +116,7 @@ if (!$dry_run && count($candidates) > 0) {
 } else {
     foreach ($candidates as $row) {
         $responseRows[] = ['username' => $row['username'], 'status' => 'candidate', 'harga' => $row['harga']];
+        insert_automation_log($conn, $router_id, $month, $year, 'isolate', $dry_run, $row['username'], 'candidate', intval($_SESSION['admin_id'] ?? 0), null);
     }
 }
 
@@ -122,4 +127,28 @@ echo json_encode([
     'total_processed' => $processed,
     'data' => $responseRows,
 ], JSON_UNESCAPED_UNICODE);
+
+function ensure_automation_logs_table(mysqli $conn): void {
+    $conn->query("CREATE TABLE IF NOT EXISTS automation_logs (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        router_id VARCHAR(64) NOT NULL,
+        period_month INT DEFAULT NULL,
+        period_year INT DEFAULT NULL,
+        action VARCHAR(50) NOT NULL,
+        dry_run TINYINT(1) DEFAULT 1,
+        username VARCHAR(150) DEFAULT NULL,
+        status VARCHAR(80) DEFAULT NULL,
+        secret_id VARCHAR(80) DEFAULT NULL,
+        admin_id INT DEFAULT NULL,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        INDEX idx_router_created (router_id, created_at),
+        INDEX idx_period (period_month, period_year)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+}
+function insert_automation_log(mysqli $conn, $routerId, int $month, int $year, string $action, bool $dryRun, string $username, string $status, int $adminId, $secretId): void {
+    $stmt = $conn->prepare('INSERT INTO automation_logs (router_id, period_month, period_year, action, dry_run, username, status, secret_id, admin_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)');
+    $rid = (string)$routerId; $dry = $dryRun ? 1 : 0; $sid = $secretId ? (string)$secretId : null;
+    $stmt->bind_param('siisisssi', $rid, $month, $year, $action, $dry, $username, $status, $sid, $adminId);
+    @$stmt->execute();
+}
 ?>

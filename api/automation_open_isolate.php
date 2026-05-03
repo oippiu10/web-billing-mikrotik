@@ -9,6 +9,7 @@ require_once __DIR__ . '/mikrotik_cache.php';
 header('Content-Type: application/json; charset=UTF-8');
 header('Cache-Control: no-store');
 require_admin_role(['admin','administrator','super_admin','super admin','superadministrator','finance'], 'Akses buka isolir ditolak.');
+ensure_automation_logs_table($conn);
 
 $input = json_decode(file_get_contents('php://input'), true) ?: [];
 $router_id = trim($input['router_id'] ?? '');
@@ -39,4 +40,29 @@ if ($disabled) $api->comm('/ppp/secret/enable', ['.id' => $secretId]);
 $api->disconnect();
 $cache = new MikrotikCache($conn); $cache->invalidate('mt_' . $router['host'] . '_' . (intval($router['port']) ?: 8728) . '_ppp_secret');
 log_admin_activity($conn, 'auto_open_isolate', 'Buka isolir PPP secret '.$username, intval($_SESSION['admin_id'] ?? 0));
+insert_automation_log($conn, $router_id, 'open_isolate', $username, $disabled ? 'enabled' : 'already_enabled', intval($_SESSION['admin_id'] ?? 0), $secretId);
 echo json_encode(['success'=>true,'message'=>$disabled?'Layanan berhasil diaktifkan':'Layanan sudah aktif','username'=>$username,'was_disabled'=>$disabled]);
+
+function ensure_automation_logs_table(mysqli $conn): void {
+    $conn->query("CREATE TABLE IF NOT EXISTS automation_logs (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        router_id VARCHAR(64) NOT NULL,
+        period_month INT DEFAULT NULL,
+        period_year INT DEFAULT NULL,
+        action VARCHAR(50) NOT NULL,
+        dry_run TINYINT(1) DEFAULT 1,
+        username VARCHAR(150) DEFAULT NULL,
+        status VARCHAR(80) DEFAULT NULL,
+        secret_id VARCHAR(80) DEFAULT NULL,
+        admin_id INT DEFAULT NULL,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        INDEX idx_router_created (router_id, created_at),
+        INDEX idx_period (period_month, period_year)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+}
+function insert_automation_log(mysqli $conn, $routerId, string $action, string $username, string $status, int $adminId, $secretId): void {
+    $stmt = $conn->prepare('INSERT INTO automation_logs (router_id, action, dry_run, username, status, secret_id, admin_id) VALUES (?, ?, 0, ?, ?, ?, ?)');
+    $rid = (string)$routerId; $sid = $secretId ? (string)$secretId : null;
+    $stmt->bind_param('sssssi', $rid, $action, $username, $status, $sid, $adminId);
+    @$stmt->execute();
+}

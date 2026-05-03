@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { createFileRoute } from '@tanstack/react-router'
-import { useMutation } from '@tanstack/react-query'
+import { useMutation, useQuery } from '@tanstack/react-query'
 import { Bot, ShieldOff, ShieldCheck, MessageCircle, DatabaseBackup, BellRing, Play, AlertTriangle, CheckCircle2, XCircle } from 'lucide-react'
 import { toast } from 'sonner'
 import { api } from '@/lib/api'
@@ -36,10 +36,18 @@ function AutomationCenter() {
   const [dryRun, setDryRun] = useState(true)
   const [lastResult, setLastResult] = useState<any>(null)
 
+  const routerId = activeRouter?.software_id || activeRouter?.id
+  const { data: logsData } = useQuery({
+    queryKey: ['automation-logs', routerId, month, year],
+    queryFn: async () => (await api.get('/automation_logs.php', { params: { router_id: routerId, month, year, limit: 100 } })).data,
+    enabled: !!routerId,
+    refetchInterval: 60000,
+  })
+
   const isolateMutation = useMutation({
     mutationFn: async () => {
       const res = await api.post('/automation_isolate.php', {
-        router_id: activeRouter?.software_id || activeRouter?.id,
+        router_id: routerId,
         month,
         year,
         grace_days: graceDays,
@@ -171,6 +179,25 @@ function AutomationCenter() {
             </CardContent>
           </Card>
         )}
+
+        <Card>
+          <CardHeader>
+            <CardTitle>History Automation</CardTitle>
+            <CardDescription>Log detail auto isolir/open isolir periode dan router aktif.</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className='max-h-[360px] overflow-auto rounded-md border'>
+              <Table>
+                <TableHeader><TableRow><TableHead>Waktu</TableHead><TableHead>Action</TableHead><TableHead>User</TableHead><TableHead>Status</TableHead><TableHead>Mode</TableHead></TableRow></TableHeader>
+                <TableBody>
+                  {(logsData?.data || []).length === 0 ? <TableRow><TableCell colSpan={5} className='py-10 text-center text-muted-foreground'>Belum ada log automation</TableCell></TableRow> : (logsData?.data || []).map((log: any) => (
+                    <TableRow key={log.id}><TableCell className='text-xs text-muted-foreground'>{log.created_at}</TableCell><TableCell><Badge variant='secondary'>{log.action}</Badge></TableCell><TableCell className='font-medium'>{log.username || '-'}</TableCell><TableCell><Badge variant='outline'>{log.status || '-'}</Badge></TableCell><TableCell>{Number(log.dry_run) === 1 ? 'Simulasi' : 'Eksekusi'}</TableCell></TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
+          </CardContent>
+        </Card>
 
         <div className='grid gap-4 md:grid-cols-2 xl:grid-cols-3'>
           {jobs.map((job) => {
