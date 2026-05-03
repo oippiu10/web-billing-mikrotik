@@ -383,9 +383,18 @@ export default function NetworkMap() {
                     })
                 }).addTo(mapInstance)
                 const used = Number(odp.total_users || 0)
-                const total = Number(odp.ratio_total || 0)
+                const splitterCapacity = odp.splitter_type ? Number(String(odp.splitter_type).split(':')[1] || 0) : 0
+                const total = Number(odp.ratio_total || 0) || splitterCapacity
                 const pct = total > 0 ? Math.round((used / total) * 100) : 0
                 const odpUsers = usersList?.filter((u: any) => String(u.odp_id) === String(odp.id)) || []
+                const remainingPorts = total > 0 ? Math.max(total - used, 0) : 0
+                const userRows = odpUsers.slice(0, 8).map((u: any, i: number) => `
+                    <tr class='border-b border-slate-100 text-[10px] dark:border-slate-800'>
+                        <td class='py-1.5 pr-2 font-black text-slate-400'>${i + 1}</td>
+                        <td class='max-w-[150px] truncate py-1.5 font-bold'>${u.username}</td>
+                        <td class='py-1.5 text-right font-black text-orange-500'>${u.redaman || '-'} dB</td>
+                    </tr>
+                `).join('')
                 marker.bindPopup(`
                     <div class='w-[260px] overflow-hidden rounded-2xl bg-white text-slate-900 shadow-2xl dark:bg-slate-900 dark:text-white'>
                         <div style='background:${color}' class='p-4 text-white'>
@@ -412,11 +421,19 @@ export default function NetworkMap() {
                                     <p class='text-[9px] font-black uppercase text-slate-500'>Pelanggan</p>
                                 </div>
                                 <div class='rounded-xl bg-slate-50 p-3 dark:bg-slate-800/70'>
-                                    <p class='text-lg font-black'>${Math.max((total || 0) - used, 0)}</p>
+                                    <p class='text-lg font-black'>${remainingPorts}</p>
                                     <p class='text-[9px] font-black uppercase text-slate-500'>Sisa Port</p>
                                 </div>
                             </div>
-                            ${odp.alamat ? `<p class='rounded-xl bg-slate-50 p-3 text-[10px] font-bold text-slate-500 dark:bg-slate-800/70 dark:text-slate-400'>${odp.alamat}</p>` : ''}
+                            <div class='rounded-xl bg-slate-50 p-3 dark:bg-slate-800/70'>
+                                <div class='mb-2 flex items-center justify-between'>
+                                    <p class='text-[9px] font-black uppercase tracking-widest text-slate-500'>Daftar Pelanggan</p>
+                                    <span class='rounded-full bg-slate-200 px-2 py-0.5 text-[9px] font-black dark:bg-slate-700'>${odpUsers.length} user</span>
+                                </div>
+                                ${odpUsers.length ? `<table class='w-full'><tbody>${userRows}${odpUsers.length > 8 ? `<tr><td colspan='3' class='pt-2 text-center text-[9px] font-black text-slate-400'>+${odpUsers.length - 8} pelanggan lain</td></tr>` : ''}</tbody></table>` : `<p class='text-[10px] font-bold text-slate-400'>Belum ada pelanggan terhubung ke ODP ini.</p>`}
+                            </div>
+                            ${odp.location || odp.alamat ? `<p class='rounded-xl bg-slate-50 p-3 text-[10px] font-bold text-slate-500 dark:bg-slate-800/70 dark:text-slate-400'>${odp.location || odp.alamat}</p>` : ''}
+                            ${odp.maps_link ? `<a href='${odp.maps_link}' target='_blank' class='block rounded-xl bg-blue-600 px-3 py-2.5 text-center text-[10px] font-black uppercase tracking-widest text-white'>Buka di Google Maps</a>` : ''}
                         </div>
                     </div>
                 `, { className: 'premium-popup', closeButton: false })
@@ -486,7 +503,14 @@ export default function NetworkMap() {
                 if (layers.cables && user.odp_id) {
                     const odp = odpList?.find((o: any) => String(o.id) === String(user.odp_id))
                     if (odp && odp.lat && odp.lng) {
-                        const line = L.polyline([[parseFloat(odp.lat), parseFloat(odp.lng)], pos], { color: '#3b82f6', weight: 1, opacity: 0.2 }).addTo(mapInstance)
+                        const isOnline = user.status === 'online'
+                        const line = L.polyline([[parseFloat(odp.lat), parseFloat(odp.lng)], pos], {
+                            color: isOnline ? '#22c55e' : '#ef4444',
+                            weight: isOnline ? 2 : 1.8,
+                            opacity: isOnline ? 0.55 : 0.4,
+                            dashArray: isOnline ? undefined : '4, 8'
+                        }).addTo(mapInstance)
+                        line.bindTooltip(`${user.username} → ${odp.name}`, { direction: 'center', sticky: true, opacity: 0.9 })
                         elementsRef.current.push(line)
                     }
                 }
