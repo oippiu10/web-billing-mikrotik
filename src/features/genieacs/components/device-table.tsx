@@ -51,6 +51,7 @@ export function GenieACSDeviceTable({ data, isLoading }: Props) {
   const [rowSelection, setRowSelection] = useState({})
   const [selectedDeviceId, setSelectedDeviceId] = useState<string | null>(null)
   const [detailDialogOpen, setDetailDialogOpen] = useState(false)
+  const [statusFilter, setStatusFilter] = useState<'all' | 'online' | 'offline'>('all')
 
   const safeText = (value: any): string => {
     if (value === null || value === undefined || value === '') return ''
@@ -322,8 +323,17 @@ export function GenieACSDeviceTable({ data, isLoading }: Props) {
     },
   ]
 
+  const filteredData = data.filter((device) => {
+    if (statusFilter === 'online') return isDeviceOnline(device)
+    if (statusFilter === 'offline') return !isDeviceOnline(device)
+    return true
+  })
+
+  const offlineCount = data.filter((device) => !isDeviceOnline(device)).length
+  const onlineCount = data.length - offlineCount
+
   const table = useReactTable({
-    data,
+    data: filteredData,
     columns,
     state: {
       sorting,
@@ -354,32 +364,37 @@ export function GenieACSDeviceTable({ data, isLoading }: Props) {
                 <div className="flex items-center gap-2 animate-in fade-in slide-in-from-left-2">
                     <Separator orientation="vertical" className="h-6" />
                     <Button 
-                        variant="destructive" 
+                        variant="outline" 
                         size="sm" 
                         className="h-8 text-[10px] uppercase font-black"
                         onClick={() => {
                             const selectedIds = table.getFilteredSelectedRowModel().rows.map(r => r.original._id)
-                            toast.promise(Promise.all(selectedIds.map(id => actionMutation.mutateAsync({ deviceId: id, action: 'reboot' }))), {
-                                loading: 'Queuing mass reboot...',
-                                success: 'All reboot commands queued!',
-                                error: 'Failed to queue some commands'
+                            toast.promise(Promise.allSettled(selectedIds.map(id => actionMutation.mutateAsync({ deviceId: id, action: 'summon', connectionRequest: true }))), {
+                                loading: `Summon ${selectedIds.length} selected CPE...`,
+                                success: 'Summon selected selesai dikirim',
+                                error: 'Sebagian summon gagal dikirim'
                             })
                             setRowSelection({})
                         }}
                     >
-                        <Power className="w-3 h-3 mr-1" />
-                        Mass Reboot ({Object.keys(rowSelection).length})
+                        <RadioTower className="w-3 h-3 mr-1" />
+                        Summon Selected ({Object.keys(rowSelection).length})
                     </Button>
                 </div>
             )}
         </div>
-        <div className='flex items-center gap-2'>
+        <div className='flex flex-wrap items-center justify-end gap-2'>
+          <div className='flex items-center rounded-md border bg-background p-1'>
+            <Button size='sm' variant={statusFilter === 'all' ? 'secondary' : 'ghost'} className='h-7 px-2 text-xs' onClick={() => setStatusFilter('all')}>All {data.length}</Button>
+            <Button size='sm' variant={statusFilter === 'online' ? 'secondary' : 'ghost'} className='h-7 px-2 text-xs text-emerald-600' onClick={() => setStatusFilter('online')}>Online {onlineCount}</Button>
+            <Button size='sm' variant={statusFilter === 'offline' ? 'secondary' : 'ghost'} className='h-7 px-2 text-xs text-red-600' onClick={() => setStatusFilter('offline')}>Offline {offlineCount}</Button>
+          </div>
           <Button
               variant="outline"
               size="sm"
               className="h-8"
               onClick={() => {
-                const offlineIds = data.filter((d) => !isDeviceOnline(d)).map((d) => d._id)
+                const offlineIds = filteredData.filter((d) => !isDeviceOnline(d)).map((d) => d._id)
                 if (!offlineIds.length) return toast.success('Tidak ada CPE offline')
                 if (!confirm(`Summon ${offlineIds.length} CPE offline via Connection Request?`)) return
                 toast.promise(Promise.allSettled(offlineIds.map(id => actionMutation.mutateAsync({ deviceId: id, action: 'summon', connectionRequest: true }))), {
