@@ -34,6 +34,30 @@ function ensure_tables(mysqli $conn) {
         updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
         INDEX idx_status (status), INDEX idx_brand (brand)
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+    $conn->query("CREATE TABLE IF NOT EXISTS olt_onus (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        olt_id INT NOT NULL,
+        pon VARCHAR(20) NULL,
+        onu_no VARCHAR(20) NULL,
+        onu_id VARCHAR(30) NULL,
+        name VARCHAR(120) NULL,
+        mac VARCHAR(32) NULL,
+        status VARCHAR(30) NULL,
+        auth_state VARCHAR(30) NULL,
+        register_time VARCHAR(40) NULL,
+        last_deregister_time VARCHAR(40) NULL,
+        last_deregister_reason VARCHAR(80) NULL,
+        device_type VARCHAR(40) NULL,
+        onu_type VARCHAR(40) NULL,
+        round_trip_time VARCHAR(40) NULL,
+        receive_power VARCHAR(40) NULL,
+        raw_line TEXT NULL,
+        last_seen_at DATETIME NULL,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+        UNIQUE KEY uniq_olt_onu (olt_id, onu_id),
+        INDEX idx_olt_status (olt_id, status), INDEX idx_mac (mac), INDEX idx_name (name)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
 }
 ensure_tables($conn);
 ensure_column($conn, 'olts', 'last_checked_at', 'DATETIME NULL');
@@ -43,6 +67,8 @@ ensure_column($conn, 'olts', 'sys_name', 'VARCHAR(190) NULL');
 ensure_column($conn, 'olts', 'sys_descr', 'TEXT NULL');
 ensure_column($conn, 'olts', 'sys_uptime', 'VARCHAR(190) NULL');
 ensure_column($conn, 'olts', 'last_snmp_at', 'DATETIME NULL');
+ensure_column($conn, 'olts', 'web_username', 'VARCHAR(120) NULL');
+ensure_column($conn, 'olts', 'web_password', 'VARCHAR(190) NULL');
 $action = $_GET['action'] ?? $_POST['action'] ?? 'list';
 
 switch ($action) {
@@ -110,6 +136,30 @@ switch ($action) {
         }
         echo json_encode($ifs);
         break;
+    case 'onu_list':
+        $d = input_data(); $id = intval($d['id'] ?? ($_GET['id'] ?? 0));
+        $rows = [];
+        $stmt = $conn->prepare('SELECT * FROM olt_onus WHERE olt_id=? ORDER BY CAST(SUBSTRING_INDEX(onu_id,"/",1) AS UNSIGNED), CAST(SUBSTRING_INDEX(onu_id,"/",-1) AS UNSIGNED), id');
+        $stmt->bind_param('i', $id); $stmt->execute(); $res = $stmt->get_result();
+        while ($r = $res->fetch_assoc()) $rows[] = $r;
+        $online = count(array_filter($rows, fn($r) => strtolower($r['status'] ?? '') === 'online'));
+        echo json_encode(['success'=>true,'count'=>count($rows),'online'=>$online,'offline'=>count($rows)-$online,'data'=>$rows]);
+        break;
+    case 'onu_import_text':
+        $d = input_data(); $id = intval($d['id'] ?? 0); $text = trim($d['text'] ?? '');
+        if ($id <= 0 || $text === '') { echo json_encode(['success'=>false,'message'=>'ID OLT dan text tabel ONU wajib diisi']); break; }
+        $parsed = parse_hsgq_onu_text($text);
+        if (empty($parsed)) { echo json_encode(['success'=>false,'message'=>'Tidak ada baris ONU terbaca. Paste baris tabel mulai dari ONU ID, contoh: 1/1 pck@inul 94:bf:... Online ... -16 dBm']); break; }
+        $conn->begin_transaction();
+        $stmt = $conn->prepare('INSERT INTO olt_onus (olt_id,pon,onu_no,onu_id,name,mac,status,auth_state,register_time,last_deregister_time,last_deregister_reason,device_type,onu_type,round_trip_time,receive_power,raw_line,last_seen_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,NOW()) ON DUPLICATE KEY UPDATE pon=VALUES(pon),onu_no=VALUES(onu_no),name=VALUES(name),mac=VALUES(mac),status=VALUES(status),auth_state=VALUES(auth_state),register_time=VALUES(register_time),last_deregister_time=VALUES(last_deregister_time),last_deregister_reason=VALUES(last_deregister_reason),device_type=VALUES(device_type),onu_type=VALUES(onu_type),round_trip_time=VALUES(round_trip_time),receive_power=VALUES(receive_power),raw_line=VALUES(raw_line),last_seen_at=NOW()');
+        foreach ($parsed as $r) { $stmt->bind_param('issssssssssssssss', $id,$r['pon'],$r['onu_no'],$r['onu_id'],$r['name'],$r['mac'],$r['status'],$r['auth_state'],$r['register_time'],$r['last_deregister_time'],$r['last_deregister_reason'],$r['device_type'],$r['onu_type'],$r['round_trip_time'],$r['receive_power'],$r['raw_line']); $stmt->execute(); }
+        $online = count(array_filter($parsed, fn($r) => strtolower($r['status']) === 'online'));
+        $total = count($parsed); $offline = max(0, $total-$online); $pon = count(array_unique(array_map(fn($r) => $r['pon'], $parsed)));
+        $up = $conn->prepare('UPDATE olts SET total_onu=?, online_onu=?, offline_onu=?, pon_ports=?, status="online", last_checked_at=NOW(), last_check_message=? WHERE id=?');
+        $msg = 'ONU import OK: '.$online.'/'.$total.' online'; $up->bind_param('iiiisi',$total,$online,$offline,$pon,$msg,$id); $up->execute();
+        $conn->commit(); log_admin_activity($conn,'olt_onu_import','Import ONU table OLT ID '.$id.' '.$online.'/'.$total.' online', intval($_SESSION['admin_id'] ?? 0));
+        echo json_encode(['success'=>true,'message'=>'Import ONU berhasil','count'=>$total,'online'=>$online,'offline'=>$offline,'pon_total'=>$pon,'data'=>$parsed]);
+        break;
     case 'snmp_walk':
         $d = input_data(); $id = intval($d['id'] ?? 0); $baseOid = trim($d['oid'] ?? '1.3.6.1.2.1.1'); $limit = max(1, min(200, intval($d['limit'] ?? 50)));
         $stmt = $conn->prepare('SELECT id,name,host,snmp_community FROM olts WHERE id=? LIMIT 1');
@@ -160,6 +210,29 @@ function ensure_column(mysqli $conn, string $table, string $column, string $defi
     $safeColumn = preg_replace('/[^A-Za-z0-9_]/', '', $column);
     $res = $conn->query("SHOW COLUMNS FROM `$safeTable` LIKE '$safeColumn'");
     if ($res && $res->num_rows === 0) $conn->query("ALTER TABLE `$safeTable` ADD COLUMN `$safeColumn` $definition");
+}
+
+function parse_hsgq_onu_text(string $text): array {
+    $rows = [];
+    foreach (preg_split('/\r?\n/', $text) as $line) {
+        $line = trim(preg_replace('/\s+/', ' ', $line));
+        if ($line === '' || !preg_match('/^(\d+)\/(\d+)\s+(.+)$/', $line, $m)) continue;
+        $onuId = $m[1].'/'.$m[2]; $rest = $m[3];
+        if (!preg_match('/\b([0-9a-f]{2}(?::[0-9a-f]{2}){5})\b/i', $rest, $mm, PREG_OFFSET_CAPTURE)) continue;
+        $mac = strtolower($mm[1][0]); $name = trim(substr($rest, 0, $mm[0][1])); $after = trim(substr($rest, $mm[0][1] + strlen($mm[0][0])));
+        $status = preg_match('/\b(Online|Offline)\b/i', $after, $sm) ? ucfirst(strtolower($sm[1])) : '';
+        $auth = preg_match('/\b(true|false)\b/i', $after, $am) ? strtolower($am[1]) : '';
+        $rx = preg_match('/(-?inf|-?\d+(?:\.\d+)?)\s*dBm/i', $after, $rm) ? $rm[1].' dBm' : '';
+        $reason = '';
+        foreach (['Dying gasp','Laser out','LOS','LOSi','Not Down Before'] as $cand) if (stripos($after, $cand) !== false) { $reason = $cand; break; }
+        $dev = preg_match('/\b(HGU|SFU|MDU|ONU)\b/i', $after, $dm) ? strtoupper($dm[1]) : '';
+        $type = preg_match('/\b(\d+ge\d+fe|\d+ge|\d+fe|\d+ge\d+pots|\d+ge\d+fe\d+pots)\b/i', $after, $tm) ? strtolower($tm[1]) : '';
+        $rtt = preg_match('/\b(\d{2,5})\b\s+'.preg_quote($rx, '/').'/i', $after, $rtm) ? $rtm[1] : '';
+        preg_match_all('/\d{4}\/\d{2}\/\d{2}\s+\d{2}:\d{2}:\d{2}|Not Down Before/i', $after, $times);
+        $reg = $times[0][0] ?? ''; $last = $times[0][1] ?? '';
+        $rows[] = ['pon'=>$m[1], 'onu_no'=>$m[2], 'onu_id'=>$onuId, 'name'=>$name, 'mac'=>$mac, 'status'=>$status, 'auth_state'=>$auth, 'register_time'=>$reg, 'last_deregister_time'=>$last, 'last_deregister_reason'=>$reason, 'device_type'=>$dev, 'onu_type'=>$type, 'round_trip_time'=>$rtt, 'receive_power'=>$rx, 'raw_line'=>$line];
+    }
+    return $rows;
 }
 
 function olt_snmp_probe(string $host, string $community, string $group = 'fast'): array {
