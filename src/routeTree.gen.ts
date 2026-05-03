@@ -27,18 +27,27 @@ import { Route as ClerkAuthenticatedRouteRouteImport } from './routes/clerk/_aut
 import { Route as ClerkauthRouteRouteImport } from './routes/clerk/(auth)/route'
 import { Route as AuthenticatedSettingsRouteRouteImport } from './routes/_authenticated/settings/route'
 import { Route as AuthenticatedUsersIndexRouteImport } from './routes/_authenticated/users/index'
+import { Route as AuthenticatedTicketsIndexRouteImport } from './routes/_authenticated/tickets/index'
 import { Route as AuthenticatedTasksIndexRouteImport } from './routes/_authenticated/tasks/index'
+import { Route as AuthenticatedSystemToolsIndexRouteImport } from './routes/_authenticated/system-tools/index'
 import { Route as AuthenticatedSettingsIndexRouteImport } from './routes/_authenticated/settings/index'
+import { Route as AuthenticatedReportsIndexRouteImport } from './routes/_authenticated/reports/index'
 import { Route as AuthenticatedPppoeIndexRouteImport } from './routes/_authenticated/pppoe/index'
+import { Route as AuthenticatedOltIndexRouteImport } from './routes/_authenticated/olt/index'
 import { Route as AuthenticatedOdpIndexRouteImport } from './routes/_authenticated/odp/index'
 import { Route as AuthenticatedMonitoringIndexRouteImport } from './routes/_authenticated/monitoring/index'
 import { Route as AuthenticatedLogsIndexRouteImport } from './routes/_authenticated/logs/index'
+import { Route as AuthenticatedInventoryIndexRouteImport } from './routes/_authenticated/inventory/index'
+import { Route as AuthenticatedHotspotIndexRouteImport } from './routes/_authenticated/hotspot/index'
 import { Route as AuthenticatedHelpCenterIndexRouteImport } from './routes/_authenticated/help-center/index'
 import { Route as AuthenticatedGenieacsIndexRouteImport } from './routes/_authenticated/genieacs/index'
 import { Route as AuthenticatedFinanceIndexRouteImport } from './routes/_authenticated/finance/index'
 import { Route as AuthenticatedCustomersIndexRouteImport } from './routes/_authenticated/customers/index'
 import { Route as AuthenticatedChatsIndexRouteImport } from './routes/_authenticated/chats/index'
+import { Route as AuthenticatedBillingIndexRouteImport } from './routes/_authenticated/billing/index'
+import { Route as AuthenticatedAutomationIndexRouteImport } from './routes/_authenticated/automation/index'
 import { Route as AuthenticatedAppsIndexRouteImport } from './routes/_authenticated/apps/index'
+import { Route as AuthenticatedAcsIndexRouteImport } from './routes/_authenticated/acs/index'
 import { Route as ClerkAuthenticatedUserManagementRouteImport } from './routes/clerk/_authenticated/user-management'
 import { Route as ClerkauthSignUpRouteImport } from './routes/clerk/(auth)/sign-up'
 import { Route as ClerkauthSignInRouteImport } from './routes/clerk/(auth)/sign-in'
@@ -152,20 +161,43 @@ const AuthenticatedUsersIndexRoute = AuthenticatedUsersIndexRouteImport.update({
   path: '/users/',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
+const AuthenticatedTicketsIndexRoute =
+  AuthenticatedTicketsIndexRouteImport.update({
+    id: '/tickets/',
+    path: '/tickets/',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
 const AuthenticatedTasksIndexRoute = AuthenticatedTasksIndexRouteImport.update({
   id: '/tasks/',
   path: '/tasks/',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
+const AuthenticatedSystemToolsIndexRoute =
+  AuthenticatedSystemToolsIndexRouteImport.update({
+    id: '/system-tools/',
+    path: '/system-tools/',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
 const AuthenticatedSettingsIndexRoute =
   AuthenticatedSettingsIndexRouteImport.update({
     id: '/',
     path: '/',
     getParentRoute: () => AuthenticatedSettingsRouteRoute,
   } as any)
+const AuthenticatedReportsIndexRoute =
+  AuthenticatedReportsIndexRouteImport.update({
+    id: '/reports/',
+    path: '/reports/',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
 const AuthenticatedPppoeIndexRoute = AuthenticatedPppoeIndexRouteImport.update({
   id: '/pppoe/',
   path: '/pppoe/',
+  getParentRoute: () => AuthenticatedRouteRoute,
+} as any)
+const AuthenticatedOltIndexRoute = AuthenticatedOltIndexRouteImport.update({
+  id: '/olt/',
+  path: '/olt/',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
 const AuthenticatedOdpIndexRoute = AuthenticatedOdpIndexRouteImport.update({
@@ -184,6 +216,18 @@ const AuthenticatedLogsIndexRoute = AuthenticatedLogsIndexRouteImport.update({
   path: '/logs/',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
+const AuthenticatedInventoryIndexRoute =
+  AuthenticatedInventoryIndexRouteImport.update({
+    id: '/inventory/',
+    path: '/inventory/',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
+const AuthenticatedHotspotIndexRoute =
+  AuthenticatedHotspotIndexRouteImport.update({
+    id: '/hotspot/',
+    path: '/hotspot/',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
 const AuthenticatedHelpCenterIndexRoute =
   AuthenticatedHelpCenterIndexRouteImport.update({
     id: '/help-center/',
@@ -213,9 +257,26 @@ const AuthenticatedChatsIndexRoute = AuthenticatedChatsIndexRouteImport.update({
   path: '/chats/',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
+const AuthenticatedBillingIndexRoute =
+  AuthenticatedBillingIndexRouteImport.update({
+    id: '/billing/',
+    path: '/billing/',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
+const AuthenticatedAutomationIndexRoute =
+  AuthenticatedAutomationIndexRouteImport.update({
+    id: '/automation/',
+    path: '/automation/',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
 const AuthenticatedAppsIndexRoute = AuthenticatedAppsIndexRouteImport.update({
   id: '/apps/',
   path: '/apps/',
+  getParentRoute: () => AuthenticatedRouteRoute,
+} as any)
+const AuthenticatedAcsIndexRoute = AuthenticatedAcsIndexRouteImport.update({
+  id: '/acs/',
+  path: '/acs/',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
 const ClerkAuthenticatedUserManagementRoute =
@@ -400,18 +461,27 @@ export interface FileRoutesByFullPath {
   '/clerk/sign-in': typeof ClerkauthSignInRoute
   '/clerk/sign-up': typeof ClerkauthSignUpRoute
   '/clerk/user-management': typeof ClerkAuthenticatedUserManagementRoute
+  '/acs/': typeof AuthenticatedAcsIndexRoute
   '/apps/': typeof AuthenticatedAppsIndexRoute
+  '/automation/': typeof AuthenticatedAutomationIndexRoute
+  '/billing/': typeof AuthenticatedBillingIndexRoute
   '/chats/': typeof AuthenticatedChatsIndexRoute
   '/customers/': typeof AuthenticatedCustomersIndexRoute
   '/finance/': typeof AuthenticatedFinanceIndexRoute
   '/genieacs/': typeof AuthenticatedGenieacsIndexRoute
   '/help-center/': typeof AuthenticatedHelpCenterIndexRoute
+  '/hotspot/': typeof AuthenticatedHotspotIndexRoute
+  '/inventory/': typeof AuthenticatedInventoryIndexRoute
   '/logs/': typeof AuthenticatedLogsIndexRoute
   '/monitoring/': typeof AuthenticatedMonitoringIndexRoute
   '/odp/': typeof AuthenticatedOdpIndexRoute
+  '/olt/': typeof AuthenticatedOltIndexRoute
   '/pppoe/': typeof AuthenticatedPppoeIndexRoute
+  '/reports/': typeof AuthenticatedReportsIndexRoute
   '/settings/': typeof AuthenticatedSettingsIndexRoute
+  '/system-tools/': typeof AuthenticatedSystemToolsIndexRoute
   '/tasks/': typeof AuthenticatedTasksIndexRoute
+  '/tickets/': typeof AuthenticatedTicketsIndexRoute
   '/users/': typeof AuthenticatedUsersIndexRoute
 }
 export interface FileRoutesByTo {
@@ -452,18 +522,27 @@ export interface FileRoutesByTo {
   '/clerk/sign-in': typeof ClerkauthSignInRoute
   '/clerk/sign-up': typeof ClerkauthSignUpRoute
   '/clerk/user-management': typeof ClerkAuthenticatedUserManagementRoute
+  '/acs': typeof AuthenticatedAcsIndexRoute
   '/apps': typeof AuthenticatedAppsIndexRoute
+  '/automation': typeof AuthenticatedAutomationIndexRoute
+  '/billing': typeof AuthenticatedBillingIndexRoute
   '/chats': typeof AuthenticatedChatsIndexRoute
   '/customers': typeof AuthenticatedCustomersIndexRoute
   '/finance': typeof AuthenticatedFinanceIndexRoute
   '/genieacs': typeof AuthenticatedGenieacsIndexRoute
   '/help-center': typeof AuthenticatedHelpCenterIndexRoute
+  '/hotspot': typeof AuthenticatedHotspotIndexRoute
+  '/inventory': typeof AuthenticatedInventoryIndexRoute
   '/logs': typeof AuthenticatedLogsIndexRoute
   '/monitoring': typeof AuthenticatedMonitoringIndexRoute
   '/odp': typeof AuthenticatedOdpIndexRoute
+  '/olt': typeof AuthenticatedOltIndexRoute
   '/pppoe': typeof AuthenticatedPppoeIndexRoute
+  '/reports': typeof AuthenticatedReportsIndexRoute
   '/settings': typeof AuthenticatedSettingsIndexRoute
+  '/system-tools': typeof AuthenticatedSystemToolsIndexRoute
   '/tasks': typeof AuthenticatedTasksIndexRoute
+  '/tickets': typeof AuthenticatedTicketsIndexRoute
   '/users': typeof AuthenticatedUsersIndexRoute
 }
 export interface FileRoutesById {
@@ -509,18 +588,27 @@ export interface FileRoutesById {
   '/clerk/(auth)/sign-in': typeof ClerkauthSignInRoute
   '/clerk/(auth)/sign-up': typeof ClerkauthSignUpRoute
   '/clerk/_authenticated/user-management': typeof ClerkAuthenticatedUserManagementRoute
+  '/_authenticated/acs/': typeof AuthenticatedAcsIndexRoute
   '/_authenticated/apps/': typeof AuthenticatedAppsIndexRoute
+  '/_authenticated/automation/': typeof AuthenticatedAutomationIndexRoute
+  '/_authenticated/billing/': typeof AuthenticatedBillingIndexRoute
   '/_authenticated/chats/': typeof AuthenticatedChatsIndexRoute
   '/_authenticated/customers/': typeof AuthenticatedCustomersIndexRoute
   '/_authenticated/finance/': typeof AuthenticatedFinanceIndexRoute
   '/_authenticated/genieacs/': typeof AuthenticatedGenieacsIndexRoute
   '/_authenticated/help-center/': typeof AuthenticatedHelpCenterIndexRoute
+  '/_authenticated/hotspot/': typeof AuthenticatedHotspotIndexRoute
+  '/_authenticated/inventory/': typeof AuthenticatedInventoryIndexRoute
   '/_authenticated/logs/': typeof AuthenticatedLogsIndexRoute
   '/_authenticated/monitoring/': typeof AuthenticatedMonitoringIndexRoute
   '/_authenticated/odp/': typeof AuthenticatedOdpIndexRoute
+  '/_authenticated/olt/': typeof AuthenticatedOltIndexRoute
   '/_authenticated/pppoe/': typeof AuthenticatedPppoeIndexRoute
+  '/_authenticated/reports/': typeof AuthenticatedReportsIndexRoute
   '/_authenticated/settings/': typeof AuthenticatedSettingsIndexRoute
+  '/_authenticated/system-tools/': typeof AuthenticatedSystemToolsIndexRoute
   '/_authenticated/tasks/': typeof AuthenticatedTasksIndexRoute
+  '/_authenticated/tickets/': typeof AuthenticatedTicketsIndexRoute
   '/_authenticated/users/': typeof AuthenticatedUsersIndexRoute
 }
 export interface FileRouteTypes {
@@ -564,18 +652,27 @@ export interface FileRouteTypes {
     | '/clerk/sign-in'
     | '/clerk/sign-up'
     | '/clerk/user-management'
+    | '/acs/'
     | '/apps/'
+    | '/automation/'
+    | '/billing/'
     | '/chats/'
     | '/customers/'
     | '/finance/'
     | '/genieacs/'
     | '/help-center/'
+    | '/hotspot/'
+    | '/inventory/'
     | '/logs/'
     | '/monitoring/'
     | '/odp/'
+    | '/olt/'
     | '/pppoe/'
+    | '/reports/'
     | '/settings/'
+    | '/system-tools/'
     | '/tasks/'
+    | '/tickets/'
     | '/users/'
   fileRoutesByTo: FileRoutesByTo
   to:
@@ -616,18 +713,27 @@ export interface FileRouteTypes {
     | '/clerk/sign-in'
     | '/clerk/sign-up'
     | '/clerk/user-management'
+    | '/acs'
     | '/apps'
+    | '/automation'
+    | '/billing'
     | '/chats'
     | '/customers'
     | '/finance'
     | '/genieacs'
     | '/help-center'
+    | '/hotspot'
+    | '/inventory'
     | '/logs'
     | '/monitoring'
     | '/odp'
+    | '/olt'
     | '/pppoe'
+    | '/reports'
     | '/settings'
+    | '/system-tools'
     | '/tasks'
+    | '/tickets'
     | '/users'
   id:
     | '__root__'
@@ -672,18 +778,27 @@ export interface FileRouteTypes {
     | '/clerk/(auth)/sign-in'
     | '/clerk/(auth)/sign-up'
     | '/clerk/_authenticated/user-management'
+    | '/_authenticated/acs/'
     | '/_authenticated/apps/'
+    | '/_authenticated/automation/'
+    | '/_authenticated/billing/'
     | '/_authenticated/chats/'
     | '/_authenticated/customers/'
     | '/_authenticated/finance/'
     | '/_authenticated/genieacs/'
     | '/_authenticated/help-center/'
+    | '/_authenticated/hotspot/'
+    | '/_authenticated/inventory/'
     | '/_authenticated/logs/'
     | '/_authenticated/monitoring/'
     | '/_authenticated/odp/'
+    | '/_authenticated/olt/'
     | '/_authenticated/pppoe/'
+    | '/_authenticated/reports/'
     | '/_authenticated/settings/'
+    | '/_authenticated/system-tools/'
     | '/_authenticated/tasks/'
+    | '/_authenticated/tickets/'
     | '/_authenticated/users/'
   fileRoutesById: FileRoutesById
 }
@@ -830,11 +945,25 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedUsersIndexRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
+    '/_authenticated/tickets/': {
+      id: '/_authenticated/tickets/'
+      path: '/tickets'
+      fullPath: '/tickets/'
+      preLoaderRoute: typeof AuthenticatedTicketsIndexRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
     '/_authenticated/tasks/': {
       id: '/_authenticated/tasks/'
       path: '/tasks'
       fullPath: '/tasks/'
       preLoaderRoute: typeof AuthenticatedTasksIndexRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/system-tools/': {
+      id: '/_authenticated/system-tools/'
+      path: '/system-tools'
+      fullPath: '/system-tools/'
+      preLoaderRoute: typeof AuthenticatedSystemToolsIndexRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
     '/_authenticated/settings/': {
@@ -844,11 +973,25 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedSettingsIndexRouteImport
       parentRoute: typeof AuthenticatedSettingsRouteRoute
     }
+    '/_authenticated/reports/': {
+      id: '/_authenticated/reports/'
+      path: '/reports'
+      fullPath: '/reports/'
+      preLoaderRoute: typeof AuthenticatedReportsIndexRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
     '/_authenticated/pppoe/': {
       id: '/_authenticated/pppoe/'
       path: '/pppoe'
       fullPath: '/pppoe/'
       preLoaderRoute: typeof AuthenticatedPppoeIndexRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/olt/': {
+      id: '/_authenticated/olt/'
+      path: '/olt'
+      fullPath: '/olt/'
+      preLoaderRoute: typeof AuthenticatedOltIndexRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
     '/_authenticated/odp/': {
@@ -870,6 +1013,20 @@ declare module '@tanstack/react-router' {
       path: '/logs'
       fullPath: '/logs/'
       preLoaderRoute: typeof AuthenticatedLogsIndexRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/inventory/': {
+      id: '/_authenticated/inventory/'
+      path: '/inventory'
+      fullPath: '/inventory/'
+      preLoaderRoute: typeof AuthenticatedInventoryIndexRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/hotspot/': {
+      id: '/_authenticated/hotspot/'
+      path: '/hotspot'
+      fullPath: '/hotspot/'
+      preLoaderRoute: typeof AuthenticatedHotspotIndexRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
     '/_authenticated/help-center/': {
@@ -907,11 +1064,32 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedChatsIndexRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
+    '/_authenticated/billing/': {
+      id: '/_authenticated/billing/'
+      path: '/billing'
+      fullPath: '/billing/'
+      preLoaderRoute: typeof AuthenticatedBillingIndexRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/automation/': {
+      id: '/_authenticated/automation/'
+      path: '/automation'
+      fullPath: '/automation/'
+      preLoaderRoute: typeof AuthenticatedAutomationIndexRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
     '/_authenticated/apps/': {
       id: '/_authenticated/apps/'
       path: '/apps'
       fullPath: '/apps/'
       preLoaderRoute: typeof AuthenticatedAppsIndexRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/acs/': {
+      id: '/_authenticated/acs/'
+      path: '/acs'
+      fullPath: '/acs/'
+      preLoaderRoute: typeof AuthenticatedAcsIndexRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
     '/clerk/_authenticated/user-management': {
@@ -1131,17 +1309,26 @@ interface AuthenticatedRouteRouteChildren {
   AuthenticatedPppoeOfflineRoute: typeof AuthenticatedPppoeOfflineRoute
   AuthenticatedPppoeProfilesRoute: typeof AuthenticatedPppoeProfilesRoute
   AuthenticatedPppoeSecretsRoute: typeof AuthenticatedPppoeSecretsRoute
+  AuthenticatedAcsIndexRoute: typeof AuthenticatedAcsIndexRoute
   AuthenticatedAppsIndexRoute: typeof AuthenticatedAppsIndexRoute
+  AuthenticatedAutomationIndexRoute: typeof AuthenticatedAutomationIndexRoute
+  AuthenticatedBillingIndexRoute: typeof AuthenticatedBillingIndexRoute
   AuthenticatedChatsIndexRoute: typeof AuthenticatedChatsIndexRoute
   AuthenticatedCustomersIndexRoute: typeof AuthenticatedCustomersIndexRoute
   AuthenticatedFinanceIndexRoute: typeof AuthenticatedFinanceIndexRoute
   AuthenticatedGenieacsIndexRoute: typeof AuthenticatedGenieacsIndexRoute
   AuthenticatedHelpCenterIndexRoute: typeof AuthenticatedHelpCenterIndexRoute
+  AuthenticatedHotspotIndexRoute: typeof AuthenticatedHotspotIndexRoute
+  AuthenticatedInventoryIndexRoute: typeof AuthenticatedInventoryIndexRoute
   AuthenticatedLogsIndexRoute: typeof AuthenticatedLogsIndexRoute
   AuthenticatedMonitoringIndexRoute: typeof AuthenticatedMonitoringIndexRoute
   AuthenticatedOdpIndexRoute: typeof AuthenticatedOdpIndexRoute
+  AuthenticatedOltIndexRoute: typeof AuthenticatedOltIndexRoute
   AuthenticatedPppoeIndexRoute: typeof AuthenticatedPppoeIndexRoute
+  AuthenticatedReportsIndexRoute: typeof AuthenticatedReportsIndexRoute
+  AuthenticatedSystemToolsIndexRoute: typeof AuthenticatedSystemToolsIndexRoute
   AuthenticatedTasksIndexRoute: typeof AuthenticatedTasksIndexRoute
+  AuthenticatedTicketsIndexRoute: typeof AuthenticatedTicketsIndexRoute
   AuthenticatedUsersIndexRoute: typeof AuthenticatedUsersIndexRoute
 }
 
@@ -1165,17 +1352,26 @@ const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedPppoeOfflineRoute: AuthenticatedPppoeOfflineRoute,
   AuthenticatedPppoeProfilesRoute: AuthenticatedPppoeProfilesRoute,
   AuthenticatedPppoeSecretsRoute: AuthenticatedPppoeSecretsRoute,
+  AuthenticatedAcsIndexRoute: AuthenticatedAcsIndexRoute,
   AuthenticatedAppsIndexRoute: AuthenticatedAppsIndexRoute,
+  AuthenticatedAutomationIndexRoute: AuthenticatedAutomationIndexRoute,
+  AuthenticatedBillingIndexRoute: AuthenticatedBillingIndexRoute,
   AuthenticatedChatsIndexRoute: AuthenticatedChatsIndexRoute,
   AuthenticatedCustomersIndexRoute: AuthenticatedCustomersIndexRoute,
   AuthenticatedFinanceIndexRoute: AuthenticatedFinanceIndexRoute,
   AuthenticatedGenieacsIndexRoute: AuthenticatedGenieacsIndexRoute,
   AuthenticatedHelpCenterIndexRoute: AuthenticatedHelpCenterIndexRoute,
+  AuthenticatedHotspotIndexRoute: AuthenticatedHotspotIndexRoute,
+  AuthenticatedInventoryIndexRoute: AuthenticatedInventoryIndexRoute,
   AuthenticatedLogsIndexRoute: AuthenticatedLogsIndexRoute,
   AuthenticatedMonitoringIndexRoute: AuthenticatedMonitoringIndexRoute,
   AuthenticatedOdpIndexRoute: AuthenticatedOdpIndexRoute,
+  AuthenticatedOltIndexRoute: AuthenticatedOltIndexRoute,
   AuthenticatedPppoeIndexRoute: AuthenticatedPppoeIndexRoute,
+  AuthenticatedReportsIndexRoute: AuthenticatedReportsIndexRoute,
+  AuthenticatedSystemToolsIndexRoute: AuthenticatedSystemToolsIndexRoute,
   AuthenticatedTasksIndexRoute: AuthenticatedTasksIndexRoute,
+  AuthenticatedTicketsIndexRoute: AuthenticatedTicketsIndexRoute,
   AuthenticatedUsersIndexRoute: AuthenticatedUsersIndexRoute,
 }
 

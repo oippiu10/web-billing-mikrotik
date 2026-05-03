@@ -20,6 +20,13 @@ import {
   List,
   Server,
   FileUp,
+  RadioTower,
+  Bot,
+  LifeBuoy,
+  Package,
+  Ticket,
+  FileText,
+  DatabaseBackup,
 } from 'lucide-react'
 import { type SidebarData } from '../types'
 
@@ -137,6 +144,18 @@ export const sidebarData: SidebarData = {
           ],
         },
         {
+          title: 'OLT',
+          url: '/olt',
+          icon: RadioTower,
+          requiredRoles: ['admin', 'administrator', 'super_admin', 'super admin', 'superadministrator', 'operator', 'viewer'],
+        },
+        {
+          title: 'ACS / TR-069',
+          url: '/acs',
+          icon: Bot,
+          requiredRoles: ['admin', 'administrator', 'super_admin', 'super admin', 'superadministrator', 'operator'],
+        },
+        {
           title: 'GenieACS',
           icon: Server,
           requiredRoles: ['admin', 'administrator', 'super_admin', 'super admin', 'superadministrator'],
@@ -152,6 +171,12 @@ export const sidebarData: SidebarData = {
               icon: Settings,
             },
           ],
+        },
+        {
+          title: 'Hotspot / Voucher',
+          url: '/hotspot',
+          icon: Ticket,
+          requiredRoles: ['admin', 'administrator', 'super_admin', 'super admin', 'superadministrator', 'operator'],
         },
       ],
     },
@@ -184,6 +209,36 @@ export const sidebarData: SidebarData = {
               icon: BarChart3,
             },
           ],
+        },
+        {
+          title: 'Billing Lengkap',
+          url: '/billing',
+          icon: FileText,
+          requiredRoles: ['admin', 'administrator', 'super_admin', 'super admin', 'superadministrator', 'finance'],
+        },
+        {
+          title: 'Automation',
+          url: '/automation',
+          icon: Bot,
+          requiredRoles: ['admin', 'administrator', 'super_admin', 'super admin', 'superadministrator'],
+        },
+        {
+          title: 'Helpdesk / Ticketing',
+          url: '/tickets',
+          icon: LifeBuoy,
+          requiredRoles: ['admin', 'administrator', 'super_admin', 'super admin', 'superadministrator', 'operator'],
+        },
+        {
+          title: 'Inventory / Asset',
+          url: '/inventory',
+          icon: Package,
+          requiredRoles: ['admin', 'administrator', 'super_admin', 'super admin', 'superadministrator', 'operator'],
+        },
+        {
+          title: 'Reports & Analytics',
+          url: '/reports',
+          icon: BarChart3,
+          requiredRoles: ['admin', 'administrator', 'super_admin', 'super admin', 'superadministrator', 'finance'],
         },
         {
           title: 'Log Aktivitas',
@@ -219,6 +274,12 @@ export const sidebarData: SidebarData = {
               url: '/settings/appearance',
             },
           ],
+        },
+        {
+          title: 'System Tools',
+          url: '/system-tools',
+          icon: DatabaseBackup,
+          requiredRoles: ['admin', 'administrator', 'super_admin', 'super admin', 'superadministrator'],
         },
       ],
     },
