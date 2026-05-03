@@ -164,7 +164,7 @@ function olt_snmp_probe(string $host, string $community): array {
     ];
     $rows = [];
     foreach ($candidates as $oid => $label) {
-        $value = raw_snmp_get($host, $community, $oid);
+        $value = raw_snmp_get($host, $community, $oid, 0.45);
         $rows[] = ['oid'=>$oid, 'label'=>$label, 'status'=>($value !== false && $value !== '') ? 'reply' : 'no_response', 'value'=>($value !== false ? (string)$value : '')];
     }
     $hits = array_values(array_filter($rows, fn($r) => $r['status'] === 'reply'));
@@ -261,14 +261,15 @@ function olt_snmp_basic(string $host, string $community = 'public'): array {
     return ['success'=>true,'message'=>isset($result['_warning']) ? ('SNMP basic OK, warning: '.$result['_warning']) : 'SNMP basic OK','sys_name'=>$name, 'sys_descr'=>$result['sys_descr'] ?? '', 'sys_uptime'=>$result['sys_uptime'] ?? ''];
 }
 
-function raw_snmp_get(string $host, string $community, string $oid) {
+function raw_snmp_get(string $host, string $community, string $oid, float $timeout = 2.0) {
     $reqId = random_int(1000, 999999);
     $varbind = ber_seq(ber_oid($oid)."\x05\x00");
     $pdu = "\xa0".ber_len(strlen(ber_int($reqId).ber_int(0).ber_int(0).ber_seq($varbind))).ber_int($reqId).ber_int(0).ber_int(0).ber_seq($varbind);
     $packet = ber_seq(ber_int(1).ber_str($community).$pdu); // SNMP v2c
-    $sock = @stream_socket_client('udp://'.$host.':161', $errno, $errstr, 2, STREAM_CLIENT_CONNECT);
+    $sock = @stream_socket_client('udp://'.$host.':161', $errno, $errstr, $timeout, STREAM_CLIENT_CONNECT);
     if (!$sock) return false;
-    stream_set_timeout($sock, 2);
+    $sec = (int) floor($timeout); $usec = (int) (($timeout - $sec) * 1000000);
+    stream_set_timeout($sock, $sec, $usec);
     fwrite($sock, $packet);
     $resp = fread($sock, 8192);
     fclose($sock);
