@@ -159,9 +159,9 @@ export function CustomersTable({
 
   return (
     <div className='flex flex-1 flex-col gap-4'>
-      <div className='overflow-hidden rounded-md border'>
+      <div className='overflow-x-auto rounded-lg border bg-card'>
         <Table>
-          <TableHeader>
+          <TableHeader className='bg-muted/60'>
             {table.getHeaderGroups().map((headerGroup) => (
               <TableRow key={headerGroup.id}>
                 {headerGroup.headers.map((header) => (
@@ -188,14 +188,14 @@ export function CustomersTable({
               table.getRowModel().rows.map((row) => (
                 <TableRow 
                     key={row.id} 
-                    className="cursor-pointer"
+                    className="cursor-pointer hover:bg-muted/30"
                     onClick={() => {
                         const meta = table.options.meta as any
                         meta?.onViewDetail?.(row.original)
                     }}
                 >
                   {row.getVisibleCells().map((cell) => (
-                    <TableCell key={cell.id}>
+                    <TableCell key={cell.id} className='py-3'>
                       {flexRender(
                         cell.column.columnDef.cell,
                         cell.getContext()

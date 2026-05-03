@@ -11,16 +11,18 @@ import { RouterSelector } from '@/components/router-selector'
 import { CustomersTable } from './components/customers-table'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
-import { UserPlus, SearchIcon, RefreshCw, LayoutGrid, WifiOff } from 'lucide-react'
+import { UserPlus, SearchIcon, RefreshCw, LayoutGrid, WifiOff, AlertTriangle } from 'lucide-react'
 import { toast } from 'sonner'
 import { CustomerMutateDialog } from './components/customer-mutate-drawer'
 import { BatchEditCustomers } from './components/batch-edit-customers'
 import { CustomersSubNav } from './components/customers-sub-nav'
 import { type Customer } from './data/schema'
+import { usePermission } from '@/lib/permissions'
 
 export default function CustomersOffline() {
   const { activeRouter } = useRouterStore()
   const queryClient = useQueryClient()
+  const permissions = usePermission()
   const [page, setPage] = useState(1)
   const [search, setSearch] = useState('')
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false)
@@ -32,10 +34,6 @@ export default function CustomersOffline() {
     queryKey: ['customers-offline', activeRouter?.id, page, search, perPage],
     queryFn: async () => {
       if (!activeRouter) return null
-      await api.get('/sync_ppp_to_db.php', {
-        params: { router_id: activeRouter.id },
-      })
-      queryClient.invalidateQueries({ queryKey: ['ppp-active', activeRouter.id] })
       const res = await api.get('/get_all_users_paginated.php', {
         params: {
           router_id: activeRouter.id,
@@ -102,6 +100,16 @@ export default function CustomersOffline() {
 
       <Main className='flex flex-col gap-4' fluid>
         <CustomersSubNav active='/customers/offline' />
+        <div className='relative overflow-hidden rounded-xl border-0 bg-gradient-to-r from-orange-500 via-rose-600 to-red-600 p-5 text-white shadow-sm'>
+          <div className='absolute -right-10 -top-10 h-32 w-32 rounded-full bg-white/10' />
+          <div className='relative flex flex-col gap-2 md:flex-row md:items-center md:justify-between'>
+            <div>
+              <h2 className='text-xl font-bold tracking-tight'>Pelanggan Offline</h2>
+              <p className='text-sm text-white/80'>Daftar pelanggan tidak aktif untuk follow-up, pengecekan ODP, dan penagihan.</p>
+            </div>
+            <div className='rounded-full border border-white/20 bg-white/15 px-3 py-1 text-xs font-semibold'>Offline terfilter • sync manual</div>
+          </div>
+        </div>
         {isBatchEditView ? (
             <BatchEditCustomers 
                 selectedCustomers={selectedCustomers.length > 0 ? selectedCustomers : (data?.data || [])}
@@ -118,8 +126,20 @@ export default function CustomersOffline() {
                 }}
             />
         ) : (
-            <div className='space-y-4'>
-                <div className='flex flex-wrap items-center justify-between gap-3'>
+            <div className='space-y-4 rounded-xl border border-destructive/10 bg-card p-4 shadow-sm'>
+                <div className='grid gap-3 md:grid-cols-3'>
+                    <div className='rounded-xl bg-gradient-to-br from-orange-500 to-rose-600 p-4 text-white'>
+                        <div className='flex items-center justify-between'><div><p className='text-xs font-bold uppercase text-white/70'>Offline</p><p className='text-3xl font-black'>{data?.total ?? 0}</p></div><WifiOff className='h-6 w-6 text-white/80' /></div>
+                    </div>
+                    <div className='rounded-xl border bg-muted/30 p-4'>
+                        <p className='text-xs font-bold uppercase text-muted-foreground'>Halaman</p><p className='text-2xl font-black'>{page}</p>
+                    </div>
+                    <div className='rounded-xl border bg-amber-500/10 p-4'>
+                        <div className='flex items-center gap-2 text-amber-700 dark:text-amber-400'><AlertTriangle className='h-5 w-5' /><p className='text-xs font-bold uppercase'>Prioritas Follow-up</p></div>
+                        <p className='mt-1 text-xs text-muted-foreground'>Cek modem, ODP, payment, atau isolir.</p>
+                    </div>
+                </div>
+                <div className='flex flex-wrap items-center justify-between gap-3 rounded-lg bg-muted/30 p-3'>
                     <div className='flex flex-1 items-center gap-2 max-w-md'>
                         <div className='relative flex-1'>
                             <SearchIcon className='absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground' />
@@ -133,6 +153,7 @@ export default function CustomersOffline() {
                     </div>
 
                     <div className='flex items-center gap-2'>
+                        {permissions.canManageCustomers && (
                         <Button
                             variant='outline'
                             size='sm'
@@ -143,6 +164,7 @@ export default function CustomersOffline() {
                             <LayoutGrid className='mr-2 h-4 w-4 text-primary' />
                             Batch Edit
                         </Button>
+                        )}
                         <Button
                             variant='outline'
                             size='sm'
@@ -153,6 +175,7 @@ export default function CustomersOffline() {
                             <RefreshCw className={cn('mr-2 h-4 w-4', syncMutation.isPending && 'animate-spin')} />
                             Sync
                         </Button>
+                        {permissions.canManageCustomers && (
                         <Button
                             size='sm'
                             variant='destructive'
@@ -163,6 +186,7 @@ export default function CustomersOffline() {
                             <UserPlus className='mr-2 h-4 w-4' />
                             Tambah
                         </Button>
+                        )}
                     </div>
                 </div>
 
