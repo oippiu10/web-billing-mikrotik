@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { createFileRoute } from '@tanstack/react-router'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { Ticket, Plus, Printer, Wifi, Users } from 'lucide-react'
+import { Ticket, Plus, Printer, Wifi, Users, Trash2, LogOut } from 'lucide-react'
 import { toast } from 'sonner'
 import { api } from '@/lib/api'
 import { useRouterStore } from '@/stores/router-store'
@@ -54,6 +54,25 @@ function HotspotPage() {
     enabled: !!routerId,
   })
 
+  const kickActive = useMutation({
+    mutationFn: async (id: string) => {
+      const body = new URLSearchParams({ id })
+      return (await api.post(`/hotspot_operations.php?action=kick&router_id=${routerId}`, body)).data
+    },
+    onSuccess: (d) => {
+      if (d.success) { toast.success(d.message || 'User dikeluarkan'); queryClient.invalidateQueries({ queryKey: ['hotspot-active'] }) }
+      else toast.error(d.message || 'Gagal kick user')
+    },
+  })
+
+  const deleteVoucher = useMutation({
+    mutationFn: async (id: number) => (await api.post('/hotspot_operations.php', { action: 'delete', router_id: routerId, ids: [id] })).data,
+    onSuccess: (d) => {
+      if (d.success) { toast.success(d.message || 'Voucher dihapus'); queryClient.invalidateQueries({ queryKey: ['hotspot-vouchers'] }) }
+      else toast.error(d.message || 'Gagal hapus voucher')
+    },
+  })
+
   const generate = useMutation({
     mutationFn: async () => {
       const body = new URLSearchParams({ ...form, qty: form.qty, length: form.length })
@@ -91,10 +110,22 @@ function HotspotPage() {
 
         <Card className='overflow-hidden'>
           <Table>
-            <TableHeader><TableRow><TableHead>Username</TableHead><TableHead>Password</TableHead><TableHead>Profile</TableHead><TableHead>Server</TableHead><TableHead>Comment</TableHead><TableHead className='text-right'>Print</TableHead></TableRow></TableHeader>
+            <TableHeader><TableRow><TableHead>Username</TableHead><TableHead>Password</TableHead><TableHead>Profile</TableHead><TableHead>Server</TableHead><TableHead>Comment</TableHead><TableHead className='text-right'>Aksi</TableHead></TableRow></TableHeader>
             <TableBody>
               {isLoading ? <TableRow><TableCell colSpan={6} className='py-12 text-center text-muted-foreground'>Memuat...</TableCell></TableRow> : vouchers.length === 0 ? <TableRow><TableCell colSpan={6} className='py-12 text-center text-muted-foreground'>Belum ada voucher</TableCell></TableRow> : vouchers.map((v: any) => (
-                <TableRow key={v.id}><TableCell className='font-mono font-bold'>{v.username}</TableCell><TableCell className='font-mono'>{v.password}</TableCell><TableCell><Badge variant='secondary'>{v.profile}</Badge></TableCell><TableCell>{v.server}</TableCell><TableCell className='text-sm text-muted-foreground'>{v.comment}</TableCell><TableCell className='text-right'><Button size='sm' variant='outline' onClick={() => printVouchers([v])}><Printer className='mr-1 h-3.5 w-3.5' /> Print</Button></TableCell></TableRow>
+                <TableRow key={v.id}><TableCell className='font-mono font-bold'>{v.username}</TableCell><TableCell className='font-mono'>{v.password}</TableCell><TableCell><Badge variant='secondary'>{v.profile}</Badge></TableCell><TableCell>{v.server}</TableCell><TableCell className='text-sm text-muted-foreground'>{v.comment}</TableCell><TableCell className='text-right'><div className='flex justify-end gap-1'><Button size='sm' variant='outline' onClick={() => printVouchers([v])}><Printer className='mr-1 h-3.5 w-3.5' /> Print</Button><Button size='sm' variant='destructive' onClick={() => { if (window.confirm(`Hapus voucher ${v.username} dari MikroTik dan database?`)) deleteVoucher.mutate(v.id) }} disabled={deleteVoucher.isPending}><Trash2 className='h-3.5 w-3.5' /></Button></div></TableCell></TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </Card>
+
+        <Card className='overflow-hidden'>
+          <div className='border-b px-4 py-3'><h3 className='font-bold'>Active Hotspot Sessions</h3><p className='text-sm text-muted-foreground'>User hotspot yang sedang aktif di MikroTik.</p></div>
+          <Table>
+            <TableHeader><TableRow><TableHead>User</TableHead><TableHead>Address</TableHead><TableHead>MAC</TableHead><TableHead>Uptime</TableHead><TableHead className='text-right'>Aksi</TableHead></TableRow></TableHeader>
+            <TableBody>
+              {active.length === 0 ? <TableRow><TableCell colSpan={5} className='py-10 text-center text-muted-foreground'>Tidak ada session aktif</TableCell></TableRow> : active.map((a: any, i: number) => (
+                <TableRow key={a['.id'] || i}><TableCell className='font-mono font-bold'>{a.user || '-'}</TableCell><TableCell>{a.address || '-'}</TableCell><TableCell className='font-mono text-xs'>{a['mac-address'] || '-'}</TableCell><TableCell>{a.uptime || '-'}</TableCell><TableCell className='text-right'><Button size='sm' variant='outline' onClick={() => { if (window.confirm(`Kick user ${a.user || a['.id']}?`)) kickActive.mutate(a['.id']) }} disabled={kickActive.isPending}><LogOut className='mr-1 h-3.5 w-3.5' /> Kick</Button></TableCell></TableRow>
               ))}
             </TableBody>
           </Table>
