@@ -219,7 +219,11 @@ function olt_snmp_walk_limited(string $host, string $community, string $baseOid,
         }
     }
     if (empty($rows)) {
-        // Fallback aman tanpa snmpwalk: baca OID umum satu per satu pakai native SNMP GET.
+        // Fallback native SNMP GETNEXT: bisa walk subtree terbatas tanpa php-snmp/snmpwalk.
+        $rows = raw_snmp_walk_limited($host, $community, $baseOid, $limit, 0.7);
+    }
+    if (empty($rows)) {
+        // Fallback terakhir: baca OID umum satu per satu pakai native SNMP GET.
         $common = [
             '1.3.6.1.2.1.1.1.0' => 'sysDescr',
             '1.3.6.1.2.1.1.3.0' => 'sysUpTime',
@@ -281,9 +285,31 @@ function olt_snmp_basic(string $host, string $community = 'public'): array {
 }
 
 function raw_snmp_get(string $host, string $community, string $oid, float $timeout = 2.0) {
+    $res = raw_snmp_request($host, $community, $oid, "\xa0", $timeout);
+    return $res ? $res['value'] : false;
+}
+
+function raw_snmp_getnext(string $host, string $community, string $oid, float $timeout = 1.0) {
+    return raw_snmp_request($host, $community, $oid, "\xa1", $timeout);
+}
+
+function raw_snmp_walk_limited(string $host, string $community, string $baseOid, int $limit = 50, float $timeout = 0.7): array {
+    $rows = []; $current = rtrim($baseOid, '.');
+    for ($i = 0; $i < $limit; $i++) {
+        $next = raw_snmp_getnext($host, $community, $current, $timeout);
+        if (!$next || empty($next['oid'])) break;
+        $oid = ltrim((string)$next['oid'], '.');
+        if (strpos($oid.'.', $baseOid.'.') !== 0 && $oid !== $baseOid) break;
+        $rows[] = ['oid'=>$oid, 'value'=>(string)($next['value'] ?? '')];
+        $current = $oid;
+    }
+    return $rows;
+}
+
+function raw_snmp_request(string $host, string $community, string $oid, string $pduType, float $timeout = 2.0) {
     $reqId = random_int(1000, 999999);
     $varbind = ber_seq(ber_oid($oid)."\x05\x00");
-    $pdu = "\xa0".ber_len(strlen(ber_int($reqId).ber_int(0).ber_int(0).ber_seq($varbind))).ber_int($reqId).ber_int(0).ber_int(0).ber_seq($varbind);
+    $pdu = $pduType.ber_len(strlen(ber_int($reqId).ber_int(0).ber_int(0).ber_seq($varbind))).ber_int($reqId).ber_int(0).ber_int(0).ber_seq($varbind);
     $packet = ber_seq(ber_int(1).ber_str($community).$pdu); // SNMP v2c
     $sock = @stream_socket_client('udp://'.$host.':161', $errno, $errstr, $timeout, STREAM_CLIENT_CONNECT);
     if (!$sock) return false;
@@ -293,7 +319,7 @@ function raw_snmp_get(string $host, string $community, string $oid, float $timeo
     $resp = fread($sock, 8192);
     fclose($sock);
     if (!$resp) return false;
-    return snmp_decode_first_value($resp);
+    return snmp_decode_first_varbind($resp);
 }
 
 function ber_len(int $len): string { if ($len < 128) return chr($len); $out=''; while($len>0){$out=chr($len&255).$out;$len>>=8;} return chr(128|strlen($out)).$out; }
@@ -302,21 +328,29 @@ function ber_str(string $v): string { return "\x04".ber_len(strlen($v)).$v; }
 function ber_int(int $v): string { $out=''; do { $out=chr($v&255).$out; $v >>= 8; } while($v>0); if ((ord($out[0]) & 0x80) !== 0) $out="\x00".$out; return "\x02".ber_len(strlen($out)).$out; }
 function ber_oid(string $oid): string { $p=array_map('intval', explode('.', $oid)); $out=chr(($p[0]*40)+$p[1]); for($i=2;$i<count($p);$i++){ $n=$p[$i]; $stack=[chr($n&0x7f)]; $n >>= 7; while($n>0){ array_unshift($stack, chr(($n&0x7f)|0x80)); $n >>= 7; } $out.=implode('', $stack); } return "\x06".ber_len(strlen($out)).$out; }
 function ber_read_len(string $d, int &$i): int { $l=ord($d[$i++]); if($l<128) return $l; $n=$l&127; $l=0; for($x=0;$x<$n;$x++) $l=($l<<8)|ord($d[$i++]); return $l; }
-function snmp_decode_first_value(string $d) {
-    $needle = "\x06";
+function ber_decode_oid_value(string $v): string { $bytes = array_map('ord', str_split($v)); if (count($bytes) < 1) return ''; $first = array_shift($bytes); $parts = [intdiv($first, 40), $first % 40]; $n = 0; foreach ($bytes as $b) { $n = ($n << 7) | ($b & 0x7f); if (($b & 0x80) === 0) { $parts[] = $n; $n = 0; } } return implode('.', $parts); }
+function snmp_decode_value_by_tag(int $tag, string $val) {
+    if ($tag === 4) return trim($val);
+    if ($tag === 6) return ber_decode_oid_value($val);
+    if ($tag === 5 || in_array($tag, [128,129,130], true)) return '';
+    if (in_array($tag, [2, 65, 66, 67, 70], true)) { $num = 0; for($k=0;$k<strlen($val);$k++) $num=($num<<8)|ord($val[$k]); return (string)$num; }
+    return trim($val);
+}
+function snmp_decode_first_varbind(string $d) {
     $pos = 0;
-    while (($pos = strpos($d, $needle, $pos)) !== false) {
-        $i = $pos + 1; $l = ber_read_len($d, $i); $afterOid = $i + $l;
+    while (($pos = strpos($d, "\x06", $pos)) !== false) {
+        $i = $pos + 1; $l = ber_read_len($d, $i); $oidRaw = substr($d, $i, $l); $afterOid = $i + $l;
         if ($afterOid < strlen($d)) {
             $tag = ord($d[$afterOid]); $j = $afterOid + 1; $vl = ber_read_len($d, $j); $val = substr($d, $j, $vl);
-            if (in_array($tag, [4, 6, 67, 2], true)) {
-                if ($tag === 4 || $tag === 6) return trim($val);
-                $num = 0; for($k=0;$k<strlen($val);$k++) $num=($num<<8)|ord($val[$k]); return (string)$num;
-            }
+            if (in_array($tag, [2,4,5,6,65,66,67,70,128,129,130], true)) return ['oid'=>ber_decode_oid_value($oidRaw), 'value'=>snmp_decode_value_by_tag($tag, $val), 'tag'=>$tag];
         }
         $pos++;
     }
     return false;
+}
+function snmp_decode_first_value(string $d) {
+    $res = snmp_decode_first_varbind($d);
+    return $res ? $res['value'] : false;
 }
 
 function olt_connectivity_test(string $host, int $port, string $protocol = 'snmp'): array {
