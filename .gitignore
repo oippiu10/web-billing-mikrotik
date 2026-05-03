@@ -1,0 +1,63 @@
+# Logs
+logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+# Local/backend secrets
+.env
+.env.*
+!.env.example
+!**/.env.example
+api/.env
+
+# Database dumps / local debug scripts
+*.sql
+scratch/
+debug_*.php
+fix_*.php
+check_*.php
+api/check_*.php
+api/debug_*.php
+api/fix_*.php
+api/auth/login_debug.php
+api/auth/login_simple.php
+api/describe_*.php
+api/diagnose_*.php
+api/dump_*.php
+api/temp_*.php
+api/test_*.php
+api/output_*.txt
+api/schema_dump.txt
+lint_output*.txt
+tsc_output*.txt
+.tanstack/tmp/
+
+node_modules
+dist
+dist-ssr
+*.local
+
+.env
+
+# Editor directories and files
+.vscode/*
+!.vscode/extensions.json
+!.vscode/settings.json
+.idea
+.DS_Store
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+
+# Test coverage
+/coverage
+
+# Vitest artifacts (browser screenshots/attachments)
+**/__screenshots__/
+.vitest-attachments/

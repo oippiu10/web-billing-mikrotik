@@ -1,0 +1,19 @@
+# Security hardening: block direct access to development/debug PHP scripts in /api.
+<FilesMatch "^(debug|dump|test|check|diagnose|create).*(\.php)$|.*(debug|test).*(\.php)$">
+    Require all denied
+</FilesMatch>
+
+# Block raw logs/config-like files if accidentally requested through web server.
+<FilesMatch "\.(log|sql|bak|env)$">
+    Require all denied
+</FilesMatch>
+
+# Apache 2.2 fallback
+<IfModule !mod_authz_core.c>
+    <FilesMatch "^(debug|dump|test|check|diagnose|create).*(\.php)$|.*(debug|test).*(\.php)$">
+        Deny from all
+    </FilesMatch>
+    <FilesMatch "\.(log|sql|bak|env)$">
+        Deny from all
+    </FilesMatch>
+</IfModule>
