@@ -100,7 +100,14 @@ switch ($action) {
         $stmt->bind_param('i', $id); $stmt->execute(); $olt = $stmt->get_result()->fetch_assoc();
         if (!$olt) { echo json_encode(['success'=>false,'message'=>'OLT tidak ditemukan']); break; }
         $ifs = olt_snmp_interfaces($olt['host'], $olt['snmp_community'] ?: 'public');
-        if ($ifs['success']) log_admin_activity($conn,'olt_snmp_interfaces','SNMP interfaces OLT ID '.$id, intval($_SESSION['admin_id'] ?? 0));
+        if ($ifs['success']) {
+            $totalOnu = intval($ifs['customer_total'] ?? 0); $onlineOnu = intval($ifs['customer_online'] ?? 0);
+            $ponPorts = intval($ifs['pon_total'] ?? 0);
+            $up = $conn->prepare('UPDATE olts SET total_onu=?, online_onu=?, pon_ports=?, status="online", last_checked_at=NOW(), last_check_message=?, response_ms=0 WHERE id=?');
+            $msg = 'Interface monitor OK: '.$onlineOnu.'/'.$totalOnu.' customer online';
+            $up->bind_param('iiisi', $totalOnu, $onlineOnu, $ponPorts, $msg, $id); $up->execute();
+            log_admin_activity($conn,'olt_snmp_interfaces','SNMP interfaces OLT ID '.$id.' '.$onlineOnu.'/'.$totalOnu.' online', intval($_SESSION['admin_id'] ?? 0));
+        }
         echo json_encode($ifs);
         break;
     case 'snmp_walk':
@@ -253,11 +260,15 @@ function olt_snmp_interfaces(string $host, string $community): array {
         $type = raw_snmp_get($host, $community, '1.3.6.1.2.1.2.2.1.3.'.$i, 0.25);
         $speed = raw_snmp_get($host, $community, '1.3.6.1.2.1.2.2.1.5.'.$i, 0.25);
         $name = trim((string)$descr);
-        $kind = preg_match('/^GE/i', $name) ? 'GE/Uplink' : (preg_match('/^PON|GPON|EPON/i', $name) ? 'PON' : (strpos($name, 'pck@') === 0 ? 'ONU/Customer logical' : 'Other'));
+        if (preg_match('/^1\.3\.6\.1\./', $name)) continue;
+        $kind = preg_match('/^GE/i', $name) ? 'GE/Uplink' : (preg_match('/^PON|GPON|EPON|ONU\d+/i', $name) ? 'PON/ONU port' : (strpos($name, '@') !== false ? 'ONU/Customer logical' : 'Other'));
         $rows[] = ['index'=>$i,'name'=>$name,'kind'=>$kind,'admin_status'=>(string)$admin,'oper_status'=>(string)$oper,'type'=>(string)$type,'speed'=>(string)$speed,'online'=>((string)$oper === '1')];
     }
     $online = count(array_filter($rows, fn($r) => $r['online']));
-    return ['success'=>true,'message'=>'Interface monitor OK','count'=>count($rows),'online'=>$online,'offline'=>count($rows)-$online,'data'=>$rows];
+    $customers = array_values(array_filter($rows, fn($r) => $r['kind'] === 'ONU/Customer logical'));
+    $pons = array_values(array_filter($rows, fn($r) => $r['kind'] === 'PON/ONU port'));
+    $ge = array_values(array_filter($rows, fn($r) => $r['kind'] === 'GE/Uplink'));
+    return ['success'=>true,'message'=>'Interface monitor OK','count'=>count($rows),'online'=>$online,'offline'=>count($rows)-$online,'customer_total'=>count($customers),'customer_online'=>count(array_filter($customers, fn($r) => $r['online'])),'pon_total'=>count($pons),'ge_total'=>count($ge),'ge_online'=>count(array_filter($ge, fn($r) => $r['online'])),'data'=>$rows];
 }
 
 function olt_native_known_oid_scan(string $host, string $community, string $baseOid, int $limit = 80): array {
