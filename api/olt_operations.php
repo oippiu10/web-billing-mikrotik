@@ -153,13 +153,21 @@ function olt_snmp_basic(string $host, string $community = 'public'): array {
         if ($value === false || $value === '' || stripos((string)$value, 'Timeout') !== false || stripos((string)$value, 'No Response') !== false) {
             $methods = [];
             $methods[] = function_exists('snmp2_get') ? 'php-snmp:ada' : 'php-snmp:tidak ada';
+            $methods[] = 'native-udp:dicoba';
             $methods[] = function_exists('exec') ? 'exec:ada' : 'exec:tidak ada';
             $methods[] = trim((string)$value) !== '' ? 'output='.substr(trim((string)$value), 0, 180) : 'output=kosong';
+            if ($key === 'sys_name' && !empty($result)) {
+                $result[$key] = '';
+                $result['_warning'] = 'sysName tidak dibalas OLT. '.implode('; ', $methods);
+                continue;
+            }
             return ['success'=>false,'message'=>'SNMP gagal/timeout untuk OID '.$oid.'. '.implode('; ', $methods).'. Cek Read Community, UDP 161, ACL SNMP OLT, firewall, atau install Net-SNMP/PHP SNMP.'];
         }
         $result[$key] = trim(preg_replace('/^(STRING:|Timeticks:|OID:|INTEGER:)\s*/i', '', (string)$value), ' "');
     }
-    return ['success'=>true,'message'=>'SNMP basic OK','sys_name'=>$result['sys_name'] ?? '', 'sys_descr'=>$result['sys_descr'] ?? '', 'sys_uptime'=>$result['sys_uptime'] ?? ''];
+    $name = $result['sys_name'] ?? '';
+    if ($name === '') $name = substr($result['sys_descr'] ?? 'OLT', 0, 80);
+    return ['success'=>true,'message'=>isset($result['_warning']) ? ('SNMP basic OK, warning: '.$result['_warning']) : 'SNMP basic OK','sys_name'=>$name, 'sys_descr'=>$result['sys_descr'] ?? '', 'sys_uptime'=>$result['sys_uptime'] ?? ''];
 }
 
 function raw_snmp_get(string $host, string $community, string $oid) {
