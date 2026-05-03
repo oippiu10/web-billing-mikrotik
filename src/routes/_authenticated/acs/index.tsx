@@ -14,7 +14,15 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 
 export const Route = createFileRoute('/_authenticated/acs/')({ component: AcsCenter })
 
-const getParam = (obj: any, path: string) => path.split('.').reduce((acc, key) => acc?.[key], obj)?._value || path.split('.').reduce((acc, key) => acc?.[key], obj) || ''
+const safeText = (value: any): string => {
+  if (value === null || value === undefined || value === '') return ''
+  if (typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean') return String(value)
+  if (value?._value !== undefined) return safeText(value._value)
+  if (value?.value !== undefined) return safeText(value.value)
+  if (value?._object !== undefined) return safeText(value._object)
+  return ''
+}
+const getParam = (obj: any, path: string) => safeText(path.split('.').reduce((acc, key) => acc?.[key], obj))
 const isOnline = (lastInform?: string) => lastInform ? new Date(lastInform).getTime() > Date.now() - 5 * 60 * 1000 : false
 
 function AcsCenter() {
