@@ -39,11 +39,15 @@ ensure_tables($conn);
 ensure_column($conn, 'olts', 'last_checked_at', 'DATETIME NULL');
 ensure_column($conn, 'olts', 'last_check_message', 'VARCHAR(255) NULL');
 ensure_column($conn, 'olts', 'response_ms', 'INT NULL');
+ensure_column($conn, 'olts', 'sys_name', 'VARCHAR(190) NULL');
+ensure_column($conn, 'olts', 'sys_descr', 'TEXT NULL');
+ensure_column($conn, 'olts', 'sys_uptime', 'VARCHAR(190) NULL');
+ensure_column($conn, 'olts', 'last_snmp_at', 'DATETIME NULL');
 $action = $_GET['action'] ?? $_POST['action'] ?? 'list';
 
 switch ($action) {
     case 'list':
-        $res = $conn->query('SELECT id,name,brand,host,port,protocol,pon_ports,total_onu,online_onu,offline_onu,status,location,note,last_checked_at,last_check_message,response_ms,created_at,updated_at FROM olts ORDER BY id DESC');
+        $res = $conn->query('SELECT id,name,brand,host,port,protocol,pon_ports,total_onu,online_onu,offline_onu,status,location,note,last_checked_at,last_check_message,response_ms,sys_name,sys_descr,sys_uptime,last_snmp_at,created_at,updated_at FROM olts ORDER BY id DESC');
         $rows = [];$summary = ['total'=>0,'online'=>0,'offline'=>0,'maintenance'=>0,'unknown'=>0,'onu_total'=>0,'onu_online'=>0,'onu_offline'=>0];
         while ($row = $res->fetch_assoc()) { $summary['total']++; if(isset($summary[$row['status']])) $summary[$row['status']]++; $summary['onu_total'] += intval($row['total_onu']); $summary['onu_online'] += intval($row['online_onu']); $summary['onu_offline'] += intval($row['offline_onu']); $rows[]=$row; }
         echo json_encode(['success'=>true,'data'=>$rows,'summary'=>$summary]);
@@ -74,6 +78,20 @@ switch ($action) {
         if($ok) log_admin_activity($conn,'olt_status','Update status OLT ID '.$id.' ke '.$status, intval($_SESSION['admin_id'] ?? 0));
         echo json_encode(['success'=>$ok,'message'=>$ok?'Status OLT diperbarui':$conn->error]);
         break;
+    case 'snmp_basic':
+        $d = input_data(); $id = intval($d['id'] ?? 0);
+        $stmt = $conn->prepare('SELECT id,name,host,snmp_community FROM olts WHERE id=? LIMIT 1');
+        $stmt->bind_param('i', $id); $stmt->execute(); $olt = $stmt->get_result()->fetch_assoc();
+        if (!$olt) { echo json_encode(['success'=>false,'message'=>'OLT tidak ditemukan']); break; }
+        $snmp = olt_snmp_basic($olt['host'], $olt['snmp_community'] ?: 'public');
+        if ($snmp['success']) {
+            $up = $conn->prepare('UPDATE olts SET sys_name=?, sys_descr=?, sys_uptime=?, last_snmp_at=NOW(), status="online", last_checked_at=NOW(), last_check_message=? WHERE id=?');
+            $msg = 'SNMP OK';
+            $up->bind_param('ssssi', $snmp['sys_name'], $snmp['sys_descr'], $snmp['sys_uptime'], $msg, $id); $up->execute();
+            log_admin_activity($conn,'olt_snmp_basic','SNMP basic OLT ID '.$id.' OK', intval($_SESSION['admin_id'] ?? 0));
+        }
+        echo json_encode($snmp);
+        break;
     case 'check_status':
         $d = input_data(); $id = intval($d['id'] ?? 0);
         $stmt = $conn->prepare('SELECT id,name,host,port,protocol,status FROM olts WHERE id=? LIMIT 1');
@@ -101,6 +119,31 @@ function ensure_column(mysqli $conn, string $table, string $column, string $defi
     $safeColumn = preg_replace('/[^A-Za-z0-9_]/', '', $column);
     $res = $conn->query("SHOW COLUMNS FROM `$safeTable` LIKE '$safeColumn'");
     if ($res && $res->num_rows === 0) $conn->query("ALTER TABLE `$safeTable` ADD COLUMN `$safeColumn` $definition");
+}
+
+function olt_snmp_basic(string $host, string $community = 'public'): array {
+    $oids = [
+        'sys_descr' => '1.3.6.1.2.1.1.1.0',
+        'sys_uptime' => '1.3.6.1.2.1.1.3.0',
+        'sys_name' => '1.3.6.1.2.1.1.5.0',
+    ];
+    $result = [];
+    foreach ($oids as $key => $oid) {
+        $value = false;
+        if (function_exists('snmp2_get')) {
+            @snmp_set_quick_print(true);
+            $value = @snmp2_get($host, $community, $oid, 2000000, 1);
+        } elseif (function_exists('exec')) {
+            $cmd = 'snmpget -v2c -c '.escapeshellarg($community).' -Oqv '.escapeshellarg($host).' '.escapeshellarg($oid).' 2>&1';
+            $out = []; $code = 1; @exec($cmd, $out, $code);
+            if ($code === 0 && isset($out[0])) $value = implode(' ', $out);
+        }
+        if ($value === false || $value === '' || stripos((string)$value, 'Timeout') !== false) {
+            return ['success'=>false,'message'=>'SNMP gagal/timeout. Cek community, UDP 161, firewall, atau extension/snmpget server.'];
+        }
+        $result[$key] = trim(preg_replace('/^(STRING:|Timeticks:|OID:|INTEGER:)\s*/i', '', (string)$value), ' "');
+    }
+    return ['success'=>true,'message'=>'SNMP basic OK','sys_name'=>$result['sys_name'] ?? '', 'sys_descr'=>$result['sys_descr'] ?? '', 'sys_uptime'=>$result['sys_uptime'] ?? ''];
 }
 
 function olt_connectivity_test(string $host, int $port, string $protocol = 'snmp'): array {
