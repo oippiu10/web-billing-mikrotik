@@ -145,8 +145,12 @@ function olt_snmp_basic(string $host, string $community = 'public'): array {
             $out = []; $code = 1; @exec($cmd, $out, $code);
             if ($code === 0 && isset($out[0])) $value = implode(' ', $out);
         }
-        if ($value === false || $value === '' || stripos((string)$value, 'Timeout') !== false) {
-            return ['success'=>false,'message'=>'SNMP gagal/timeout. Cek community, UDP 161, firewall, atau extension/snmpget server.'];
+        if ($value === false || $value === '' || stripos((string)$value, 'Timeout') !== false || stripos((string)$value, 'No Response') !== false) {
+            $methods = [];
+            $methods[] = function_exists('snmp2_get') ? 'php-snmp:ada' : 'php-snmp:tidak ada';
+            $methods[] = function_exists('exec') ? 'exec:ada' : 'exec:tidak ada';
+            $methods[] = trim((string)$value) !== '' ? 'output='.substr(trim((string)$value), 0, 180) : 'output=kosong';
+            return ['success'=>false,'message'=>'SNMP gagal/timeout untuk OID '.$oid.'. '.implode('; ', $methods).'. Cek Read Community, UDP 161, ACL SNMP OLT, firewall, atau install Net-SNMP/PHP SNMP.'];
         }
         $result[$key] = trim(preg_replace('/^(STRING:|Timeticks:|OID:|INTEGER:)\s*/i', '', (string)$value), ' "');
     }
