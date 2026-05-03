@@ -24,7 +24,13 @@ function OltCenter() {
   const [open, setOpen] = useState(false)
   const [form, setForm] = useState({ name: '', brand: 'Generic', host: '', port: '23', protocol: 'snmp', snmp_community: 'public', pon_ports: '0', total_onu: '0', online_onu: '0', status: 'unknown', location: '', note: '' })
   const { data, isLoading } = useQuery({ queryKey: ['olts'], queryFn: async () => (await api.get('/olt_operations.php', { params: { action: 'list' } })).data })
-  const add = useMutation({ mutationFn: async () => (await api.post('/olt_operations.php?action=add', form)).data, onSuccess: (d) => { d.success ? toast.success('OLT ditambahkan') : toast.error(d.message || 'Gagal'); setOpen(false); queryClient.invalidateQueries({ queryKey: ['olts'] }) } })
+  const add = useMutation({ mutationFn: async () => {
+    const test = (await api.post('/olt_operations.php?action=test_connection', { host: form.host, port: form.port, protocol: form.protocol })).data
+    if (!test.success) throw new Error(test.message || 'Ping test gagal')
+    if (!test.online && !confirm(`Ping test gagal/offline. Pesan: ${test.message}\n\nTetap simpan OLT?`)) return { success: false, cancelled: true }
+    const payload = { ...form, status: test.status || 'unknown' }
+    return (await api.post('/olt_operations.php?action=add', payload)).data
+  }, onSuccess: (d) => { if (d.cancelled) return; d.success ? toast.success('OLT ditambahkan') : toast.error(d.message || 'Gagal'); setOpen(false); queryClient.invalidateQueries({ queryKey: ['olts'] }) }, onError: (e: any) => toast.error(e?.message || 'Gagal test koneksi') })
   const updateStatus = useMutation({ mutationFn: async ({ id, status }: any) => (await api.post('/olt_operations.php?action=update_status', { id, status })).data, onSuccess: () => queryClient.invalidateQueries({ queryKey: ['olts'] }) })
   const del = useMutation({ mutationFn: async (id: number) => (await api.post('/olt_operations.php?action=delete', { id })).data, onSuccess: (d) => { d.success ? toast.success('OLT dihapus') : toast.error(d.message || 'Gagal'); queryClient.invalidateQueries({ queryKey: ['olts'] }) } })
   const checkStatus = useMutation({ mutationFn: async (id: number) => (await api.post('/olt_operations.php?action=check_status', { id })).data, onSuccess: (d) => { d.success ? toast.success(`OLT ${d.status} (${d.response_ms}ms)`) : toast.error(d.message || 'Gagal check OLT'); queryClient.invalidateQueries({ queryKey: ['olts'] }) } })
@@ -102,7 +108,7 @@ function OltCenter() {
             </Select>
           </div>
         </div>
-        <DialogFooter><Button variant='outline' onClick={() => setOpen(false)}>Batal</Button><Button onClick={() => add.mutate()} disabled={add.isPending}>Simpan</Button></DialogFooter>
+        <DialogFooter><Button variant='outline' onClick={() => setOpen(false)}>Batal</Button><Button onClick={() => add.mutate()} disabled={add.isPending}>{add.isPending ? 'Ping test...' : 'Simpan'}</Button></DialogFooter>
       </DialogContent>
     </Dialog>
   </>

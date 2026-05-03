@@ -48,6 +48,13 @@ switch ($action) {
         while ($row = $res->fetch_assoc()) { $summary['total']++; if(isset($summary[$row['status']])) $summary[$row['status']]++; $summary['onu_total'] += intval($row['total_onu']); $summary['onu_online'] += intval($row['online_onu']); $summary['onu_offline'] += intval($row['offline_onu']); $rows[]=$row; }
         echo json_encode(['success'=>true,'data'=>$rows,'summary'=>$summary]);
         break;
+    case 'test_connection':
+        $d = input_data();
+        $host = trim($d['host'] ?? ''); $port = intval($d['port'] ?? 23); $protocol = trim($d['protocol'] ?? 'snmp');
+        if ($host === '') { echo json_encode(['success'=>false,'message'=>'IP/Host wajib diisi']); break; }
+        $result = olt_connectivity_test($host, $port, $protocol);
+        echo json_encode($result);
+        break;
     case 'add':
         $d = input_data();
         $name = trim($d['name'] ?? ''); $host = trim($d['host'] ?? '');
@@ -72,12 +79,10 @@ switch ($action) {
         $stmt = $conn->prepare('SELECT id,name,host,port,protocol,status FROM olts WHERE id=? LIMIT 1');
         $stmt->bind_param('i', $id); $stmt->execute(); $olt = $stmt->get_result()->fetch_assoc();
         if (!$olt) { echo json_encode(['success'=>false,'message'=>'OLT tidak ditemukan']); break; }
-        $start = microtime(true); $errno = 0; $errstr = '';
-        $port = intval($olt['port']) ?: (($olt['protocol'] === 'snmp') ? 161 : 23);
-        $fp = @fsockopen($olt['host'], $port, $errno, $errstr, 3.0);
-        $ms = intval((microtime(true) - $start) * 1000);
-        $status = $fp ? 'online' : 'offline'; if ($fp) fclose($fp);
-        $message = $fp ? 'TCP port reachable' : ('Tidak terhubung: '.($errstr ?: 'timeout'));
+        $test = olt_connectivity_test($olt['host'], intval($olt['port']), $olt['protocol']);
+        $ms = intval($test['response_ms']);
+        $status = $test['status'];
+        $message = $test['message'];
         $up = $conn->prepare('UPDATE olts SET status=?, last_checked_at=NOW(), last_check_message=?, response_ms=? WHERE id=?');
         $up->bind_param('ssii', $status, $message, $ms, $id); $ok = $up->execute();
         if($ok) log_admin_activity($conn,'olt_check','Check OLT ID '.$id.' hasil '.$status, intval($_SESSION['admin_id'] ?? 0));
@@ -96,4 +101,41 @@ function ensure_column(mysqli $conn, string $table, string $column, string $defi
     $safeColumn = preg_replace('/[^A-Za-z0-9_]/', '', $column);
     $res = $conn->query("SHOW COLUMNS FROM `$safeTable` LIKE '$safeColumn'");
     if ($res && $res->num_rows === 0) $conn->query("ALTER TABLE `$safeTable` ADD COLUMN `$safeColumn` $definition");
+}
+
+function olt_connectivity_test(string $host, int $port, string $protocol = 'snmp'): array {
+    $host = trim($host); $port = $port > 0 ? $port : (($protocol === 'snmp') ? 161 : 23);
+    $start = microtime(true); $tcpOk = false; $tcpMsg = ''; $errno = 0; $errstr = '';
+
+    if ($protocol !== 'snmp') {
+        $fp = @fsockopen($host, $port, $errno, $errstr, 3.0);
+        $tcpOk = (bool)$fp;
+        if ($fp) fclose($fp);
+        $tcpMsg = $tcpOk ? "TCP port $port reachable" : ('TCP gagal: '.($errstr ?: 'timeout'));
+    } else {
+        // SNMP memakai UDP/161, jadi TCP connect sering gagal. Untuk test awal, gunakan ICMP ping.
+        $tcpMsg = 'SNMP memakai UDP/161; test memakai ICMP ping.';
+    }
+
+    $pingOk = null; $pingMsg = 'Ping tidak tersedia di server';
+    if (function_exists('exec')) {
+        $safeHost = escapeshellarg($host);
+        $isWindows = strtoupper(substr(PHP_OS, 0, 3)) === 'WIN';
+        $cmd = $isWindows ? "ping -n 1 -w 2000 $safeHost" : "ping -c 1 -W 2 $safeHost";
+        $out = []; $code = 1; @exec($cmd, $out, $code);
+        $pingOk = ($code === 0);
+        $pingMsg = $pingOk ? 'Ping reply OK' : 'Ping gagal/timeout';
+    }
+
+    $ms = intval((microtime(true) - $start) * 1000);
+    $online = ($pingOk === true) || $tcpOk;
+    return [
+        'success' => true,
+        'online' => $online,
+        'status' => $online ? 'online' : 'offline',
+        'response_ms' => $ms,
+        'message' => trim($pingMsg.'; '.$tcpMsg),
+        'ping_ok' => $pingOk,
+        'tcp_ok' => $tcpOk,
+    ];
 }
