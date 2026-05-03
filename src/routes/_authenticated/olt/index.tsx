@@ -22,7 +22,7 @@ export const Route = createFileRoute('/_authenticated/olt/')({ component: OltCen
 function OltCenter() {
   const queryClient = useQueryClient()
   const [open, setOpen] = useState(false)
-  const [form, setForm] = useState({ name: '', brand: 'Generic', host: '', port: '23', protocol: 'manual', snmp_community: 'public', pon_ports: '0', total_onu: '0', online_onu: '0', status: 'unknown', location: '', note: '' })
+  const [form, setForm] = useState({ name: '', brand: 'Generic', host: '', port: '23', protocol: 'snmp', snmp_community: 'public', pon_ports: '0', total_onu: '0', online_onu: '0', status: 'unknown', location: '', note: '' })
   const { data, isLoading } = useQuery({ queryKey: ['olts'], queryFn: async () => (await api.get('/olt_operations.php', { params: { action: 'list' } })).data })
   const add = useMutation({ mutationFn: async () => (await api.post('/olt_operations.php?action=add', form)).data, onSuccess: (d) => { d.success ? toast.success('OLT ditambahkan') : toast.error(d.message || 'Gagal'); setOpen(false); queryClient.invalidateQueries({ queryKey: ['olts'] }) } })
   const updateStatus = useMutation({ mutationFn: async ({ id, status }: any) => (await api.post('/olt_operations.php?action=update_status', { id, status })).data, onSuccess: () => queryClient.invalidateQueries({ queryKey: ['olts'] }) })
@@ -52,6 +52,44 @@ function OltCenter() {
         {isLoading ? <TableRow><TableCell colSpan={9} className='py-10 text-center text-muted-foreground'>Memuat...</TableCell></TableRow> : olts.length === 0 ? <TableRow><TableCell colSpan={9} className='py-10 text-center text-muted-foreground'>Belum ada OLT</TableCell></TableRow> : olts.map((o: any) => <TableRow key={o.id}><TableCell><b>{o.name}</b><p className='text-xs text-muted-foreground'>{o.brand}</p></TableCell><TableCell className='font-mono text-xs'>{o.host}:{o.port}</TableCell><TableCell>{o.protocol}</TableCell><TableCell>{o.pon_ports}</TableCell><TableCell>{o.online_onu}/{o.total_onu}</TableCell><TableCell><Select value={o.status} onValueChange={(status) => updateStatus.mutate({ id: o.id, status })}><SelectTrigger className='h-8 w-32'><SelectValue /></SelectTrigger><SelectContent><SelectItem value='unknown'>unknown</SelectItem><SelectItem value='online'>online</SelectItem><SelectItem value='offline'>offline</SelectItem><SelectItem value='maintenance'>maintenance</SelectItem></SelectContent></Select><Badge className='mt-1' variant={statusBadge(o.status) as any}>{o.status}</Badge></TableCell><TableCell>{o.location || '-'}</TableCell><TableCell><p className='text-xs'>{o.last_checked_at || '-'}</p><p className='text-xs text-muted-foreground'>{o.response_ms ? `${o.response_ms}ms` : ''} {o.last_check_message || ''}</p></TableCell><TableCell className='text-right'><div className='flex justify-end gap-1'><Button size='icon' variant='outline' onClick={() => checkStatus.mutate(Number(o.id))} disabled={checkStatus.isPending}><RefreshCw className='h-4 w-4' /></Button><Button size='icon' variant='ghost' onClick={() => confirm('Hapus OLT?') && del.mutate(Number(o.id))}><Trash2 className='h-4 w-4 text-red-500' /></Button></div></TableCell></TableRow>)}
       </TableBody></Table></Card>
     </Main>
-    <Dialog open={open} onOpenChange={setOpen}><DialogContent><DialogHeader><DialogTitle>Tambah OLT</DialogTitle></DialogHeader><div className='grid gap-3 py-2'><Input placeholder='Nama OLT' value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} /><div className='grid grid-cols-2 gap-2'><Input placeholder='Brand' value={form.brand} onChange={(e) => setForm({ ...form, brand: e.target.value })} /><Input placeholder='Host/IP' value={form.host} onChange={(e) => setForm({ ...form, host: e.target.value })} /></div><div className='grid grid-cols-2 gap-2'><Input placeholder='Port' value={form.port} onChange={(e) => setForm({ ...form, port: e.target.value })} /><Select value={form.protocol} onValueChange={(protocol) => setForm({ ...form, protocol })}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value='manual'>manual</SelectItem><SelectItem value='snmp'>snmp</SelectItem><SelectItem value='telnet'>telnet</SelectItem><SelectItem value='ssh'>ssh</SelectItem><SelectItem value='api'>api</SelectItem></SelectContent></Select></div><div className='grid grid-cols-3 gap-2'><Input placeholder='PON' value={form.pon_ports} onChange={(e) => setForm({ ...form, pon_ports: e.target.value })} /><Input placeholder='Total ONU' value={form.total_onu} onChange={(e) => setForm({ ...form, total_onu: e.target.value })} /><Input placeholder='ONU Online' value={form.online_onu} onChange={(e) => setForm({ ...form, online_onu: e.target.value })} /></div><Input placeholder='SNMP Community' value={form.snmp_community} onChange={(e) => setForm({ ...form, snmp_community: e.target.value })} /><Input placeholder='Lokasi' value={form.location} onChange={(e) => setForm({ ...form, location: e.target.value })} /><Input placeholder='Catatan' value={form.note} onChange={(e) => setForm({ ...form, note: e.target.value })} /></div><DialogFooter><Button variant='outline' onClick={() => setOpen(false)}>Batal</Button><Button onClick={() => add.mutate()} disabled={add.isPending}>Simpan</Button></DialogFooter></DialogContent></Dialog>
+    <Dialog open={open} onOpenChange={setOpen}>
+      <DialogContent className='max-w-md'>
+        <DialogHeader><DialogTitle>Tambah OLT</DialogTitle></DialogHeader>
+        <div className='grid gap-3 py-2'>
+          <div>
+            <label className='text-xs font-bold uppercase text-muted-foreground'>Nama</label>
+            <Input className='mt-1' placeholder='Contoh: OLT POP 1' value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} />
+          </div>
+          <div>
+            <label className='text-xs font-bold uppercase text-muted-foreground'>IP / Host</label>
+            <Input className='mt-1' placeholder='192.168.10.2' value={form.host} onChange={(e) => setForm({ ...form, host: e.target.value })} />
+          </div>
+          <div>
+            <label className='text-xs font-bold uppercase text-muted-foreground'>Port</label>
+            <Input className='mt-1' placeholder='23 / 22 / 80 / 443 / 161' value={form.port} onChange={(e) => setForm({ ...form, port: e.target.value })} />
+          </div>
+          <div>
+            <label className='text-xs font-bold uppercase text-muted-foreground'>SNMP Community</label>
+            <Input className='mt-1' placeholder='public' value={form.snmp_community} onChange={(e) => setForm({ ...form, snmp_community: e.target.value })} />
+          </div>
+          <div>
+            <label className='text-xs font-bold uppercase text-muted-foreground'>Type OLT</label>
+            <Select value={form.brand} onValueChange={(brand) => setForm({ ...form, brand })}>
+              <SelectTrigger className='mt-1'><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value='Generic'>Generic</SelectItem>
+                <SelectItem value='Huawei'>Huawei</SelectItem>
+                <SelectItem value='ZTE'>ZTE</SelectItem>
+                <SelectItem value='Fiberhome'>Fiberhome</SelectItem>
+                <SelectItem value='VSOL'>VSOL</SelectItem>
+                <SelectItem value='BDCOM'>BDCOM</SelectItem>
+                <SelectItem value='C-Data'>C-Data</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+        </div>
+        <DialogFooter><Button variant='outline' onClick={() => setOpen(false)}>Batal</Button><Button onClick={() => add.mutate()} disabled={add.isPending}>Simpan</Button></DialogFooter>
+      </DialogContent>
+    </Dialog>
   </>
 }
