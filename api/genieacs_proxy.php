@@ -13,14 +13,21 @@ if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
 require_once __DIR__ . '/config.php';
 require_once __DIR__ . '/auth/require_auth.php';
 
-// Fetch settings from DB
-$res = $conn->query("SELECT setting_key, setting_value FROM web_settings WHERE setting_key IN ('genieacs_url', 'genieacs_user', 'genieacs_pass')");
+// Fetch settings from DB. Keep proxy usable even if settings table is not installed yet.
 $settings = [];
-while ($row = $res->fetch_assoc()) {
-    $settings[$row['setting_key']] = $row['setting_value'];
+if (isset($conn) && $conn instanceof mysqli) {
+    $tableCheck = $conn->query("SHOW TABLES LIKE 'web_settings'");
+    if ($tableCheck && $tableCheck->num_rows > 0) {
+        $res = $conn->query("SELECT setting_key, setting_value FROM web_settings WHERE setting_key IN ('genieacs_url', 'genieacs_user', 'genieacs_pass')");
+        if ($res) {
+            while ($row = $res->fetch_assoc()) {
+                $settings[$row['setting_key']] = $row['setting_value'];
+            }
+        }
+    }
 }
 
-$acs_url = $settings['genieacs_url'] ?? "http://api-acs.marzuqnetwork.online";
+$acs_url = rtrim($settings['genieacs_url'] ?? "http://api-acs.marzuqnetwork.online", '/');
 $acs_user = $settings['genieacs_user'] ?? "acs";
 $acs_pass = $settings['genieacs_pass'] ?? "acs123";
 
