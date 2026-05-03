@@ -47,7 +47,7 @@ $action = $_GET['action'] ?? $_POST['action'] ?? 'list';
 
 switch ($action) {
     case 'list':
-        $res = $conn->query('SELECT id,name,brand,host,port,protocol,pon_ports,total_onu,online_onu,offline_onu,status,location,note,last_checked_at,last_check_message,response_ms,sys_name,sys_descr,sys_uptime,last_snmp_at,created_at,updated_at FROM olts ORDER BY id DESC');
+        $res = $conn->query('SELECT id,name,brand,host,port,protocol,snmp_community,pon_ports,total_onu,online_onu,offline_onu,status,location,note,last_checked_at,last_check_message,response_ms,sys_name,sys_descr,sys_uptime,last_snmp_at,created_at,updated_at FROM olts ORDER BY id DESC');
         $rows = [];$summary = ['total'=>0,'online'=>0,'offline'=>0,'maintenance'=>0,'unknown'=>0,'onu_total'=>0,'onu_online'=>0,'onu_offline'=>0];
         while ($row = $res->fetch_assoc()) { $summary['total']++; if(isset($summary[$row['status']])) $summary[$row['status']]++; $summary['onu_total'] += intval($row['total_onu']); $summary['onu_online'] += intval($row['online_onu']); $summary['onu_offline'] += intval($row['offline_onu']); $rows[]=$row; }
         echo json_encode(['success'=>true,'data'=>$rows,'summary'=>$summary]);
@@ -71,6 +71,13 @@ switch ($action) {
         $stmt->bind_param('sssissssiiiisss', $name,$brand,$host,$port,$protocol,$username,$password,$community,$pon,$total,$online,$offline,$status,$location,$note);
         $ok = $stmt->execute(); if($ok) log_admin_activity($conn,'olt_add','Tambah OLT '.$name, intval($_SESSION['admin_id'] ?? 0));
         echo json_encode(['success'=>$ok,'message'=>$ok?'OLT berhasil ditambahkan':$conn->error]);
+        break;
+    case 'update_snmp':
+        $d = input_data(); $id = intval($d['id'] ?? 0); $community = trim($d['snmp_community'] ?? 'public-read');
+        if ($id <= 0 || $community === '') { echo json_encode(['success'=>false,'message'=>'ID dan SNMP community wajib diisi']); break; }
+        $stmt = $conn->prepare('UPDATE olts SET snmp_community=? WHERE id=?'); $stmt->bind_param('si',$community,$id); $ok=$stmt->execute();
+        if($ok) log_admin_activity($conn,'olt_snmp_update','Update SNMP community OLT ID '.$id, intval($_SESSION['admin_id'] ?? 0));
+        echo json_encode(['success'=>$ok,'message'=>$ok?'SNMP community diperbarui':$conn->error]);
         break;
     case 'update_status':
         $d = input_data(); $id = intval($d['id'] ?? 0); $status = in_array(($d['status'] ?? 'unknown'), ['unknown','online','offline','maintenance'], true) ? $d['status'] : 'unknown';
