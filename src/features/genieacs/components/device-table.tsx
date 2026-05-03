@@ -80,12 +80,26 @@ export function GenieACSDeviceTable({ data, isLoading }: Props) {
     return new Date(device._lastInform).getTime() > Date.now() - 5 * 60 * 1000
   }
 
+  const buildTaskPayload = (action: string) => {
+    if (action === 'summon') {
+      return {
+        name: 'getParameterValues',
+        parameterNames: [
+          'Device.DeviceInfo.SerialNumber',
+          'InternetGatewayDevice.DeviceInfo.SerialNumber',
+          'Device.ManagementServer.ConnectionRequestURL',
+          'InternetGatewayDevice.ManagementServer.ConnectionRequestURL',
+        ],
+      }
+    }
+    if (action === 'refreshObject') return { name: 'refreshObject', objectName: '' }
+    return { name: action }
+  }
+
   const actionMutation = useMutation({
     mutationFn: async ({ deviceId, action, connectionRequest = false }: { deviceId: string; action: string; connectionRequest?: boolean }) => {
-      const suffix = connectionRequest ? '&connection_request' : ''
-      const res = await api.post(`/genieacs_proxy.php?path=/devices/${encodeURIComponent(deviceId)}/tasks${suffix}`, {
-        name: action
-      })
+      const suffix = connectionRequest ? '&connection_request=true' : ''
+      const res = await api.post(`/genieacs_proxy.php?path=/devices/${encodeURIComponent(deviceId)}/tasks${suffix}`, buildTaskPayload(action))
       return res.data
     },
     onSuccess: () => {
@@ -94,7 +108,8 @@ export function GenieACSDeviceTable({ data, isLoading }: Props) {
       queryClient.invalidateQueries({ queryKey: ['acs-center-devices'] })
     },
     onError: (error: any) => {
-      toast.error(error.response?.data?.message || 'Failed to send command')
+      const detail = error.response?.data?.error || error.response?.data?.message || error.response?.data || error.message
+      toast.error(typeof detail === 'string' ? detail : 'Failed to send command')
     }
   })
 
@@ -287,7 +302,7 @@ export function GenieACSDeviceTable({ data, isLoading }: Props) {
                 Reboot Device
               </DropdownMenuItem>
               <DropdownMenuItem 
-                onClick={() => actionMutation.mutate({ deviceId: device._id, action: 'refreshObject', connectionRequest: true })}
+                onClick={() => actionMutation.mutate({ deviceId: device._id, action: 'summon', connectionRequest: true })}
                 className="cursor-pointer"
               >
                 <RadioTower className="w-4 h-4 mr-2" />
@@ -367,7 +382,7 @@ export function GenieACSDeviceTable({ data, isLoading }: Props) {
                 const offlineIds = data.filter((d) => !isDeviceOnline(d)).map((d) => d._id)
                 if (!offlineIds.length) return toast.success('Tidak ada CPE offline')
                 if (!confirm(`Summon ${offlineIds.length} CPE offline via Connection Request?`)) return
-                toast.promise(Promise.allSettled(offlineIds.map(id => actionMutation.mutateAsync({ deviceId: id, action: 'refreshObject', connectionRequest: true }))), {
+                toast.promise(Promise.allSettled(offlineIds.map(id => actionMutation.mutateAsync({ deviceId: id, action: 'summon', connectionRequest: true }))), {
                   loading: `Mengirim summon ke ${offlineIds.length} CPE offline...`,
                   success: 'Summon offline selesai dikirim',
                   error: 'Sebagian summon gagal dikirim'
