@@ -26,7 +26,7 @@ import {
 } from '@/components/ui/form'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
-import { MapPin } from 'lucide-react'
+import { Info, MapPin } from 'lucide-react'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { ScrollArea } from '@/components/ui/scroll-area'
 
@@ -142,11 +142,28 @@ export function CustomerMutateDialog({ isOpen, onClose, customer, profiles, odps
 
   const mutation = useMutation({
     mutationFn: async (values: Customer) => {
-      const res = await api.post('/save_user.php', {
-        ...values,
-        action: isEditing ? 'edit' : 'add',
-        router_id: activeRouter?.id,
-      })
+      const payload = isEditing
+        ? {
+            action: 'edit_extra',
+            router_id: activeRouter?.id,
+            username: values.username,
+            wa: values.wa,
+            alamat: values.alamat,
+            maps: values.maps,
+            lat: values.lat,
+            lng: values.lng,
+            redaman: values.redaman,
+            odp_id: values.odp_id,
+            tanggal_tagihan: values.tanggal_tagihan,
+            tanggal_dibuat: values.tanggal_dibuat,
+          }
+        : {
+            ...values,
+            action: 'add',
+            router_id: activeRouter?.id,
+          }
+
+      const res = await api.post('/save_user.php', payload)
       return res.data
     },
     onSuccess: (data) => {
@@ -180,56 +197,71 @@ export function CustomerMutateDialog({ isOpen, onClose, customer, profiles, odps
           <div className="p-4">
             <Form {...form}>
             <form id='customer-form' onSubmit={form.handleSubmit(onSubmit)} className='space-y-3'>
-                <div className='grid grid-cols-2 gap-3'>
+                {isEditing ? (
+                  <div className='rounded-lg border border-blue-200 bg-blue-50/70 p-3 text-xs text-blue-800'>
+                    <div className='flex items-start gap-2'>
+                      <Info className='mt-0.5 h-4 w-4 shrink-0' />
+                      <div>
+                        <p className='font-bold'>Mode edit data tambahan</p>
+                        <p className='mt-1 text-[11px] leading-relaxed'>Username, password, paket/profile, status PPPoE, remote-address, dan konfigurasi MikroTik tidak akan diubah dari halaman ini.</p>
+                        <p className='mt-2 font-mono text-[11px]'>Username: {customer?.username}</p>
+                      </div>
+                    </div>
+                  </div>
+                ) : (
+                  <>
+                    <div className='grid grid-cols-2 gap-3'>
+                        <FormField
+                        control={form.control}
+                        name='username'
+                        render={({ field }) => (
+                            <FormItem className="space-y-1">
+                            <FormLabel className="text-xs">Username PPPoE</FormLabel>
+                            <FormControl>
+                                <Input placeholder='johndoe' {...field} className="h-8 text-xs" />
+                            </FormControl>
+                            <FormMessage className="text-[10px]" />
+                            </FormItem>
+                        )}
+                        />
+                        <FormField
+                        control={form.control}
+                        name='password'
+                        render={({ field }) => (
+                            <FormItem className="space-y-1">
+                            <FormLabel className="text-xs">Password</FormLabel>
+                            <FormControl>
+                                <Input type='text' placeholder='secret' {...field} className="h-8 text-xs" />
+                            </FormControl>
+                            <FormMessage className="text-[10px]" />
+                            </FormItem>
+                        )}
+                        />
+                    </div>
                     <FormField
                     control={form.control}
-                    name='username'
+                    name='profile'
                     render={({ field }) => (
                         <FormItem className="space-y-1">
-                        <FormLabel className="text-xs">Username PPPoE</FormLabel>
-                        <FormControl>
-                            <Input placeholder='johndoe' {...field} disabled={isEditing} className="h-8 text-xs" />
-                        </FormControl>
+                        <FormLabel className="text-xs">Paket (Profile)</FormLabel>
+                        <Select onValueChange={field.onChange} value={field.value}>
+                            <FormControl>
+                            <SelectTrigger className="h-8 text-xs">
+                                <SelectValue placeholder='Pilih paket' />
+                            </SelectTrigger>
+                            </FormControl>
+                            <SelectContent>
+                            {profiles.map(p => (
+                                <SelectItem key={p} value={p} className="text-xs">{p}</SelectItem>
+                            ))}
+                            </SelectContent>
+                        </Select>
                         <FormMessage className="text-[10px]" />
                         </FormItem>
                     )}
                     />
-                    <FormField
-                    control={form.control}
-                    name='password'
-                    render={({ field }) => (
-                        <FormItem className="space-y-1">
-                        <FormLabel className="text-xs">Password</FormLabel>
-                        <FormControl>
-                            <Input type='text' placeholder='secret' {...field} className="h-8 text-xs" />
-                        </FormControl>
-                        <FormMessage className="text-[10px]" />
-                        </FormItem>
-                    )}
-                    />
-                </div>
-                <FormField
-                control={form.control}
-                name='profile'
-                render={({ field }) => (
-                    <FormItem className="space-y-1">
-                    <FormLabel className="text-xs">Paket (Profile)</FormLabel>
-                    <Select onValueChange={field.onChange} value={field.value}>
-                        <FormControl>
-                        <SelectTrigger className="h-8 text-xs">
-                            <SelectValue placeholder='Pilih paket' />
-                        </SelectTrigger>
-                        </FormControl>
-                        <SelectContent>
-                        {profiles.map(p => (
-                            <SelectItem key={p} value={p} className="text-xs">{p}</SelectItem>
-                        ))}
-                        </SelectContent>
-                    </Select>
-                    <FormMessage className="text-[10px]" />
-                    </FormItem>
+                  </>
                 )}
-                />
                 <FormField
                 control={form.control}
                 name='wa'
@@ -435,6 +467,7 @@ export function CustomerMutateDialog({ isOpen, onClose, customer, profiles, odps
                     )}
                     />
                 </div>
+                {!isEditing && (
                 <FormField
                 control={form.control}
                 name='disabled'
@@ -456,6 +489,7 @@ export function CustomerMutateDialog({ isOpen, onClose, customer, profiles, odps
                     </FormItem>
                 )}
                 />
+                )}
             </form>
             </Form>
           </div>

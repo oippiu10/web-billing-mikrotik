@@ -125,6 +125,42 @@ try {
         exit;
     }
 
+    // ── HANDLE EDIT DATA TAMBAHAN SAJA ──
+    // Dipakai dari halaman Pelanggan agar tidak mengubah PPP secret/MikroTik
+    // seperti username, password, profile, disabled, remote-address, atau rate-limit.
+    if ($action === 'edit_extra') {
+        if (empty($routerId)) {
+            echo json_encode(['success' => false, 'message' => 'Parameter router_id wajib']);
+            exit;
+        }
+
+        $wa = $input['wa'] ?? '';
+        $alamat = $input['alamat'] ?? '';
+        $maps = $input['maps'] ?? '';
+        $redaman = $input['redaman'] ?? '';
+        $odpId = $input['odp_id'] ?? null;
+        if ($odpId === '' || $odpId === 'none' || $odpId === 0 || $odpId === '0') {
+            $odpId = null;
+        } else {
+            $odpId = intval($odpId);
+        }
+        $tanggalTagihan = intval($input['tanggal_tagihan'] ?? 0) ?: null;
+        $tanggalDibuat = $input['tanggal_dibuat'] ?? null;
+        $lat = ($input['lat'] ?? '') !== '' && $input['lat'] !== null ? floatval($input['lat']) : null;
+        $lng = ($input['lng'] ?? '') !== '' && $input['lng'] !== null ? floatval($input['lng']) : null;
+
+        $stmt = $conn->prepare("UPDATE users SET wa=?, alamat=?, maps=?, redaman=?, odp_id=?, tanggal_tagihan=?, tanggal_dibuat=?, lat=?, lng=?, updated_at=NOW() WHERE username=? AND router_id=?");
+        if (!$stmt) throw new Exception($conn->error);
+        $stmt->bind_param('ssssiisddss', $wa, $alamat, $maps, $redaman, $odpId, $tanggalTagihan, $tanggalDibuat, $lat, $lng, $username, $routerId);
+        $stmt->execute();
+        $affected = $stmt->affected_rows;
+        $stmt->close();
+
+        log_admin_activity($conn, 'customer_extra_update', "Data tambahan user {$username} berhasil diperbarui", (int)($_SESSION['admin_id'] ?? 0));
+        echo json_encode(['success' => true, 'message' => 'Data tambahan pelanggan berhasil diperbarui', 'affected' => $affected]);
+        exit;
+    }
+
     // ── HANDLE ADD / EDIT ──
     $password = trim((string)($input['password'] ?? ''));
     $profile = trim((string)($input['profile'] ?? 'default')) ?: 'default';

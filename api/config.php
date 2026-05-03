@@ -11,7 +11,7 @@ foreach ([__DIR__ . '/.env', dirname(__DIR__) . '/.env'] as $envFile) {
   $lines = file($envFile, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES);
   foreach ($lines as $line) {
     $line = trim($line);
-    if ($line === '' || strpos($line, '#') === 0 || !str_contains($line, '=')) {
+    if ($line === '' || strpos($line, '#') === 0 || strpos($line, '=') === false) {
       continue;
     }
 
@@ -42,10 +42,11 @@ $pass = $_ENV['DB_PASS'] ?? getenv('DB_PASS') ?: '';
 $conn = mysqli_init();
 mysqli_options($conn, MYSQLI_OPT_CONNECT_TIMEOUT, 5); // 5 seconds timeout
 if (!@mysqli_real_connect($conn, $host, $user, $pass, $db)) {
+    error_log('Database connection failed: ' . mysqli_connect_error());
     http_response_code(500);
     die(json_encode([
-        'success' => false, 
-        'message' => 'Database connection failed: ' . mysqli_connect_error(),
+        'success' => false,
+        'message' => 'Database connection failed',
         'type' => 'db_error'
     ]));
 }

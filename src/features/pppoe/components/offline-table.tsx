@@ -43,6 +43,41 @@ interface PPPSecret {
   disabled?: string
 }
 
+const routerOsMonths: Record<string, number> = {
+  jan: 0,
+  feb: 1,
+  mar: 2,
+  apr: 3,
+  may: 4,
+  jun: 5,
+  jul: 6,
+  aug: 7,
+  sep: 8,
+  oct: 9,
+  nov: 10,
+  dec: 11,
+}
+
+function parseLastLoggedOut(value?: string): number {
+  if (!value) return 0
+
+  const direct = new Date(value).getTime()
+  if (!Number.isNaN(direct)) return direct
+
+  const match = value.trim().toLowerCase().match(/^(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)\/(\d{1,2})\/(\d{4})(?:\s+(\d{1,2}):(\d{2}):(\d{2}))?$/)
+  if (!match) return 0
+
+  const [, month, day, year, hour = '0', minute = '0', second = '0'] = match
+  return new Date(
+    Number(year),
+    routerOsMonths[month],
+    Number(day),
+    Number(hour),
+    Number(minute),
+    Number(second)
+  ).getTime()
+}
+
 // ── Export Functions ─────────────────────────────────────────────────────────
 function exportOfflineCSV(data: PPPSecret[], filename = 'pppoe-offline.csv') {
   const headers = ['Name', 'Profile', 'Service', 'Last Caller ID', 'Last Logout', 'Status']
@@ -80,7 +115,9 @@ interface Props {
 export function PPPoEOfflineTable({ data, isLoading, profiles = [] }: Props) {
   const { activeRouter } = useRouterStore()
   const queryClient = useQueryClient()
-  const [sorting, setSorting] = useState<SortingState>([])
+  const [sorting, setSorting] = useState<SortingState>([
+    { id: 'last-logged-out', desc: true },
+  ])
   const [columnVisibility, setColumnVisibility] = useState<VisibilityState>({})
   const [globalFilter, setGlobalFilter] = useState('')
   const [detailData, setDetailData] = useState<any>(null)
@@ -176,6 +213,11 @@ export function PPPoEOfflineTable({ data, isLoading, profiles = [] }: Props) {
       accessorKey: 'last-logged-out',
       header: ({ column }) => <DataTableColumnHeader column={column} title='Last Logout' />,
       cell: ({ row }) => <span className="text-sm text-muted-foreground">{row.getValue('last-logged-out') || '-'}</span>,
+      sortingFn: (rowA, rowB, columnId) => {
+        const a = parseLastLoggedOut(rowA.getValue(columnId))
+        const b = parseLastLoggedOut(rowB.getValue(columnId))
+        return a - b
+      },
     },
     {
       id: 'actions',

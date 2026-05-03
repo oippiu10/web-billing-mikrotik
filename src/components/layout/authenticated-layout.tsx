@@ -49,7 +49,7 @@ export function AuthenticatedLayout({ children }: AuthenticatedLayoutProps) {
   }, [sessionQuery.data, setAccessToken, setUser])
 
   useEffect(() => {
-    if (sessionQuery.isError) {
+    if (sessionQuery.isError || (sessionQuery.isSuccess && !sessionQuery.data?.success)) {
       resetAuth()
       navigate({
         to: '/sign-in',
@@ -57,7 +57,7 @@ export function AuthenticatedLayout({ children }: AuthenticatedLayoutProps) {
         replace: true,
       })
     }
-  }, [sessionQuery.isError, location.href, navigate, resetAuth])
+  }, [sessionQuery.isError, sessionQuery.isSuccess, sessionQuery.data?.success, location.href, navigate, resetAuth])
 
   if (sessionQuery.isLoading) {
     return (
@@ -68,7 +68,7 @@ export function AuthenticatedLayout({ children }: AuthenticatedLayoutProps) {
     )
   }
 
-  if (sessionQuery.isError) return null
+  if (sessionQuery.isError || !sessionQuery.data?.success) return null
 
   return (
     <SearchProvider>

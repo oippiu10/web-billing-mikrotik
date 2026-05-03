@@ -15,7 +15,7 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 
 interface Props {
   selectedCustomers: Customer[]
-  profiles: string[]
+  profiles?: string[]
   odps: { id: number, name: string }[]
   total: number
   totalComplete: number
@@ -27,7 +27,6 @@ interface Props {
 
 export function BatchEditCustomers({ 
     selectedCustomers, 
-    profiles, 
     odps, 
     total, 
     totalComplete,
@@ -47,8 +46,6 @@ export function BatchEditCustomers({
     setEditedData(selectedCustomers.map(c => ({
       id: c.id,
       username: c.username,
-      password: c.password || '',
-      profile: c.profile || 'default',
       wa: c.wa || '',
       alamat: c.alamat || '',
       redaman: c.redaman || '',
@@ -70,8 +67,6 @@ export function BatchEditCustomers({
       if (!original) return false
       
       return (
-        row.password !== (original.password || '') ||
-        row.profile !== (original.profile || 'default') ||
         row.wa !== (original.wa || '') ||
         row.alamat !== (original.alamat || '') ||
         row.redaman !== (original.redaman || '') ||
@@ -219,7 +214,6 @@ export function BatchEditCustomers({
                 <TableRow className="hover:bg-transparent">
                 <TableHead className="w-16 text-center border-b font-black text-xs uppercase tracking-tighter text-muted-foreground/50"><Hash className="h-3 w-3 mx-auto" /></TableHead>
                 <TableHead className="min-w-[150px] border-b font-black text-xs uppercase tracking-widest text-muted-foreground/70 py-4">Pelanggan</TableHead>
-                <TableHead className="min-w-[180px] border-b font-black text-xs uppercase tracking-widest text-muted-foreground/70">Paket Internet</TableHead>
                 <TableHead className="min-w-[150px] border-b font-black text-xs uppercase tracking-widest text-muted-foreground/70">WhatsApp</TableHead>
                 <TableHead className="min-w-[200px] border-b font-black text-xs uppercase tracking-widest text-muted-foreground/70">Alamat Pemasangan</TableHead>
                 <TableHead className="min-w-[100px] border-b font-black text-xs uppercase tracking-widest text-muted-foreground/70">Redaman</TableHead>
@@ -248,19 +242,6 @@ export function BatchEditCustomers({
                             {isModified && <span className="text-[9px] font-black text-blue-600 uppercase tracking-tighter flex items-center gap-1"><AlertCircle className="h-2 w-2" /> Perubahan Terdeteksi</span>}
                             {isComplete && !isModified && <span className="text-[9px] font-bold text-green-600 uppercase tracking-tighter flex items-center gap-1">Data Lengkap</span>}
                         </div>
-                    </TableCell>
-                    <TableCell className="border-b">
-                        <Select 
-                        value={row.profile} 
-                        onValueChange={(v) => handleFieldChange(idx, 'profile', v)}
-                        >
-                        <SelectTrigger className="h-9 text-xs border-transparent bg-transparent hover:border-input transition-all">
-                            <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                            {profiles.map(p => <SelectItem key={p} value={p} className="text-xs font-medium">{p}</SelectItem>)}
-                        </SelectContent>
-                        </Select>
                     </TableCell>
                     <TableCell className="border-b">
                         <Input 
@@ -367,7 +348,7 @@ export function BatchEditCustomers({
                 <AlertDialogDescription className="text-sm md:text-base py-4">
                     Anda akan memperbarui <span className="font-black text-foreground underline decoration-blue-500 decoration-2">{modifiedRows.length} data pelanggan</span>. 
                     <br/><br/>
-                    Data akan langsung disinkronkan ke router MikroTik. Lanjutkan?
+                    Perubahan hanya menyimpan data tambahan pelanggan di database, tidak mengubah username/password/profile PPPoE atau konfigurasi MikroTik. Lanjutkan?
                 </AlertDialogDescription>
             </AlertDialogHeader>
             <AlertDialogFooter className="flex-col sm:flex-row gap-2">

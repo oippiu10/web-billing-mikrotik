@@ -77,6 +77,7 @@ if ($cmd === 'cache_status') {
 }
 
 if ($cmd === 'cache_clear') {
+    require_admin_role(['admin', 'administrator', 'operator'], 'Akses ditolak. Hanya admin/operator yang boleh menghapus cache MikroTik.');
     $key = $_GET['key'] ?? '';
     if ($key) {
         $cache->invalidate($key);
@@ -117,10 +118,38 @@ $port = intval($routerData['port']) ?: 8728;
 $user = $routerData['username'];
 $pass = $routerData['password'];
 
+// ─── Helper khusus PPP active: deteksi cache yang tertukar/rusak ─────────────
+function is_valid_ppp_active_cache($rows) {
+    if (!is_array($rows)) return false;
+    if (count($rows) === 0) return true;
+
+    $checked = 0;
+    foreach ($rows as $row) {
+        if (!is_array($row)) return false;
+        $checked++;
+
+        // PPP active normal minimal punya name + uptime.
+        // Data interface punya type/default-name/mac-address.
+        // Data ping punya seq/packet-loss/host.
+        $hasName = isset($row['name']) && trim((string)$row['name']) !== '';
+        $hasUptime = isset($row['uptime']) && trim((string)$row['uptime']) !== '';
+        $looksLikeInterface = isset($row['type']) || isset($row['default-name']) || isset($row['mac-address']);
+        $looksLikePing = isset($row['seq']) || (isset($row['host']) && isset($row['packet-loss']));
+
+        if (!$hasName || !$hasUptime || $looksLikeInterface || $looksLikePing) {
+            return false;
+        }
+
+        // Cek beberapa row saja cukup untuk validasi cepat.
+        if ($checked >= 10) break;
+    }
+    return true;
+}
+
 // ─── Fetch dengan cache ──────────────────────────────────────────────────────
 $cacheKey = "mt_{$router_id}_{$cmd}";
 
-$lockName = "mt_conn_" . md5($host);
+$lockName = "mt_conn_" . md5($host . ':' . $port);
 $conn->query("SELECT GET_LOCK('$lockName', 20)");
 
 try {
@@ -145,35 +174,43 @@ try {
     if ($isDaemonRecent && !$forceDirect && !$allowDirectWhenDaemon) {
         $staleData = $cache->getStale($cacheKey);
         if ($staleData !== null) {
+            if ($cmd === 'ppp_active' && !is_valid_ppp_active_cache($staleData)) {
+                // Cache ppp_active rusak/tertukar. Jangan kirim ke frontend,
+                // karena ini membuat semua pelanggan dianggap offline.
+                $cache->invalidate($cacheKey);
+            } else {
+                echo json_encode([
+                    'success'    => true,
+                    'cmd'        => $cmd,
+                    'host'       => $host,
+                    'from_cache' => true,
+                    'via_daemon' => true,
+                    'is_stale'   => true,
+                    'realtime'   => $isRealtime,
+                    'time'       => date('Y-m-d H:i:s'),
+                    'data'       => $staleData
+                ], JSON_UNESCAPED_UNICODE);
+                exit;
+            }
+        }
+
+        // Daemon aktif tapi cache belum ada (baru start / warm-up).
+        // Untuk ppp_active, data kosong akan membuat semua pelanggan dianggap offline,
+        // jadi ambil direct sekali sebagai fallback aman.
+        if ($cmd !== 'ppp_active') {
             echo json_encode([
-                'success'    => true,
-                'cmd'        => $cmd,
-                'host'       => $host,
-                'from_cache' => true,
-                'via_daemon' => true,
-                'is_stale'   => true,
-                'realtime'   => $isRealtime,
-                'time'       => date('Y-m-d H:i:s'),
-                'data'       => $staleData
+                'success'      => true,
+                'cmd'          => $cmd,
+                'host'         => $host,
+                'from_cache'   => false,
+                'via_daemon'   => true,
+                'initializing' => true,
+                'message'      => 'Daemon aktif, menunggu data pertama dari daemon...',
+                'time'         => date('Y-m-d H:i:s'),
+                'data'         => []
             ], JSON_UNESCAPED_UNICODE);
             exit;
         }
-
-        // Daemon aktif tapi cache belum ada (baru start / warm-up)
-        // JANGAN konek langsung — kembalikan data kosong dengan flag initializing
-        // agar tidak membanjiri log MikroTik selama daemon belum mengisi cache
-        echo json_encode([
-            'success'      => true,
-            'cmd'          => $cmd,
-            'host'         => $host,
-            'from_cache'   => false,
-            'via_daemon'   => true,
-            'initializing' => true,
-            'message'      => 'Daemon aktif, menunggu data pertama dari daemon...',
-            'time'         => date('Y-m-d H:i:s'),
-            'data'         => []
-        ], JSON_UNESCAPED_UNICODE);
-        exit;
     }
 
 
@@ -181,10 +218,13 @@ try {
         $api = new RouterosAPI();
         $api->port = $port ?: 8728;
         $api->timeout = 5;
+        $connected = false;
 
-        if (!$api->connect($host, $user, $pass)) {
-            throw new Exception("Gagal konek ke Mikrotik $host:$api->port");
-        }
+        try {
+            if (!$api->connect($host, $user, $pass)) {
+                throw new Exception("Gagal konek ke Mikrotik $host:$api->port");
+            }
+            $connected = true;
 
         if ($cmd === 'summary') {
             $identity = $api->comm('/system/identity/print');
@@ -267,9 +307,31 @@ try {
             }
         }
 
-        $api->disconnect();
         return $data;
-    }, $forceDirect); // Kirim flag forceDirect ke getOrFetch jika library mendukungnya (saya cek mikrotik_cache.php nanti)
+        } finally {
+            if ($connected) {
+                $api->disconnect();
+            }
+        }
+    }, $forceDirect);
+
+    $dataInvalid = false;
+    if ($cmd === 'ppp_active' && !is_valid_ppp_active_cache($result['data'] ?? [])) {
+        $cache->invalidate($cacheKey);
+        $dataInvalid = true;
+        // Jangan kirim data kosong sebagai sukses normal, karena frontend bisa menganggap semua pelanggan offline.
+        http_response_code(502);
+        echo json_encode([
+            'success' => false,
+            'message' => 'Data PPP active tidak valid, cache dibersihkan. Coba refresh beberapa detik lagi.',
+            'type' => 'invalid_ppp_active_data',
+            'cmd' => $cmd,
+            'host' => $host,
+            'cache_key' => $cacheKey,
+            'time' => date('Y-m-d H:i:s'),
+        ], JSON_UNESCAPED_UNICODE);
+        exit;
+    }
 
     echo json_encode([
         'success' => true,

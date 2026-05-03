@@ -13,10 +13,10 @@ import { Search, FilterX, Terminal, History, Info } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
 interface MikrotikLog {
-  '.id': string
-  time: string
-  topics: string
-  message: string
+  '.id'?: string | null
+  time?: string | null
+  topics?: string | null
+  message?: string | null
 }
 
 interface SystemLog {
@@ -34,17 +34,20 @@ export function RecentLogs({ mikrotikLogs = [], systemLogs = [] }: RecentLogsPro
   const [hidePPPoE, setHidePPPoE] = useState(false)
 
   const filteredLogs = mikrotikLogs.filter(log => {
-    const msgMatch = log.message.toLowerCase().includes(search.toLowerCase())
-    const topicMatch = log.topics.toLowerCase().includes(search.toLowerCase())
-    const isPPPoE = log.message.toLowerCase().includes('pppoe connection established') || log.topics.toLowerCase().includes('pppoe')
+    const message = String(log.message || '')
+    const topics = String(log.topics || '')
+    const q = search.trim().toLowerCase()
+    const msgMatch = message.toLowerCase().includes(q)
+    const topicMatch = topics.toLowerCase().includes(q)
+    const isPPPoE = message.toLowerCase().includes('pppoe connection established') || topics.toLowerCase().includes('pppoe')
     
     // Jika filter aktif, sembunyikan log PPPoE kecuali sedang dicari secara spesifik
-    if (hidePPPoE && isPPPoE && !search) return false
+    if (hidePPPoE && isPPPoE && !q) return false
     return msgMatch || topicMatch
   })
 
-  const getTopicColor = (topic: string) => {
-    const t = topic.toLowerCase().trim()
+  const getTopicColor = (topic?: string | null) => {
+    const t = String(topic || '').toLowerCase().trim()
     if (t.includes('error') || t.includes('critical') || t.includes('failed')) return 'bg-red-500/10 text-red-500 border-red-500/20'
     if (t.includes('warning') || t.includes('alert')) return 'bg-orange-500/10 text-orange-500 border-orange-500/20'
     if (t.includes('pppoe') || t.includes('ppp') || t.includes('account')) return 'bg-blue-500/10 text-blue-500 border-blue-500/20'
@@ -55,8 +58,8 @@ export function RecentLogs({ mikrotikLogs = [], systemLogs = [] }: RecentLogsPro
     return 'bg-primary/5 text-primary/60 border-primary/10'
   }
 
-  const getMessageColor = (topics: string) => {
-    const t = topics.toLowerCase()
+  const getMessageColor = (topics?: string | null) => {
+    const t = String(topics || '').toLowerCase()
     if (t.includes('error') || t.includes('critical') || t.includes('failed')) return 'text-red-500'
     if (t.includes('warning') || t.includes('alert')) return 'text-orange-500'
     return ''
@@ -88,7 +91,7 @@ export function RecentLogs({ mikrotikLogs = [], systemLogs = [] }: RecentLogsPro
               className='h-7 px-2 text-[10px] gap-1 font-bold uppercase'
             >
               <FilterX className='w-3 h-3' />
-              {hidePPPoE ? 'Showing All' : 'Hide PPPoE'}
+              {hidePPPoE ? 'Show PPPoE' : 'Hide PPPoE'}
             </Button>
           </div>
         </div>
