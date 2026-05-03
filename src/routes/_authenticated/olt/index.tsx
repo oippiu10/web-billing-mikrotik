@@ -90,6 +90,9 @@ function OltCenter() {
                 <SelectItem value='BDCOM GP1700'>BDCOM GP1700 Series</SelectItem>
                 <SelectItem value='C-Data FD1600'>C-Data FD1600 Series</SelectItem>
                 <SelectItem value='C-Data FD8000'>C-Data FD8000 Series</SelectItem>
+                <SelectItem value='HSGQ'>HSGQ</SelectItem>
+                <SelectItem value='HSGQ G-series'>HSGQ G-Series</SelectItem>
+                <SelectItem value='HSGQ XPON'>HSGQ XPON OLT</SelectItem>
                 <SelectItem value='Raisecom'>Raisecom</SelectItem>
                 <SelectItem value='Dasan/Zhone'>Dasan / Zhone</SelectItem>
                 <SelectItem value='Nokia/Alcatel ISAM'>Nokia / Alcatel ISAM</SelectItem>
