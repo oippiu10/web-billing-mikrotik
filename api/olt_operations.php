@@ -85,6 +85,15 @@ switch ($action) {
         if($ok) log_admin_activity($conn,'olt_status','Update status OLT ID '.$id.' ke '.$status, intval($_SESSION['admin_id'] ?? 0));
         echo json_encode(['success'=>$ok,'message'=>$ok?'Status OLT diperbarui':$conn->error]);
         break;
+    case 'snmp_walk':
+        $d = input_data(); $id = intval($d['id'] ?? 0); $baseOid = trim($d['oid'] ?? '1.3.6.1.2.1.1'); $limit = max(1, min(200, intval($d['limit'] ?? 50)));
+        $stmt = $conn->prepare('SELECT id,name,host,snmp_community FROM olts WHERE id=? LIMIT 1');
+        $stmt->bind_param('i', $id); $stmt->execute(); $olt = $stmt->get_result()->fetch_assoc();
+        if (!$olt) { echo json_encode(['success'=>false,'message'=>'OLT tidak ditemukan']); break; }
+        $walk = olt_snmp_walk_limited($olt['host'], $olt['snmp_community'] ?: 'public', $baseOid, $limit);
+        if ($walk['success']) log_admin_activity($conn,'olt_snmp_walk','SNMP walk OLT ID '.$id.' OID '.$baseOid, intval($_SESSION['admin_id'] ?? 0));
+        echo json_encode($walk);
+        break;
     case 'snmp_basic':
         $d = input_data(); $id = intval($d['id'] ?? 0);
         $stmt = $conn->prepare('SELECT id,name,host,snmp_community FROM olts WHERE id=? LIMIT 1');
@@ -126,6 +135,46 @@ function ensure_column(mysqli $conn, string $table, string $column, string $defi
     $safeColumn = preg_replace('/[^A-Za-z0-9_]/', '', $column);
     $res = $conn->query("SHOW COLUMNS FROM `$safeTable` LIKE '$safeColumn'");
     if ($res && $res->num_rows === 0) $conn->query("ALTER TABLE `$safeTable` ADD COLUMN `$safeColumn` $definition");
+}
+
+function olt_snmp_walk_limited(string $host, string $community, string $baseOid, int $limit = 50): array {
+    $baseOid = preg_replace('/[^0-9.]/', '', $baseOid) ?: '1.3.6.1.2.1.1';
+    $rows = [];
+    if (function_exists('snmp2_real_walk')) {
+        @snmp_set_quick_print(true);
+        $data = @snmp2_real_walk($host, $community, $baseOid, 2000000, 1);
+        if (is_array($data)) {
+            foreach ($data as $oid => $value) { $rows[] = ['oid'=>(string)$oid, 'value'=>trim((string)$value)]; if (count($rows) >= $limit) break; }
+        }
+    }
+    if (empty($rows) && function_exists('exec')) {
+        $cmd = 'snmpwalk -v2c -c '.escapeshellarg($community).' -On '.escapeshellarg($host).' '.escapeshellarg($baseOid).' 2>&1';
+        $out = []; $code = 1; @exec($cmd, $out, $code);
+        foreach ($out as $line) {
+            if (stripos($line, 'Timeout') !== false || stripos($line, 'No Response') !== false || stripos($line, 'not recognized') !== false) continue;
+            $parts = preg_split('/\s+=\s+/', $line, 2);
+            $rows[] = ['oid'=>$parts[0] ?? '', 'value'=>$parts[1] ?? $line];
+            if (count($rows) >= $limit) break;
+        }
+    }
+    if (empty($rows)) {
+        // Fallback aman tanpa snmpwalk: baca OID umum satu per satu pakai native SNMP GET.
+        $common = [
+            '1.3.6.1.2.1.1.1.0' => 'sysDescr',
+            '1.3.6.1.2.1.1.3.0' => 'sysUpTime',
+            '1.3.6.1.2.1.1.4.0' => 'sysContact',
+            '1.3.6.1.2.1.1.5.0' => 'sysName',
+            '1.3.6.1.2.1.1.6.0' => 'sysLocation',
+        ];
+        foreach ($common as $oid => $name) {
+            if (strpos($oid, $baseOid) !== 0 && strpos($baseOid, '1.3.6.1.2.1.1') !== 0) continue;
+            $v = raw_snmp_get($host, $community, $oid);
+            if ($v !== false && $v !== '') $rows[] = ['oid'=>$oid.' ('.$name.')', 'value'=>(string)$v];
+            if (count($rows) >= $limit) break;
+        }
+    }
+    if (empty($rows)) return ['success'=>false,'message'=>'SNMP walk belum berhasil. Untuk walk penuh install PHP SNMP atau Net-SNMP snmpwalk; native fallback hanya baca OID umum.'];
+    return ['success'=>true,'message'=>'SNMP walk OK','oid'=>$baseOid,'count'=>count($rows),'data'=>$rows];
 }
 
 function olt_snmp_basic(string $host, string $community = 'public'): array {
