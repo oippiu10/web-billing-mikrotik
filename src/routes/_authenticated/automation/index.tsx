@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { createFileRoute } from '@tanstack/react-router'
 import { useMutation } from '@tanstack/react-query'
-import { Bot, ShieldOff, ShieldCheck, MessageCircle, DatabaseBackup, BellRing, Play, AlertTriangle } from 'lucide-react'
+import { Bot, ShieldOff, ShieldCheck, MessageCircle, DatabaseBackup, BellRing, Play, AlertTriangle, CheckCircle2, XCircle } from 'lucide-react'
 import { toast } from 'sonner'
 import { api } from '@/lib/api'
 import { useRouterStore } from '@/stores/router-store'
@@ -15,6 +15,7 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 
 export const Route = createFileRoute('/_authenticated/automation/')({ component: AutomationCenter })
 
@@ -33,6 +34,7 @@ function AutomationCenter() {
   const [year, setYear] = useState(now.getFullYear())
   const [graceDays, setGraceDays] = useState(7)
   const [dryRun, setDryRun] = useState(true)
+  const [lastResult, setLastResult] = useState<any>(null)
 
   const isolateMutation = useMutation({
     mutationFn: async () => {
@@ -46,6 +48,7 @@ function AutomationCenter() {
       return res.data
     },
     onSuccess: (data) => {
+      setLastResult(data)
       if (data.success) {
         toast.success(dryRun ? `Simulasi selesai: ${data.total_candidates || 0} kandidat` : `Auto isolir selesai: ${data.total_processed || 0} diproses`)
       } else toast.error(data.message || 'Gagal menjalankan auto isolir')
@@ -107,12 +110,67 @@ function AutomationCenter() {
                 </SelectContent>
               </Select>
             </div>
-            <Button className='gap-2' disabled={!activeRouter || isolateMutation.isPending} onClick={() => isolateMutation.mutate()}>
+            <Button className='gap-2' disabled={!activeRouter || isolateMutation.isPending} onClick={() => {
+              if (!dryRun) {
+                const ok = window.confirm('PERINGATAN: Mode eksekusi akan men-disable PPP secret pelanggan belum bayar. Pastikan sudah melakukan simulasi. Lanjutkan?')
+                if (!ok) return
+              }
+              isolateMutation.mutate()
+            }}>
               <Play className='h-4 w-4' /> Jalankan
             </Button>
             {!dryRun && <p className='flex items-center gap-2 text-xs font-bold text-red-600 md:col-span-5'><AlertTriangle className='h-4 w-4' /> Mode eksekusi akan men-disable PPP secret pelanggan kandidat.</p>}
           </CardContent>
         </Card>
+
+        {lastResult && (
+          <Card>
+            <CardHeader>
+              <div className='flex items-start justify-between gap-3'>
+                <div>
+                  <CardTitle className='flex items-center gap-2'>
+                    {lastResult.success ? <CheckCircle2 className='h-5 w-5 text-green-500' /> : <XCircle className='h-5 w-5 text-red-500' />}
+                    Hasil Auto Isolir
+                  </CardTitle>
+                  <CardDescription>
+                    Mode: {lastResult.dry_run ? 'Simulasi' : 'Eksekusi'} • Kandidat: {lastResult.total_candidates || 0} • Diproses: {lastResult.total_processed || 0}
+                  </CardDescription>
+                </div>
+                <Badge variant={lastResult.success ? 'default' : 'destructive'}>{lastResult.success ? 'Selesai' : 'Gagal'}</Badge>
+              </div>
+            </CardHeader>
+            <CardContent>
+              {!lastResult.success ? (
+                <p className='text-sm text-red-600'>{lastResult.message || 'Terjadi kesalahan'}</p>
+              ) : (lastResult.data || []).length === 0 ? (
+                <p className='rounded-lg border border-dashed p-6 text-center text-sm text-muted-foreground'>Tidak ada kandidat untuk periode ini.</p>
+              ) : (
+                <div className='max-h-[420px] overflow-auto rounded-md border'>
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Username</TableHead>
+                        <TableHead>Status</TableHead>
+                        <TableHead>Secret ID</TableHead>
+                        <TableHead className='text-right'>Tagihan</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {(lastResult.data || []).map((row: any, idx: number) => (
+                        <TableRow key={`${row.username}-${idx}`}>
+                          <TableCell className='font-medium'>{row.username || '-'}</TableCell>
+                          <TableCell><Badge variant='outline'>{row.status || '-'}</Badge></TableCell>
+                          <TableCell className='text-muted-foreground'>{row.secret_id || '-'}</TableCell>
+                          <TableCell className='text-right'>{Number(row.harga || 0).toLocaleString('id-ID')}</TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        )}
 
         <div className='grid gap-4 md:grid-cols-2 xl:grid-cols-3'>
           {jobs.map((job) => {
