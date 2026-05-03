@@ -21,7 +21,7 @@ import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter
 } from '@/components/ui/dialog'
 import {
-  AlertTriangle, Search, CheckCheck, ChevronLeft, ChevronRight, Wallet, ArrowUpDown, Download,
+  AlertTriangle, Search, CheckCheck, ChevronLeft, ChevronRight, Wallet, ArrowUpDown, Download, MessageCircle,
 } from 'lucide-react'
 import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
@@ -33,6 +33,24 @@ import { usePermission } from '@/lib/permissions'
 const MONTHS_ID = ['Januari','Februari','Maret','April','Mei','Juni','Juli','Agustus','September','Oktober','November','Desember']
 const fmt = (n: number) =>
   new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', maximumFractionDigits: 0 }).format(n)
+
+const normalizeWhatsapp = (value: unknown) => {
+  const raw = String(value || '').replace(/\D/g, '')
+  if (!raw) return ''
+  if (raw.startsWith('62')) return raw
+  if (raw.startsWith('0')) return `62${raw.slice(1)}`
+  return raw
+}
+
+const openWhatsappReminder = (row: any, month: number, year: number) => {
+  const phone = normalizeWhatsapp(row.phone || row.no_hp || row.telepon || row.whatsapp)
+  const amount = fmt(parseFloat(row.harga || 0))
+  const message = `Halo ${row.username}, kami informasikan tagihan internet periode ${MONTHS_ID[month - 1]} ${year} sebesar ${amount} belum tercatat lunas. Mohon abaikan pesan ini jika sudah melakukan pembayaran. Terima kasih.`
+  const url = phone
+    ? `https://wa.me/${phone}?text=${encodeURIComponent(message)}`
+    : `https://wa.me/?text=${encodeURIComponent(message)}`
+  window.open(url, '_blank')
+}
 
 export function FinanceReceivable() {
   const { activeRouter } = useRouterStore()
@@ -275,10 +293,16 @@ export function FinanceReceivable() {
                     </TableCell>
                     {permissions.canManageFinance && (
                       <TableCell className='text-right pr-4'>
-                        <Button size='sm' className='h-7 text-[10px] bg-green-500 hover:bg-green-600'
-                          onClick={() => { setPaidDialog(row); setPaidAmount(row.harga || '') }}>
-                          <CheckCheck className='h-3.5 w-3.5 mr-1' /> Lunas
-                        </Button>
+                        <div className='flex justify-end gap-1'>
+                          <Button size='sm' variant='outline' className='h-7 text-[10px] text-green-600'
+                            onClick={() => openWhatsappReminder(row, month, year)}>
+                            <MessageCircle className='h-3.5 w-3.5 mr-1' /> WA
+                          </Button>
+                          <Button size='sm' className='h-7 text-[10px] bg-green-500 hover:bg-green-600'
+                            onClick={() => { setPaidDialog(row); setPaidAmount(row.harga || '') }}>
+                            <CheckCheck className='h-3.5 w-3.5 mr-1' /> Lunas
+                          </Button>
+                        </div>
                       </TableCell>
                     )}
                   </TableRow>
