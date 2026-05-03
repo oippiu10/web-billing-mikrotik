@@ -64,6 +64,15 @@ export function GenieACSPage() {
       </Header>
 
       <Main className='space-y-4' fluid>
+        <div className='rounded-xl border bg-card p-4 shadow-sm'>
+          <div className='flex flex-col gap-2 md:flex-row md:items-center md:justify-between'>
+            <div>
+              <h2 className='text-xl font-bold tracking-tight'>ACS Device Center</h2>
+              <p className='text-sm text-muted-foreground'>Monitoring CPE, summon offline, dan inventaris TR-069/GenieACS.</p>
+            </div>
+            <div className='rounded-full border bg-muted/40 px-3 py-1 text-xs font-medium text-muted-foreground'>Mode ringan • refresh manual</div>
+          </div>
+        </div>
         {isError && (
             <Alert variant="destructive" className="bg-destructive/10 border-destructive/20 text-destructive">
                 <AlertTriangle className="h-4 w-4" />
@@ -76,22 +85,22 @@ export function GenieACSPage() {
         )}
         {/* Lightweight KPI Cards */}
       <div className='grid gap-3 md:grid-cols-3'>
-        <Card>
+        <Card className='border-l-4 border-l-primary'>
           <CardContent className='flex items-center justify-between p-4'>
-            <div><p className='text-xs text-muted-foreground'>Total CPE</p><div className='text-2xl font-bold'>{devices?.length || 0}</div></div>
-            <Server className='h-5 w-5 text-primary' />
+            <div><p className='text-xs font-medium uppercase tracking-wide text-muted-foreground'>Total CPE</p><div className='text-3xl font-bold tabular-nums'>{devices?.length || 0}</div></div>
+            <div className='rounded-lg bg-primary/10 p-2'><Server className='h-5 w-5 text-primary' /></div>
           </CardContent>
         </Card>
-        <Card>
+        <Card className='border-l-4 border-l-emerald-500'>
           <CardContent className='flex items-center justify-between p-4'>
-            <div><p className='text-xs text-muted-foreground'>Online</p><div className='text-2xl font-bold text-emerald-600'>{onlineCount}</div></div>
-            <Wifi className='h-5 w-5 text-emerald-600' />
+            <div><p className='text-xs font-medium uppercase tracking-wide text-muted-foreground'>Online</p><div className='text-3xl font-bold tabular-nums text-emerald-600'>{onlineCount}</div></div>
+            <div className='rounded-lg bg-emerald-500/10 p-2'><Wifi className='h-5 w-5 text-emerald-600' /></div>
           </CardContent>
         </Card>
-        <Card>
+        <Card className='border-l-4 border-l-red-500'>
           <CardContent className='flex items-center justify-between p-4'>
-            <div><p className='text-xs text-muted-foreground'>Offline</p><div className='text-2xl font-bold text-red-600'>{(devices?.length || 0) - onlineCount}</div></div>
-            <AlertTriangle className='h-5 w-5 text-red-600' />
+            <div><p className='text-xs font-medium uppercase tracking-wide text-muted-foreground'>Offline</p><div className='text-3xl font-bold tabular-nums text-red-600'>{(devices?.length || 0) - onlineCount}</div></div>
+            <div className='rounded-lg bg-red-500/10 p-2'><AlertTriangle className='h-5 w-5 text-red-600' /></div>
           </CardContent>
         </Card>
       </div>
@@ -104,14 +113,14 @@ export function GenieACSPage() {
         )}
 
         <Card>
-          <CardHeader className='pb-3'>
+          <CardHeader className='border-b pb-4'>
             <div className='flex items-center justify-between'>
               <div>
-                <CardTitle className='text-xl flex items-center gap-2'>
-                  <Server className='w-5 h-5 text-teal-500' />
+                <CardTitle className='flex items-center gap-2 text-lg'>
+                  <span className='rounded-md bg-teal-500/10 p-1.5'><Server className='h-4 w-4 text-teal-600' /></span>
                   CPE Inventory List
                 </CardTitle>
-                <p className="text-xs text-muted-foreground mt-1">Mode ringan: refresh manual agar halaman tidak berat.</p>
+                <p className="mt-1 text-xs text-muted-foreground">Cari modem, filter status, summon offline, dan buka detail parameter ACS.</p>
               </div>
             </div>
           </CardHeader>

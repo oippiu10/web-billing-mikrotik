@@ -359,7 +359,7 @@ export function GenieACSDeviceTable({ data, isLoading }: Props) {
 
   return (
     <div className='flex flex-1 flex-col gap-4'>
-      <div className="flex items-center justify-between gap-2">
+      <div className='flex flex-col gap-3 rounded-lg bg-muted/30 p-3 lg:flex-row lg:items-center lg:justify-between'>
         <div className="flex items-center gap-2 flex-1">
             <DataTableToolbar
                 table={table}
@@ -403,10 +403,10 @@ export function GenieACSDeviceTable({ data, isLoading }: Props) {
             <option value={50}>50/baris</option>
             <option value={100}>100/baris</option>
           </select>
-          <div className='flex items-center rounded-md border bg-background p-1'>
-            <Button size='sm' variant={statusFilter === 'all' ? 'secondary' : 'ghost'} className='h-7 px-2 text-xs' onClick={() => setStatusFilter('all')}>All {data.length}</Button>
-            <Button size='sm' variant={statusFilter === 'online' ? 'secondary' : 'ghost'} className='h-7 px-2 text-xs text-emerald-600' onClick={() => setStatusFilter('online')}>Online {onlineCount}</Button>
-            <Button size='sm' variant={statusFilter === 'offline' ? 'secondary' : 'ghost'} className='h-7 px-2 text-xs text-red-600' onClick={() => setStatusFilter('offline')}>Offline {offlineCount}</Button>
+          <div className='flex items-center rounded-md border bg-background p-1 shadow-sm'>
+            <Button size='sm' variant={statusFilter === 'all' ? 'secondary' : 'ghost'} className='h-7 px-2 text-xs font-semibold' onClick={() => setStatusFilter('all')}>All <span className='ml-1 text-muted-foreground'>{data.length}</span></Button>
+            <Button size='sm' variant={statusFilter === 'online' ? 'secondary' : 'ghost'} className='h-7 px-2 text-xs font-semibold text-emerald-600' onClick={() => setStatusFilter('online')}>Online <span className='ml-1'>{onlineCount}</span></Button>
+            <Button size='sm' variant={statusFilter === 'offline' ? 'secondary' : 'ghost'} className='h-7 px-2 text-xs font-semibold text-red-600' onClick={() => setStatusFilter('offline')}>Offline <span className='ml-1'>{offlineCount}</span></Button>
           </div>
           <Button
               variant="outline"
@@ -439,9 +439,9 @@ export function GenieACSDeviceTable({ data, isLoading }: Props) {
           </Button>
         </div>
       </div>
-      <div className='overflow-x-auto rounded-md border'>
+      <div className='overflow-x-auto rounded-lg border bg-card'>
         <Table>
-          <TableHeader className="bg-muted/50">
+          <TableHeader className="bg-muted/60">
             {table.getHeaderGroups().map((headerGroup) => (
               <TableRow key={headerGroup.id}>
                 {headerGroup.headers.map((header) => (
@@ -470,7 +470,7 @@ export function GenieACSDeviceTable({ data, isLoading }: Props) {
                   }}
                 >
                   {row.getVisibleCells().map((cell) => (
-                    <TableCell key={cell.id}>
+                    <TableCell key={cell.id} className='py-3'>
                       {flexRender(cell.column.columnDef.cell, cell.getContext())}
                     </TableCell>
                   ))}
