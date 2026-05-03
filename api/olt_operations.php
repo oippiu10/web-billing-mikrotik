@@ -163,12 +163,16 @@ function olt_snmp_probe(string $host, string $community): array {
         '1.3.6.1.4.1.2011.6.128.1.1.2.21.1.1.1' => 'Huawei GPON candidate',
     ];
     $rows = [];
-    foreach ($candidates as $oid => $label) {
-        $value = raw_snmp_get($host, $community, $oid, 0.45);
-        $rows[] = ['oid'=>$oid, 'label'=>$label, 'status'=>($value !== false && $value !== '') ? 'reply' : 'no_response', 'value'=>($value !== false ? (string)$value : '')];
+    try {
+        foreach ($candidates as $oid => $label) {
+            $value = raw_snmp_get($host, $community, $oid, 0.35);
+            $rows[] = ['oid'=>$oid, 'label'=>$label, 'status'=>($value !== false && $value !== '') ? 'reply' : 'no_response', 'value'=>($value !== false ? (string)$value : '')];
+        }
+        $hits = array_values(array_filter($rows, fn($r) => $r['status'] === 'reply'));
+        return ['success'=>true,'message'=>'SNMP probe selesai','count'=>count($rows),'hits'=>count($hits),'data'=>$rows];
+    } catch (Throwable $e) {
+        return ['success'=>true,'message'=>'SNMP probe selesai dengan error: '.$e->getMessage(),'count'=>count($rows),'hits'=>0,'data'=>$rows,'warning'=>$e->getMessage()];
     }
-    $hits = array_values(array_filter($rows, fn($r) => $r['status'] === 'reply'));
-    return ['success'=>true,'message'=>'SNMP probe selesai','count'=>count($rows),'hits'=>count($hits),'data'=>$rows];
 }
 
 function olt_snmp_walk_limited(string $host, string $community, string $baseOid, int $limit = 50): array {
