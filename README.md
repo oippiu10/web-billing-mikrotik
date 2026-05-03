@@ -69,6 +69,15 @@ Permission sudah diterapkan pada:
 - Bulk import/export CSV.
 - Sinkronisasi PPP Secret dari MikroTik ke database.
 - Hard sync: pelanggan yang tidak ada lagi di MikroTik dapat dihapus dari DB.
+- Load pelanggan dari database lebih ringan; sync MikroTik dilakukan manual.
+- Subnav pelanggan lengkap: overview, semua, online, offline, per profil, import/export.
+- Lokasi pelanggan:
+  - field `maps`, `lat`, `lng`
+  - parse koordinat dari Google Maps link umum
+  - resolve short link `maps.app.goo.gl` via backend
+  - bulk convert maps link ke `lat/lng`
+  - Map Picker untuk pilih/drag titik manual
+  - koordinat `0,0` dianggap tidak valid dan tidak disimpan dari hasil convert
 - Optional customer fields boleh kosong.
 - Field wajib utama mengikuti kebutuhan PPP Secret MikroTik:
   - username
@@ -113,14 +122,29 @@ Permission sudah diterapkan pada:
 - CRUD ODP.
 - Bulk update/delete ODP dengan permission.
 - Kapasitas ODP.
+- Koordinat ODP memakai `lat/lng`, dengan fallback `maps_link`.
+- Convert Google Maps link ODP ke koordinat:
+  - per-ODP dari form tambah/edit
+  - bulk convert dari daftar ODP
 - Network map berbasis Leaflet.
-- Tampilkan router, ODP, pelanggan, kabel otomatis, dan jalur manual.
+- Tampilkan router/server, ODP, pelanggan, kabel ODP ke rumah pelanggan, dan jalur manual.
+- Validasi koordinat map: titik `0,0` dianggap tidak valid dan tidak diplot.
+- Marker custom:
+  - server/router merah
+  - ODP berwarna sesuai kapasitas
+  - rumah pelanggan hijau/merah/isolir sesuai status
+- Popup marker hanya muncul saat diklik, bukan hover.
+- Popup router/ODP/pelanggan dibuat compact/minimalis.
+- Popup ODP menampilkan chart port kotak-kotak:
+  - hijau = port terpakai
+  - abu-abu = port kosong
+- Garis server/router ke ODP dinonaktifkan sementara.
+- Garis ODP ke pelanggan dibuat tebal, dashed, dan animated flow.
 - Layer control compact.
 - Filter pelanggan online/offline/semua.
 - Search pelanggan di map.
 - Focus router.
 - Fit semua titik.
-- Popup ODP dan pelanggan premium.
 - Bottom status bar:
   - online
   - offline
