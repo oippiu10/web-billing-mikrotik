@@ -140,7 +140,12 @@ function olt_snmp_basic(string $host, string $community = 'public'): array {
         if (function_exists('snmp2_get')) {
             @snmp_set_quick_print(true);
             $value = @snmp2_get($host, $community, $oid, 2000000, 1);
-        } elseif (function_exists('exec')) {
+        }
+        if (($value === false || $value === '') && function_exists('stream_socket_client')) {
+            $raw = raw_snmp_get($host, $community, $oid);
+            if ($raw !== false) $value = $raw;
+        }
+        if (($value === false || $value === '') && function_exists('exec')) {
             $cmd = 'snmpget -v2c -c '.escapeshellarg($community).' -Oqv '.escapeshellarg($host).' '.escapeshellarg($oid).' 2>&1';
             $out = []; $code = 1; @exec($cmd, $out, $code);
             if ($code === 0 && isset($out[0])) $value = implode(' ', $out);
@@ -155,6 +160,44 @@ function olt_snmp_basic(string $host, string $community = 'public'): array {
         $result[$key] = trim(preg_replace('/^(STRING:|Timeticks:|OID:|INTEGER:)\s*/i', '', (string)$value), ' "');
     }
     return ['success'=>true,'message'=>'SNMP basic OK','sys_name'=>$result['sys_name'] ?? '', 'sys_descr'=>$result['sys_descr'] ?? '', 'sys_uptime'=>$result['sys_uptime'] ?? ''];
+}
+
+function raw_snmp_get(string $host, string $community, string $oid) {
+    $reqId = random_int(1000, 999999);
+    $varbind = ber_seq(ber_oid($oid)."\x05\x00");
+    $pdu = "\xa0".ber_len(strlen(ber_int($reqId).ber_int(0).ber_int(0).ber_seq($varbind))).ber_int($reqId).ber_int(0).ber_int(0).ber_seq($varbind);
+    $packet = ber_seq(ber_int(1).ber_str($community).$pdu); // SNMP v2c
+    $sock = @stream_socket_client('udp://'.$host.':161', $errno, $errstr, 2, STREAM_CLIENT_CONNECT);
+    if (!$sock) return false;
+    stream_set_timeout($sock, 2);
+    fwrite($sock, $packet);
+    $resp = fread($sock, 8192);
+    fclose($sock);
+    if (!$resp) return false;
+    return snmp_decode_first_value($resp);
+}
+
+function ber_len(int $len): string { if ($len < 128) return chr($len); $out=''; while($len>0){$out=chr($len&255).$out;$len>>=8;} return chr(128|strlen($out)).$out; }
+function ber_seq(string $v): string { return "\x30".ber_len(strlen($v)).$v; }
+function ber_str(string $v): string { return "\x04".ber_len(strlen($v)).$v; }
+function ber_int(int $v): string { $out=''; do { $out=chr($v&255).$out; $v >>= 8; } while($v>0); if ((ord($out[0]) & 0x80) !== 0) $out="\x00".$out; return "\x02".ber_len(strlen($out)).$out; }
+function ber_oid(string $oid): string { $p=array_map('intval', explode('.', $oid)); $out=chr(($p[0]*40)+$p[1]); for($i=2;$i<count($p);$i++){ $n=$p[$i]; $stack=[chr($n&0x7f)]; $n >>= 7; while($n>0){ array_unshift($stack, chr(($n&0x7f)|0x80)); $n >>= 7; } $out.=implode('', $stack); } return "\x06".ber_len(strlen($out)).$out; }
+function ber_read_len(string $d, int &$i): int { $l=ord($d[$i++]); if($l<128) return $l; $n=$l&127; $l=0; for($x=0;$x<$n;$x++) $l=($l<<8)|ord($d[$i++]); return $l; }
+function snmp_decode_first_value(string $d) {
+    $needle = "\x06";
+    $pos = 0;
+    while (($pos = strpos($d, $needle, $pos)) !== false) {
+        $i = $pos + 1; $l = ber_read_len($d, $i); $afterOid = $i + $l;
+        if ($afterOid < strlen($d)) {
+            $tag = ord($d[$afterOid]); $j = $afterOid + 1; $vl = ber_read_len($d, $j); $val = substr($d, $j, $vl);
+            if (in_array($tag, [4, 6, 67, 2], true)) {
+                if ($tag === 4 || $tag === 6) return trim($val);
+                $num = 0; for($k=0;$k<strlen($val);$k++) $num=($num<<8)|ord($val[$k]); return (string)$num;
+            }
+        }
+        $pos++;
+    }
+    return false;
 }
 
 function olt_connectivity_test(string $host, int $port, string $protocol = 'snmp'): array {
