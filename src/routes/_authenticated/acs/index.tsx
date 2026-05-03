@@ -19,12 +19,16 @@ const isOnline = (lastInform?: string) => lastInform ? new Date(lastInform).getT
 
 function AcsCenter() {
   const projection = ['_id','_lastInform','Device.DeviceInfo.SerialNumber','Device.DeviceInfo.ProductClass','Device.DeviceInfo.Manufacturer','InternetGatewayDevice.DeviceInfo.SerialNumber','InternetGatewayDevice.DeviceInfo.ModelName','InternetGatewayDevice.DeviceInfo.Manufacturer','VirtualParameters.RXPower','VirtualParameters.pppoeUsername','VirtualParameters.WiFi SSID'].join(',')
-  const { data: devices, isLoading, isError } = useQuery({
+  const { data: devices, isLoading, isError, error } = useQuery({
     queryKey: ['acs-center-devices'],
-    queryFn: async () => (await api.get(`/genieacs_proxy.php?path=/devices&projection=${projection}`)).data || [],
+    queryFn: async () => {
+      const res = await api.get(`/genieacs_proxy.php?path=/devices&projection=${projection}`)
+      return Array.isArray(res.data) ? res.data : []
+    },
+    retry: 1,
     refetchInterval: 30000,
   })
-  const list = devices || []
+  const list = Array.isArray(devices) ? devices : []
   const online = list.filter((d: any) => isOnline(d._lastInform)).length
   const offline = Math.max(0, list.length - online)
 
@@ -37,7 +41,7 @@ function AcsCenter() {
           <div className='flex gap-2'><Button asChild><Link to='/genieacs'>Buka Device Manager</Link></Button><Button asChild variant='outline'><Link to='/genieacs/settings'><Settings className='mr-2 h-4 w-4' /> Settings</Link></Button></div>
         </div>
 
-        {isError && <Card className='border-red-200 bg-red-50 dark:bg-red-950/20'><CardContent className='py-4 text-sm text-red-600'>Gagal konek ke GenieACS. Cek URL, username, password di GenieACS Settings.</CardContent></Card>}
+        {isError && <Card className='border-red-200 bg-red-50 dark:bg-red-950/20'><CardContent className='py-4 text-sm text-red-600'>Gagal konek ke GenieACS. Cek URL, username, password di GenieACS Settings. <span className='text-xs opacity-80'>{(error as any)?.message}</span></CardContent></Card>}
 
         <div className='grid gap-3 md:grid-cols-4'>
           <Card><CardContent className='flex items-center gap-3 py-4'><Server className='h-8 w-8 text-blue-500' /><div><p className='text-xs font-bold uppercase text-muted-foreground'>Total CPE</p><p className='text-2xl font-black'>{list.length}</p></div></CardContent></Card>
