@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import {
   type ColumnDef,
   type SortingState,
@@ -82,6 +82,18 @@ export function GenieACSDeviceTable({ data, isLoading }: Props) {
     return new Date(device._lastInform).getTime() > Date.now() - 5 * 60 * 1000
   }
 
+  const preparedData = useMemo(() => data.map((device) => ({
+    ...device,
+    __online: isDeviceOnline(device),
+    __pppoe: getParam(device, 'VirtualParameters.pppoeUsername') || 'No ID',
+    __model: getParam(device, 'Device.DeviceInfo.ProductClass') || getParam(device, 'InternetGatewayDevice.DeviceInfo.ModelName') || 'Unknown',
+    __manufacturer: getParam(device, 'Device.DeviceInfo.Manufacturer') || getParam(device, 'InternetGatewayDevice.DeviceInfo.Manufacturer') || '',
+    __rx: getParam(device, 'VirtualParameters.RXPower'),
+    __temp: getParam(device, 'VirtualParameters.gettemp'),
+    __wifiClients: getParam(device, 'VirtualParameters.activedevices') || '0',
+    __connectionUrl: getParam(device, 'Device.ManagementServer.ConnectionRequestURL') || getParam(device, 'InternetGatewayDevice.ManagementServer.ConnectionRequestURL') || '',
+  })), [data])
+
   const buildTaskPayload = (action: string) => {
     if (action === 'summon') {
       return {
@@ -153,24 +165,17 @@ export function GenieACSDeviceTable({ data, isLoading }: Props) {
     },
     {
       id: 'client_id',
-      accessorFn: (row) => getParam(row, 'VirtualParameters.pppoeUsername') || 'No ID',
+      accessorFn: (row) => row.__pppoe || 'No ID',
       header: ({ column }) => <DataTableColumnHeader column={column} title='Client ID' icon={<User className="w-4 h-4 mr-1"/>} />,
-      cell: ({ row }) => <span className="font-bold text-teal-600 dark:text-teal-400">{getParam(row.original, 'VirtualParameters.pppoeUsername') || '-'}</span>,
+      cell: ({ row }) => <span className="font-bold text-teal-600 dark:text-teal-400">{row.original.__pppoe === 'No ID' ? '-' : row.original.__pppoe}</span>,
     },
     {
       id: 'model',
-      accessorFn: (row) => 
-        getParam(row, 'Device.DeviceInfo.ProductClass') || 
-        getParam(row, 'InternetGatewayDevice.DeviceInfo.ModelName') || 
-        'Unknown',
+      accessorFn: (row) => row.__model || 'Unknown',
       header: ({ column }) => <DataTableColumnHeader column={column} title='Model' icon={<Monitor className="w-4 h-4 mr-1"/>} />,
       cell: ({ row }) => {
-        const model = getParam(row.original, 'Device.DeviceInfo.ProductClass') || 
-                      getParam(row.original, 'InternetGatewayDevice.DeviceInfo.ModelName') || 
-                      'Unknown'
-        const mfr = getParam(row.original, 'Device.DeviceInfo.Manufacturer') || 
-                    getParam(row.original, 'InternetGatewayDevice.DeviceInfo.Manufacturer') || 
-                    ''
+        const model = row.original.__model || 'Unknown'
+        const mfr = row.original.__manufacturer || ''
         return (
             <div className="flex flex-col">
               <span className="font-bold text-xs">{model}</span>
@@ -181,10 +186,10 @@ export function GenieACSDeviceTable({ data, isLoading }: Props) {
     },
     {
         id: 'rx_power',
-        accessorFn: (row) => parseFloat(getParam(row, 'VirtualParameters.RXPower')) || 0,
+        accessorFn: (row) => parseFloat(row.__rx) || 0,
         header: ({ column }) => <DataTableColumnHeader column={column} title='RX Power' icon={<Zap className="w-4 h-4 mr-1"/>} />,
         cell: ({ row }) => {
-            const rx = getParam(row.original, 'VirtualParameters.RXPower')
+            const rx = row.original.__rx
             if (!rx || rx === 'N/A') return <span className="text-muted-foreground text-xs">-</span>
             const val = parseFloat(rx)
             let status = { label: 'Bagus', color: 'bg-emerald-500/10 text-emerald-500' }
@@ -203,10 +208,10 @@ export function GenieACSDeviceTable({ data, isLoading }: Props) {
     },
     {
         id: 'temp',
-        accessorFn: (row) => parseFloat(getParam(row, 'VirtualParameters.gettemp')) || 0,
+        accessorFn: (row) => parseFloat(row.__temp) || 0,
         header: ({ column }) => <DataTableColumnHeader column={column} title='Temp' icon={<Activity className="w-4 h-4 mr-1"/>} />,
         cell: ({ row }) => {
-            const temp = getParam(row.original, 'VirtualParameters.gettemp')
+            const temp = row.original.__temp
             if (!temp || temp === 'N/A') return <span className="text-muted-foreground text-xs">-</span>
             const val = parseFloat(temp)
             let status = { label: 'Normal', color: 'text-emerald-500' }
@@ -223,10 +228,10 @@ export function GenieACSDeviceTable({ data, isLoading }: Props) {
     },
     {
         id: 'wifi',
-        accessorFn: (row) => getParam(row, 'VirtualParameters.activedevices') || '0',
+        accessorFn: (row) => row.__wifiClients || '0',
         header: ({ column }) => <DataTableColumnHeader column={column} title='WiFi' icon={<Wifi className="w-4 h-4 mr-1"/>} />,
         cell: ({ row }) => {
-            const active = getParam(row.original, 'VirtualParameters.activedevices') || '0'
+            const active = row.original.__wifiClients || '0'
             return (
                 <div className="flex items-center gap-1">
                     <Badge className="bg-blue-500/10 text-blue-500 border-0 text-xs font-black">
@@ -240,17 +245,13 @@ export function GenieACSDeviceTable({ data, isLoading }: Props) {
     {
         id: 'ip',
         accessorFn: (row) => {
-            const url = getParam(row, 'Device.ManagementServer.ConnectionRequestURL') || 
-                        getParam(row, 'InternetGatewayDevice.ManagementServer.ConnectionRequestURL') || 
-                        ''
+            const url = row.__connectionUrl || ''
             const match = url.match(/https?:\/\/([^:/]+)/)
             return match ? match[1] : 'N/A'
         },
         header: ({ column }) => <DataTableColumnHeader column={column} title='IP Address' icon={<Globe className="w-4 h-4 mr-1"/>} />,
         cell: ({ row }) => {
-            const url = getParam(row.original, 'Device.ManagementServer.ConnectionRequestURL') || 
-                        getParam(row.original, 'InternetGatewayDevice.ManagementServer.ConnectionRequestURL') || 
-                        ''
+            const url = row.original.__connectionUrl || ''
             const match = url.match(/https?:\/\/([^:/]+)/)
             const ip = match ? match[1] : 'N/A'
             return <span className="font-mono text-[10px] text-muted-foreground">{ip}</span>
@@ -324,14 +325,14 @@ export function GenieACSDeviceTable({ data, isLoading }: Props) {
     },
   ]
 
-  const filteredData = data.filter((device) => {
-    if (statusFilter === 'online') return isDeviceOnline(device)
-    if (statusFilter === 'offline') return !isDeviceOnline(device)
+  const filteredData = useMemo(() => preparedData.filter((device) => {
+    if (statusFilter === 'online') return device.__online
+    if (statusFilter === 'offline') return !device.__online
     return true
-  })
+  }), [preparedData, statusFilter])
 
-  const offlineCount = data.filter((device) => !isDeviceOnline(device)).length
-  const onlineCount = data.length - offlineCount
+  const offlineCount = useMemo(() => preparedData.filter((device) => !device.__online).length, [preparedData])
+  const onlineCount = preparedData.length - offlineCount
 
   const table = useReactTable({
     data: filteredData,
