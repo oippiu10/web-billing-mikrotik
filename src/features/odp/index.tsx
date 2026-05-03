@@ -39,7 +39,7 @@ export default function ODPPage() {
     setIsConvertingMaps(true)
     try {
       const res = await api.post('/odp_maps_bulk_convert.php', {
-        router_id: activeRouter.id,
+        router_id: activeRouter.software_id || activeRouter.id,
         limit: 25,
       })
       if (res.data?.success) {

@@ -68,6 +68,16 @@ function resolve_odp_maps_coords(string $url): array
 $input = json_decode(file_get_contents('php://input'), true) ?: [];
 $limit = max(1, min(100, (int)($input['limit'] ?? 25)));
 $routerId = trim((string)($input['router_id'] ?? ''));
+if ($routerId !== '') {
+    $stmtR = $conn->prepare("SELECT software_id FROM mikrotik_routers WHERE software_id = ? OR id = ? LIMIT 1");
+    $stmtR->bind_param('ss', $routerId, $routerId);
+    $stmtR->execute();
+    $routerRow = $stmtR->get_result()->fetch_assoc();
+    $stmtR->close();
+    if (!empty($routerRow['software_id'])) {
+        $routerId = (string)$routerRow['software_id'];
+    }
+}
 
 $where = "maps_link IS NOT NULL AND maps_link <> '' AND (lat IS NULL OR lng IS NULL OR lat = 0 OR lng = 0)";
 $params = [];
