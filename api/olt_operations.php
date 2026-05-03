@@ -151,9 +151,17 @@ function olt_snmp_walk_limited(string $host, string $community, string $baseOid,
         $cmd = 'snmpwalk -v2c -c '.escapeshellarg($community).' -On '.escapeshellarg($host).' '.escapeshellarg($baseOid).' 2>&1';
         $out = []; $code = 1; @exec($cmd, $out, $code);
         foreach ($out as $line) {
-            if (stripos($line, 'Timeout') !== false || stripos($line, 'No Response') !== false || stripos($line, 'not recognized') !== false) continue;
+            $badLine = stripos($line, 'Timeout') !== false
+                || stripos($line, 'No Response') !== false
+                || stripos($line, 'not recognized') !== false
+                || stripos($line, 'operable program') !== false
+                || stripos($line, 'batch file') !== false
+                || stripos($line, 'not found') !== false;
+            if ($badLine) continue;
             $parts = preg_split('/\s+=\s+/', $line, 2);
-            $rows[] = ['oid'=>$parts[0] ?? '', 'value'=>$parts[1] ?? $line];
+            $oidText = trim($parts[0] ?? '');
+            if ($oidText === '' || !preg_match('/^(\.|iso|SNMP|[0-9])/', $oidText)) continue;
+            $rows[] = ['oid'=>$oidText, 'value'=>$parts[1] ?? $line];
             if (count($rows) >= $limit) break;
         }
     }
