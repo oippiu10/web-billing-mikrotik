@@ -21,7 +21,7 @@ import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter
 } from '@/components/ui/dialog'
 import {
-  AlertTriangle, Search, CheckCheck, ChevronLeft, ChevronRight, Wallet, ArrowUpDown, Download, MessageCircle,
+  AlertTriangle, Search, CheckCheck, ChevronLeft, ChevronRight, Wallet, ArrowUpDown, Download, MessageCircle, ShieldCheck,
 } from 'lucide-react'
 import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
@@ -89,6 +89,22 @@ export function FinanceReceivable() {
   })
 
   const allProfiles = data?.profiles || []
+
+  const openIsolate = useMutation({
+    mutationFn: async (row: any) => {
+      const res = await api.post('/automation_open_isolate.php', {
+        router_id: activeRouter?.software_id || activeRouter?.id,
+        user_id: row.id,
+        username: row.username,
+      })
+      return res.data
+    },
+    onSuccess: (d) => {
+      if (d.success) toast.success(d.message || 'Layanan berhasil dibuka')
+      else toast.error(d.message || 'Gagal buka isolir')
+    },
+    onError: () => toast.error('Gagal menghubungi server'),
+  })
 
   const markPaid = useMutation({
     mutationFn: async (row: any) => {
@@ -297,6 +313,12 @@ export function FinanceReceivable() {
                           <Button size='sm' variant='outline' className='h-7 text-[10px] text-green-600'
                             onClick={() => openWhatsappReminder(row, month, year)}>
                             <MessageCircle className='h-3.5 w-3.5 mr-1' /> WA
+                          </Button>
+                          <Button size='sm' variant='outline' className='h-7 text-[10px] text-blue-600'
+                            onClick={() => {
+                              if (window.confirm(`Buka isolir PPP secret ${row.username}?`)) openIsolate.mutate(row)
+                            }} disabled={openIsolate.isPending}>
+                            <ShieldCheck className='h-3.5 w-3.5 mr-1' /> Open
                           </Button>
                           <Button size='sm' className='h-7 text-[10px] bg-green-500 hover:bg-green-600'
                             onClick={() => { setPaidDialog(row); setPaidAmount(row.harga || '') }}>
