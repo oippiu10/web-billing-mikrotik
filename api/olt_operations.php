@@ -162,10 +162,15 @@ function olt_snmp_probe(string $host, string $community, string $group = 'fast')
             '1.3.6.1.2.1.2.2.1.8.2' => 'ifOperStatus index 2',
         ],
         'hsgq' => [
+            '1.3.6.1.4.1.50224.3.1.1' => 'HSGQ enterprise sysObjectID root',
+            '1.3.6.1.4.1.50224.3.1.1.0' => 'HSGQ enterprise root scalar candidate',
+            '1.3.6.1.4.1.50224.3.1.2.1.1.1' => 'HSGQ candidate table 3.1.2',
+            '1.3.6.1.4.1.50224.3.1.3.1.1.1' => 'HSGQ candidate table 3.1.3',
+            '1.3.6.1.4.1.50224.3.1.4.1.1.1' => 'HSGQ candidate table 3.1.4',
+            '1.3.6.1.4.1.50224.3.1.5.1.1.1' => 'HSGQ candidate table 3.1.5',
+            '1.3.6.1.4.1.50224.3.1.10.1.1.1' => 'HSGQ ONU/Optic candidate 3.1.10',
             '1.3.6.1.4.1.34592.1.3.1.1.1.1' => 'VSOL/HSGQ candidate',
-            '1.3.6.1.4.1.34592.1.3.2.1.1.1' => 'VSOL/HSGQ ONU candidate',
-            '1.3.6.1.4.1.37950.1.1.5.1.1.1.1' => 'HSGQ/XPON candidate',
-            '1.3.6.1.4.1.37950.1.1.10.1.1.1.1' => 'HSGQ ONU candidate',
+            '1.3.6.1.4.1.37950.1.1.5.1.1.1.1' => 'Old HSGQ/XPON candidate',
         ],
         'vendor' => [
             '1.3.6.1.4.1.3320.1.1.1.0' => 'BDCOM/EPON candidate',
@@ -243,7 +248,7 @@ function olt_native_known_oid_scan(string $host, string $community, string $base
         $known['1.3.6.1.2.1.2.2.1.7.'.$i] = 'ifAdminStatus '.$i;
         $known['1.3.6.1.2.1.2.2.1.8.'.$i] = 'ifOperStatus '.$i;
     }
-    $vendorRoots = ['3320','17409','5875','34592','37950','3902','2011','14988','45555','4413'];
+    $vendorRoots = ['50224','3320','17409','5875','34592','37950','3902','2011','14988','45555','4413'];
     foreach ($vendorRoots as $root) {
         $known['1.3.6.1.4.1.'.$root] = 'enterprise root '.$root;
         $known['1.3.6.1.4.1.'.$root.'.1.1.1.0'] = 'vendor candidate '.$root;
