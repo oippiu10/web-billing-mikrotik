@@ -34,6 +34,9 @@ const popupStyles = `
   .mn-label { position:absolute; left:50%; top:100%; transform:translateX(-50%); margin-top:4px; max-width:110px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; border-radius:999px; background:rgba(15,23,42,.82); color:white; padding:2px 7px; font-size:9px; font-weight:900; letter-spacing:.02em; box-shadow:0 4px 12px rgba(0,0,0,.25); }
   .marker-cluster-small, .marker-cluster-medium, .marker-cluster-large { background:rgba(37,99,235,.18) !important; }
   .marker-cluster div { background:linear-gradient(135deg,#2563eb,#7c3aed) !important; color:white !important; font-weight:900 !important; border:3px solid white; box-shadow:0 8px 22px rgba(37,99,235,.38); }
+  .leaflet-overlay-pane path.cable-flow { stroke-dasharray: 16 12; animation: cable-flow 1.1s linear infinite; filter: drop-shadow(0 0 5px rgba(255,255,255,.55)); }
+  .leaflet-overlay-pane path.cable-flow.offline { stroke-dasharray: 10 12; animation-duration: 1.4s; }
+  @keyframes cable-flow { to { stroke-dashoffset: -56; } }
   @keyframes mn-pulse { 0%,100%{transform:scale(.88);opacity:.12} 50%{transform:scale(1.18);opacity:.22} }
   .premium-popup .leaflet-popup-content-wrapper {
     background: transparent !important;
@@ -154,11 +157,11 @@ export default function NetworkMap() {
 
     const map = L.map(mapRef.current, {
         zoomControl: false,
-        maxZoom: 22
+        maxZoom: 24
     }).setView(center, 14)
     
     L.tileLayer('https://mt{s}.google.com/vt/lyrs=y&x={x}&y={y}&z={z}', {
-      maxZoom: 22,
+      maxZoom: 24,
       maxNativeZoom: 20,
       subdomains: ['0', '1', '2', '3'],
       attribution: '&copy; Google Maps'
@@ -508,11 +511,12 @@ export default function NetworkMap() {
                         const isOnline = user.status === 'online'
                         const line = L.polyline([[parseFloat(odp.lat), parseFloat(odp.lng)], pos], {
                             color: isOnline ? '#22c55e' : '#ef4444',
-                            weight: isOnline ? 5 : 4.5,
-                            opacity: isOnline ? 0.82 : 0.72,
-                            dashArray: isOnline ? undefined : '10, 10',
+                            weight: isOnline ? 5.5 : 5,
+                            opacity: isOnline ? 0.88 : 0.78,
+                            dashArray: isOnline ? '16, 12' : '10, 12',
                             lineCap: 'round',
-                            lineJoin: 'round'
+                            lineJoin: 'round',
+                            className: `cable-flow ${isOnline ? 'online' : 'offline'}`
                         }).addTo(mapInstance)
                         line.bindTooltip(`${user.username} → ${odp.name}`, { direction: 'center', sticky: true, opacity: 0.9 })
                         elementsRef.current.push(line)
@@ -535,7 +539,7 @@ export default function NetworkMap() {
         })
     }
     if (hasPoints && mapInstance && lastFittedId.current !== activeRouter?.id) {
-        mapInstance.fitBounds(bounds, { padding: [100, 100], maxZoom: 18 })
+        mapInstance.fitBounds(bounds, { padding: [100, 100], maxZoom: 20 })
         lastFittedId.current = activeRouter?.id || null
     }
   }, [mapInstance, clusterGroup, odpList, usersList, linesList, activeRouter, layers, routerSummary, statusFilter])
@@ -544,7 +548,7 @@ export default function NetworkMap() {
     if (!searchQuery || !usersList || !mapInstance) return
     const user = usersList.find((u: any) => u.username.toLowerCase().includes(searchQuery.toLowerCase()))
     if (user && user.lat && user.lng) {
-        mapInstance.flyTo([user.lat, user.lng], 21, { duration: 2 })
+        mapInstance.flyTo([user.lat, user.lng], 23, { duration: 2 })
         toast.success(`Menuju lokasi ${user.username}`)
     } else {
         toast.error('Lokasi pelanggan tidak ditemukan')
@@ -575,12 +579,12 @@ export default function NetworkMap() {
         hasPoints = true
       }
     })
-    if (hasPoints) mapInstance.fitBounds(bounds, { padding: [100, 100], maxZoom: 18 })
+    if (hasPoints) mapInstance.fitBounds(bounds, { padding: [100, 100], maxZoom: 20 })
   }
 
   const goToRouter = () => {
     if (mapInstance && activeRouter?.lat && activeRouter?.lng) {
-      mapInstance.flyTo([parseFloat(activeRouter.lat), parseFloat(activeRouter.lng)], 19, { duration: 1.5 })
+      mapInstance.flyTo([parseFloat(activeRouter.lat), parseFloat(activeRouter.lng)], 21, { duration: 1.5 })
     }
   }
 
