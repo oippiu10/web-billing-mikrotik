@@ -293,31 +293,22 @@ export default function NetworkMap() {
         const model = res?.['board-name'] || '...'
         
         const popupContent = `
-            <div class='p-0 w-[280px] bg-[#1e293b]/95 backdrop-blur-md text-white rounded-2xl overflow-hidden shadow-2xl border-0'>
-                <div class='p-4 bg-gradient-to-r from-blue-600/30 to-transparent flex items-center justify-between border-b border-white/10'>
-                    <div class='flex items-center gap-3'>
-                        <div class='p-2 bg-blue-500/20 rounded-xl text-blue-400'><svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="2" width="20" height="8" rx="2" ry="2"/><rect x="2" y="14" width="20" height="8" rx="2" ry="2"/></svg></div>
-                        <b class='text-sm uppercase tracking-wider font-black'>${identity}</b>
-                    </div>
-                    <div class='flex items-center gap-1.5'>
-                        <div class='w-2.5 h-2.5 rounded-full ${isFetching ? 'bg-slate-500 animate-pulse' : 'bg-green-500 shadow-[0_0_12px_rgba(34,197,94,0.8)]'}'></div>
-                        <span class='text-[10px] font-black uppercase tracking-tighter'>${isFetching ? 'SYNCING' : 'ONLINE'}</span>
-                    </div>
+            <div class='w-[230px] overflow-hidden rounded-xl bg-[#1e293b]/95 text-white shadow-xl'>
+                <div class='flex items-center justify-between gap-2 border-b border-white/10 bg-blue-600/30 px-3 py-2.5'>
+                    <b class='min-w-0 truncate text-xs font-black uppercase'>${identity}</b>
+                    <span class='shrink-0 rounded-lg bg-white/15 px-2 py-0.5 text-[9px] font-black uppercase'>${isFetching ? 'Sync' : 'Online'}</span>
                 </div>
 
-                <div class='p-4 space-y-3.5'>
+                <div class='space-y-2 p-3'>
                     ${isFetching ? `
-                        <div class='py-8 flex flex-col items-center justify-center gap-3 text-slate-500'>
+                        <div class='flex flex-col items-center justify-center gap-2 py-5 text-slate-500'>
                             <div class='w-6 h-6 border-2 border-blue-500 border-t-transparent rounded-full animate-spin'></div>
                             <span class='text-[10px] font-bold uppercase tracking-widest'>Connecting...</span>
                         </div>
                     ` : `
-                    <div class='flex items-center justify-between group'>
-                        <div class='flex items-center gap-3 text-slate-400'>
-                            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="4" width="16" height="16" rx="2"/><rect x="9" y="9" width="6" height="6"/><line x1="15" y1="2" x2="15" y2="4"/><line x1="9" y1="2" x2="9" y2="4"/><line x1="15" y1="20" x2="15" y2="22"/><line x1="9" y1="20" x2="9" y2="22"/><line x1="22" y1="15" x2="20" y2="15"/><line x1="22" y1="9" x2="20" y2="9"/><line x1="4" y1="15" x2="2" y2="15"/><line x1="4" y1="9" x2="2" y2="9"/></svg>
-                            <span class='text-[11px] font-bold'>Model</span>
-                        </div>
-                        <span class='text-[11px] font-black text-slate-200'>${model}</span>
+                    <div class='flex items-center justify-between gap-2 rounded-lg bg-black/25 p-2'>
+                        <span class='text-[9px] font-black uppercase text-slate-400'>Model</span>
+                        <span class='truncate text-[10px] font-black text-slate-200'>${model}</span>
                     </div>
 
                     <div class='flex items-center justify-between'>
@@ -345,7 +336,7 @@ export default function NetworkMap() {
                     </div>
 
                     ${topIf ? `
-                    <div class='mt-4 p-3.5 bg-black/40 rounded-xl border border-white/5 space-y-3'>
+                    <div class='space-y-2 rounded-lg bg-black/30 p-2'>
                         <div class='flex items-center gap-2'>
                             <span class='text-[9px] font-black uppercase text-cyan-400 tracking-widest'>TRAFFIC ${topIf.name}</span>
                         </div>
@@ -372,7 +363,7 @@ export default function NetworkMap() {
             autoPan: true,
             autoPanPadding: [24, 24],
             closeButton: false,
-            maxWidth: 360
+            maxWidth: 250
         })
         rMarker.on('click', () => rMarker.openPopup())
 
@@ -405,55 +396,46 @@ export default function NetworkMap() {
                 const pct = total > 0 ? Math.round((used / total) * 100) : 0
                 const odpUsers = usersList?.filter((u: any) => String(u.odp_id) === String(odp.id)) || []
                 const remainingPorts = total > 0 ? Math.max(total - used, 0) : 0
-                const userRows = odpUsers.slice(0, 8).map((u: any, i: number) => `
-                    <tr class='border-b border-slate-100 text-[10px] dark:border-slate-800'>
-                        <td class='py-1.5 pr-2 font-black text-slate-400'>${i + 1}</td>
-                        <td class='max-w-[150px] truncate py-1.5 font-bold'>${u.username}</td>
-                        <td class='py-1.5 text-right font-black text-orange-500'>${u.redaman || '-'} dB</td>
-                    </tr>
+                const portCount = total > 0 ? Math.min(total, 64) : 0
+                const portBoxes = portCount > 0 ? Array.from({ length: portCount }).map((_, i) => {
+                    const filled = i < used
+                    return `<span title='Port ${i + 1} ${filled ? 'terpakai' : 'kosong'}' class='inline-block h-3 w-3 rounded-[3px] border ${filled ? 'border-emerald-600 bg-emerald-500' : 'border-slate-300 bg-slate-100 dark:border-slate-700 dark:bg-slate-800'}'></span>`
+                }).join('') : ''
+                const userRows = odpUsers.slice(0, 5).map((u: any, i: number) => `
+                    <div class='flex items-center justify-between gap-2 border-b border-slate-100 py-1 text-[10px] last:border-0 dark:border-slate-800'>
+                        <span class='min-w-0 truncate font-bold'>${i + 1}. ${u.username}</span>
+                        <span class='shrink-0 font-black text-orange-500'>${u.redaman || '-'} dB</span>
+                    </div>
                 `).join('')
                 marker.bindPopup(`
-                    <div class='w-[300px] overflow-hidden rounded-2xl bg-white text-slate-900 shadow-2xl dark:bg-slate-900 dark:text-white'>
-                        <div style='background:${color}' class='p-4 text-white'>
-                            <div class='flex items-center justify-between gap-3'>
-                                <div>
-                                    <p class='text-[9px] font-black uppercase tracking-[0.2em] opacity-80'>Optical Distribution Point</p>
-                                    <h4 class='mt-1 truncate text-sm font-black'>${odp.name}</h4>
+                    <div class='w-[240px] overflow-hidden rounded-xl bg-white text-slate-900 shadow-xl dark:bg-slate-900 dark:text-white'>
+                        <div style='background:${color}' class='px-3 py-2.5 text-white'>
+                            <div class='flex items-center justify-between gap-2'>
+                                <div class='min-w-0'>
+                                    <p class='text-[8px] font-black uppercase tracking-widest opacity-80'>ODP</p>
+                                    <h4 class='truncate text-xs font-black'>${odp.name}</h4>
                                 </div>
-                                <div class='rounded-xl bg-white/20 px-2.5 py-1 text-xs font-black'>${pct}%</div>
+                                <div class='shrink-0 rounded-lg bg-white/20 px-2 py-0.5 text-[10px] font-black'>${used}/${total || '?'}</div>
                             </div>
                         </div>
-                        <div class='space-y-3 p-4'>
-                            <div>
-                                <div class='mb-1 flex justify-between text-[10px] font-black uppercase tracking-widest text-slate-500 dark:text-slate-400'>
-                                    <span>Kapasitas</span><span>${used}/${total || '?'}</span>
+                        <div class='space-y-2 p-3'>
+                            <div class='rounded-lg bg-slate-50 p-2 dark:bg-slate-800/70'>
+                                <div class='mb-1.5 flex justify-between text-[9px] font-black uppercase text-slate-500'>
+                                    <span>Port Terpakai</span><span>${pct}%</span>
                                 </div>
-                                <div class='h-2 overflow-hidden rounded-full bg-slate-100 dark:bg-slate-800'>
-                                    <div class='h-full rounded-full' style='width:${Math.min(pct, 100)}%; background:${color}'></div>
-                                </div>
+                                ${portBoxes ? `<div class='flex flex-wrap gap-1'>${portBoxes}</div>` : `<p class='text-[10px] font-bold text-slate-400'>Kapasitas belum diisi</p>`}
                             </div>
-                            <div class='grid grid-cols-2 gap-2'>
-                                <div class='rounded-xl bg-slate-50 p-3 dark:bg-slate-800/70'>
-                                    <p class='text-lg font-black'>${odpUsers.length}</p>
-                                    <p class='text-[9px] font-black uppercase text-slate-500'>Pelanggan</p>
-                                </div>
-                                <div class='rounded-xl bg-slate-50 p-3 dark:bg-slate-800/70'>
-                                    <p class='text-lg font-black'>${remainingPorts}</p>
-                                    <p class='text-[9px] font-black uppercase text-slate-500'>Sisa Port</p>
-                                </div>
+                            <div class='grid grid-cols-3 gap-1.5 text-center'>
+                                <div class='rounded-lg bg-slate-50 p-2 dark:bg-slate-800/70'><p class='text-sm font-black'>${total || '-'}</p><p class='text-[8px] font-black uppercase text-slate-500'>Port</p></div>
+                                <div class='rounded-lg bg-slate-50 p-2 dark:bg-slate-800/70'><p class='text-sm font-black text-emerald-600'>${used}</p><p class='text-[8px] font-black uppercase text-slate-500'>Pakai</p></div>
+                                <div class='rounded-lg bg-slate-50 p-2 dark:bg-slate-800/70'><p class='text-sm font-black text-blue-600'>${remainingPorts}</p><p class='text-[8px] font-black uppercase text-slate-500'>Sisa</p></div>
                             </div>
-                            <div class='rounded-xl bg-slate-50 p-3 dark:bg-slate-800/70'>
-                                <div class='mb-2 flex items-center justify-between'>
-                                    <p class='text-[9px] font-black uppercase tracking-widest text-slate-500'>Daftar Pelanggan</p>
-                                    <span class='rounded-full bg-slate-200 px-2 py-0.5 text-[9px] font-black dark:bg-slate-700'>${odpUsers.length} user</span>
-                                </div>
-                                ${odpUsers.length ? `<table class='w-full'><tbody>${userRows}${odpUsers.length > 8 ? `<tr><td colspan='3' class='pt-2 text-center text-[9px] font-black text-slate-400'>+${odpUsers.length - 8} pelanggan lain</td></tr>` : ''}</tbody></table>` : `<p class='text-[10px] font-bold text-slate-400'>Belum ada pelanggan terhubung ke ODP ini.</p>`}
-                            </div>
-                            ${odp.location || odp.alamat ? `<p class='rounded-xl bg-slate-50 p-3 text-[10px] font-bold text-slate-500 dark:bg-slate-800/70 dark:text-slate-400'>${odp.location || odp.alamat}</p>` : ''}
-                            ${odp.maps_link ? `<a href='${odp.maps_link}' target='_blank' class='block rounded-xl bg-blue-600 px-3 py-2.5 text-center text-[10px] font-black uppercase tracking-widest text-white'>Buka di Google Maps</a>` : ''}
+                            ${odpUsers.length ? `<div class='rounded-lg bg-slate-50 px-2 py-1.5 dark:bg-slate-800/70'><div class='mb-1 text-[8px] font-black uppercase text-slate-500'>Pelanggan</div>${userRows}${odpUsers.length > 5 ? `<p class='pt-1 text-center text-[9px] font-black text-slate-400'>+${odpUsers.length - 5} lainnya</p>` : ''}</div>` : ''}
+                            ${odp.location || odp.alamat ? `<p class='truncate rounded-lg bg-slate-50 p-2 text-[9px] font-bold text-slate-500 dark:bg-slate-800/70'>${odp.location || odp.alamat}</p>` : ''}
+                            ${odp.maps_link ? `<a href='${odp.maps_link}' target='_blank' class='block rounded-lg bg-blue-600 px-2 py-2 text-center text-[9px] font-black uppercase text-white'>Google Maps</a>` : ''}
                         </div>
                     </div>
-                `, { className: 'premium-popup', closeButton: false, autoPan: true, autoPanPadding: [24, 24], maxWidth: 360 })
+                `, { className: 'premium-popup', closeButton: false, autoPan: true, autoPanPadding: [24, 24], maxWidth: 260 })
                 marker.on('click', () => marker.openPopup())
                 elementsRef.current.push(marker)
                 bounds.extend(pos)
@@ -481,34 +463,23 @@ export default function NetworkMap() {
                 })
                 const profile = user.profile || user.paket || '-'
                 marker.bindPopup(`
-                    <div class='w-[280px] overflow-hidden rounded-2xl bg-white text-slate-900 shadow-2xl dark:bg-slate-900 dark:text-white'>
-                        <div class='p-4 ${user.status === 'online' ? 'bg-emerald-600' : 'bg-slate-600'} text-white'>
-                            <div class='flex items-center justify-between gap-3'>
-                                <div class='min-w-0'>
-                                    <p class='text-[9px] font-black uppercase tracking-[0.2em] opacity-80'>Pelanggan PPPoE</p>
-                                    <h4 class='mt-1 truncate text-sm font-black'>${user.username}</h4>
-                                </div>
-                                <div class='flex items-center gap-1.5 rounded-xl bg-white/20 px-2.5 py-1 text-[10px] font-black uppercase'>
-                                    <span class='h-2 w-2 rounded-full bg-white'></span>${user.status || 'unknown'}
-                                </div>
+                    <div class='w-[230px] overflow-hidden rounded-xl bg-white text-slate-900 shadow-xl dark:bg-slate-900 dark:text-white'>
+                        <div class='px-3 py-2.5 ${user.status === 'online' ? 'bg-emerald-600' : 'bg-red-600'} text-white'>
+                            <div class='flex items-center justify-between gap-2'>
+                                <h4 class='min-w-0 truncate text-xs font-black'>${user.username}</h4>
+                                <span class='shrink-0 rounded-lg bg-white/20 px-2 py-0.5 text-[9px] font-black uppercase'>${user.status || 'unknown'}</span>
                             </div>
                         </div>
-                        <div class='space-y-3 p-4'>
-                            <div class='grid grid-cols-2 gap-2'>
-                                <div class='rounded-xl bg-slate-50 p-3 dark:bg-slate-800/70'>
-                                    <p class='truncate text-xs font-black'>${profile}</p>
-                                    <p class='text-[9px] font-black uppercase text-slate-500'>Profile</p>
-                                </div>
-                                <div class='rounded-xl bg-slate-50 p-3 dark:bg-slate-800/70'>
-                                    <p class='truncate text-xs font-black'>${user.ip_address || user.address || '-'}</p>
-                                    <p class='text-[9px] font-black uppercase text-slate-500'>IP Address</p>
-                                </div>
+                        <div class='space-y-2 p-3'>
+                            <div class='grid grid-cols-2 gap-1.5'>
+                                <div class='rounded-lg bg-slate-50 p-2 dark:bg-slate-800/70'><p class='truncate text-[11px] font-black'>${profile}</p><p class='text-[8px] font-black uppercase text-slate-500'>Profile</p></div>
+                                <div class='rounded-lg bg-slate-50 p-2 dark:bg-slate-800/70'><p class='truncate text-[11px] font-black'>${user.ip_address || user.address || '-'}</p><p class='text-[8px] font-black uppercase text-slate-500'>IP</p></div>
                             </div>
-                            ${user.alamat ? `<p class='rounded-xl bg-slate-50 p-3 text-[10px] font-bold text-slate-500 dark:bg-slate-800/70 dark:text-slate-400'>${user.alamat}</p>` : ''}
-                            <button onclick='window.checkLiveByUsername("${user.username}")' class='w-full rounded-xl bg-indigo-600 px-3 py-2.5 text-[10px] font-black uppercase tracking-widest text-white shadow-lg hover:bg-indigo-700'>Cek Live Status</button>
+                            ${user.alamat ? `<p class='line-clamp-2 rounded-lg bg-slate-50 p-2 text-[9px] font-bold text-slate-500 dark:bg-slate-800/70'>${user.alamat}</p>` : ''}
+                            <button onclick='window.checkLiveByUsername("${user.username}")' class='w-full rounded-lg bg-indigo-600 px-2 py-2 text-[9px] font-black uppercase text-white hover:bg-indigo-700'>Cek Live</button>
                         </div>
                     </div>
-                `, { className: 'premium-popup', closeButton: false, autoPan: true, autoPanPadding: [24, 24], maxWidth: 340 })
+                `, { className: 'premium-popup', closeButton: false, autoPan: true, autoPanPadding: [24, 24], maxWidth: 250 })
                 marker.on('click', () => marker.openPopup())
                 clusterGroup.addLayer(marker)
                 bounds.extend(pos)
