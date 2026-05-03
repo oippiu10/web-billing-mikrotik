@@ -15,7 +15,7 @@ import { DataTablePagination, DataTableToolbar, DataTableColumnHeader } from '@/
 import { Separator } from '@/components/ui/separator'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
-import { MoreHorizontal, RefreshCw, Power, Monitor, Wifi, User, Zap, Activity, Globe } from 'lucide-react'
+import { MoreHorizontal, RefreshCw, Power, Monitor, Wifi, User, Zap, Activity, Globe, RadioTower } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { Checkbox } from '@/components/ui/checkbox'
 import {
@@ -52,30 +52,38 @@ export function GenieACSDeviceTable({ data, isLoading }: Props) {
   const [selectedDeviceId, setSelectedDeviceId] = useState<string | null>(null)
   const [detailDialogOpen, setDetailDialogOpen] = useState(false)
 
+  const safeText = (value: any): string => {
+    if (value === null || value === undefined || value === '') return ''
+    if (typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean') return String(value)
+    if (value?._value !== undefined) return safeText(value._value)
+    if (value?.value !== undefined) return safeText(value.value)
+    if (value?._object !== undefined) return ''
+    return ''
+  }
+
   // Fungsi pembantu untuk mengambil nilai dari object bersarang (nested)
   const getParam = (row: any, path: string) => {
-    if (!row) return undefined
-    
-    // Cek flat key dulu (jika ada yang sudah di-flatten)
-    if (row[path] !== undefined) return row[path]?._value
+    if (!row) return ''
+    if (row[path] !== undefined) return safeText(row[path])
 
-    // Penelusuran nested object
     const parts = path.split('.')
     let current = row
     for (const part of parts) {
-      if (current && typeof current === 'object' && part in current) {
-        current = current[part]
-      } else {
-        return undefined
-      }
+      if (current && typeof current === 'object' && part in current) current = current[part]
+      else return ''
     }
-    return current?._value
+    return safeText(current)
+  }
+
+  const isDeviceOnline = (device: GenieACSDevice) => {
+    if (!device._lastInform) return false
+    return new Date(device._lastInform).getTime() > Date.now() - 5 * 60 * 1000
   }
 
   const actionMutation = useMutation({
-    mutationFn: async ({ deviceId, action }: { deviceId: string; action: string }) => {
-      // Proxy call: path=/devices/<id>/tasks
-      const res = await api.post(`/genieacs_proxy.php?path=/devices/${deviceId}/tasks`, {
+    mutationFn: async ({ deviceId, action, connectionRequest = false }: { deviceId: string; action: string; connectionRequest?: boolean }) => {
+      const suffix = connectionRequest ? '&connection_request' : ''
+      const res = await api.post(`/genieacs_proxy.php?path=/devices/${encodeURIComponent(deviceId)}/tasks${suffix}`, {
         name: action
       })
       return res.data
@@ -83,6 +91,7 @@ export function GenieACSDeviceTable({ data, isLoading }: Props) {
     onSuccess: () => {
       toast.success('Command queued successfully')
       queryClient.invalidateQueries({ queryKey: ['genieacs-devices'] })
+      queryClient.invalidateQueries({ queryKey: ['acs-center-devices'] })
     },
     onError: (error: any) => {
       toast.error(error.response?.data?.message || 'Failed to send command')
@@ -278,11 +287,18 @@ export function GenieACSDeviceTable({ data, isLoading }: Props) {
                 Reboot Device
               </DropdownMenuItem>
               <DropdownMenuItem 
+                onClick={() => actionMutation.mutate({ deviceId: device._id, action: 'refreshObject', connectionRequest: true })}
+                className="cursor-pointer"
+              >
+                <RadioTower className="w-4 h-4 mr-2" />
+                Summon / Connection Request
+              </DropdownMenuItem>
+              <DropdownMenuItem 
                 onClick={() => actionMutation.mutate({ deviceId: device._id, action: 'refreshObject' })}
                 className="cursor-pointer"
               >
                 <RefreshCw className="w-4 h-4 mr-2" />
-                Refresh Data
+                Queue Refresh Data
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
@@ -342,16 +358,37 @@ export function GenieACSDeviceTable({ data, isLoading }: Props) {
                 </div>
             )}
         </div>
-        <Button 
-            variant="outline" 
-            size="sm" 
-            className="h-8"
-            onClick={() => queryClient.invalidateQueries({ queryKey: ['genieacs-devices'] })}
-            disabled={isLoading}
-        >
-            <RefreshCw className={cn("w-3 h-3 mr-2", isLoading && "animate-spin")} />
-            Sync Now
-        </Button>
+        <div className='flex items-center gap-2'>
+          <Button
+              variant="outline"
+              size="sm"
+              className="h-8"
+              onClick={() => {
+                const offlineIds = data.filter((d) => !isDeviceOnline(d)).map((d) => d._id)
+                if (!offlineIds.length) return toast.success('Tidak ada CPE offline')
+                if (!confirm(`Summon ${offlineIds.length} CPE offline via Connection Request?`)) return
+                toast.promise(Promise.allSettled(offlineIds.map(id => actionMutation.mutateAsync({ deviceId: id, action: 'refreshObject', connectionRequest: true }))), {
+                  loading: `Mengirim summon ke ${offlineIds.length} CPE offline...`,
+                  success: 'Summon offline selesai dikirim',
+                  error: 'Sebagian summon gagal dikirim'
+                })
+              }}
+              disabled={isLoading || actionMutation.isPending}
+          >
+              <RadioTower className={cn("w-3 h-3 mr-2", actionMutation.isPending && "animate-pulse")} />
+              Summon Offline
+          </Button>
+          <Button 
+              variant="outline" 
+              size="sm" 
+              className="h-8"
+              onClick={() => queryClient.invalidateQueries({ queryKey: ['genieacs-devices'] })}
+              disabled={isLoading}
+          >
+              <RefreshCw className={cn("w-3 h-3 mr-2", isLoading && "animate-spin")} />
+              Sync Now
+          </Button>
+        </div>
       </div>
       <div className='overflow-hidden rounded-xl border bg-card/50 backdrop-blur-md shadow-lg'>
         <Table>
