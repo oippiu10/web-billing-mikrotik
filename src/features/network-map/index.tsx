@@ -131,6 +131,14 @@ export default function NetworkMap() {
     refetchInterval: 2000,
   })
 
+  const isValidCoordinate = (lat: any, lng: any) => {
+    const latNum = Number(lat)
+    const lngNum = Number(lng)
+    if (!Number.isFinite(latNum) || !Number.isFinite(lngNum)) return false
+    if (Math.abs(latNum) < 0.000001 && Math.abs(lngNum) < 0.000001) return false
+    return Math.abs(latNum) <= 90 && Math.abs(lngNum) <= 180
+  }
+
   const formatBps = (bits: any) => {
     const b = parseInt(bits || '0')
     if (b < 1000) return b + ' bps'
@@ -152,7 +160,7 @@ export default function NetworkMap() {
     if (!mapRef.current || mapInstance) return
 
     let center: [number, number] = [-6.9, 110.4]
-    if (activeRouter?.lat && activeRouter?.lng) {
+    if (activeRouter?.lat && activeRouter?.lng && !(Math.abs(Number(activeRouter.lat)) < 0.000001 && Math.abs(Number(activeRouter.lng)) < 0.000001)) {
       center = [parseFloat(activeRouter.lat), parseFloat(activeRouter.lng)]
     }
 
@@ -380,7 +388,7 @@ export default function NetworkMap() {
     // 2. ODP
     if (odpList && layers.odps) {
         odpList.forEach((odp: any) => {
-            if (odp.lat && odp.lng) {
+            if (isValidCoordinate(odp.lat, odp.lng)) {
                 const pos = [parseFloat(odp.lat), parseFloat(odp.lng)]
                 const color = getODPColor(odp.total_users, odp.ratio_total)
                 const marker = L.marker(pos, {
@@ -451,8 +459,8 @@ export default function NetworkMap() {
                 bounds.extend(pos)
                 hasPoints = true
 
-                if (layers.cables && activeRouter?.lat && activeRouter?.lng) {
-                    const line = L.polyline([[parseFloat(activeRouter.lat), parseFloat(activeRouter.lng)], pos], { color: '#ef4444', weight: 2, dashArray: '8, 8', opacity: 0.4 }).addTo(mapInstance)
+                if (layers.cables && isValidCoordinate(activeRouter?.lat, activeRouter?.lng)) {
+                    const line = L.polyline([[Number(activeRouter?.lat), Number(activeRouter?.lng)], pos], { color: '#ef4444', weight: 2, dashArray: '8, 8', opacity: 0.4 }).addTo(mapInstance)
                     elementsRef.current.push(line)
                 }
             }
@@ -464,7 +472,7 @@ export default function NetworkMap() {
         usersList
           .filter((user: any) => statusFilter === 'all' || user.status === statusFilter)
           .forEach((user: any) => {
-            if (user.lat && user.lng) {
+            if (isValidCoordinate(user.lat, user.lng)) {
                 const pos = [parseFloat(user.lat), parseFloat(user.lng)]
                 const isDisabled = user.disabled === 'yes'
                 const markerClass = isDisabled ? 'disabled' : user.status === 'online' ? 'online' : 'offline'
@@ -513,7 +521,7 @@ export default function NetworkMap() {
 
                 if (layers.cables && user.odp_id) {
                     const odp = odpList?.find((o: any) => String(o.id) === String(user.odp_id))
-                    if (odp && odp.lat && odp.lng) {
+                    if (odp && isValidCoordinate(odp.lat, odp.lng)) {
                         const isOnline = user.status === 'online'
                         const line = L.polyline([[parseFloat(odp.lat), parseFloat(odp.lng)], pos], {
                             color: isOnline ? '#22c55e' : '#ef4444',
@@ -553,7 +561,7 @@ export default function NetworkMap() {
   const handleSearch = () => {
     if (!searchQuery || !usersList || !mapInstance) return
     const user = usersList.find((u: any) => u.username.toLowerCase().includes(searchQuery.toLowerCase()))
-    if (user && user.lat && user.lng) {
+    if (user && isValidCoordinate(user.lat, user.lng)) {
         mapInstance.flyTo([user.lat, user.lng], 23, { duration: 2 })
         toast.success(`Menuju lokasi ${user.username}`)
     } else {
@@ -569,18 +577,18 @@ export default function NetworkMap() {
     if (!mapInstance) return
     const bounds = L.latLngBounds([])
     let hasPoints = false
-    if (activeRouter?.lat && activeRouter?.lng) {
-      bounds.extend([parseFloat(activeRouter.lat), parseFloat(activeRouter.lng)])
+    if (isValidCoordinate(activeRouter?.lat, activeRouter?.lng)) {
+      bounds.extend([Number(activeRouter?.lat), Number(activeRouter?.lng)])
       hasPoints = true
     }
     odpList?.forEach((o: any) => {
-      if (o.lat && o.lng) {
+      if (isValidCoordinate(o.lat, o.lng)) {
         bounds.extend([parseFloat(o.lat), parseFloat(o.lng)])
         hasPoints = true
       }
     })
     usersList?.forEach((u: any) => {
-      if (u.lat && u.lng) {
+      if (isValidCoordinate(u.lat, u.lng)) {
         bounds.extend([parseFloat(u.lat), parseFloat(u.lng)])
         hasPoints = true
       }
@@ -589,8 +597,8 @@ export default function NetworkMap() {
   }
 
   const goToRouter = () => {
-    if (mapInstance && activeRouter?.lat && activeRouter?.lng) {
-      mapInstance.flyTo([parseFloat(activeRouter.lat), parseFloat(activeRouter.lng)], 21, { duration: 1.5 })
+    if (mapInstance && isValidCoordinate(activeRouter?.lat, activeRouter?.lng)) {
+      mapInstance.flyTo([Number(activeRouter?.lat), Number(activeRouter?.lng)], 21, { duration: 1.5 })
     }
   }
 

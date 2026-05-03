@@ -9,6 +9,16 @@ require_once __DIR__ . '/config.php';
 require_once __DIR__ . '/auth/require_auth.php';
 require_admin_role(['admin', 'administrator', 'operator'], 'Akses ditolak. Hanya admin/operator yang boleh konversi maps.');
 
+function has_valid_coordinate_pair($lat, $lng): bool
+{
+    if ($lat === null || $lng === null || $lat === '' || $lng === '') return false;
+    $latF = (float)$lat;
+    $lngF = (float)$lng;
+    if (!is_finite($latF) || !is_finite($lngF)) return false;
+    if (abs($latF) < 0.000001 && abs($lngF) < 0.000001) return false;
+    return abs($latF) <= 90 && abs($lngF) <= 180;
+}
+
 function extract_maps_coords_bulk(string $text): ?array
 {
     $decoded = urldecode($text);
@@ -24,7 +34,7 @@ function extract_maps_coords_bulk(string $text): ?array
         if (preg_match($pattern, $decoded, $m)) {
             $lat = (float)$m[1];
             $lng = (float)$m[2];
-            if (abs($lat) <= 90 && abs($lng) <= 180) return ['lat' => $lat, 'lng' => $lng];
+            if (has_valid_coordinate_pair($lat, $lng)) return ['lat' => $lat, 'lng' => $lng];
         }
     }
     return null;
@@ -80,7 +90,8 @@ if ($routerId !== '' && ctype_digit($routerId)) {
     }
 }
 
-$where = "maps IS NOT NULL AND maps <> '' AND (lat IS NULL OR lng IS NULL OR lat = 0 OR lng = 0)";
+$invalidCoordinateWhere = "(lat IS NULL OR lng IS NULL OR lat = 0 OR lng = 0 OR (ABS(lat) < 0.000001 AND ABS(lng) < 0.000001))";
+$where = "maps IS NOT NULL AND maps <> '' AND {$invalidCoordinateWhere}";
 $params = [];
 $types = '';
 if ($routerId !== '') {
@@ -106,6 +117,11 @@ foreach ($rows as $row) {
     if (!empty($result['success'])) {
         $lat = (float)$result['lat'];
         $lng = (float)$result['lng'];
+        if (!has_valid_coordinate_pair($lat, $lng)) {
+            $failed++;
+            $items[] = ['id' => (int)$row['id'], 'username' => $row['username'], 'success' => false, 'message' => 'Koordinat 0,0 / tidak valid diabaikan'];
+            continue;
+        }
         $maps = "https://www.google.com/maps?q={$lat},{$lng}";
         $id = (int)$row['id'];
         $update->bind_param('ddsi', $lat, $lng, $maps, $id);
