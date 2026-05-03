@@ -64,13 +64,15 @@ export function GenieACSPage() {
       </Header>
 
       <Main className='space-y-4' fluid>
-        <div className='rounded-xl border bg-card p-4 shadow-sm'>
-          <div className='flex flex-col gap-2 md:flex-row md:items-center md:justify-between'>
+        <div className='relative overflow-hidden rounded-xl border-0 bg-gradient-to-r from-indigo-600 via-violet-600 to-fuchsia-600 p-5 text-white shadow-sm'>
+          <div className='absolute -right-10 -top-10 h-32 w-32 rounded-full bg-white/10' />
+          <div className='absolute bottom-0 right-24 h-20 w-20 rounded-full bg-white/10' />
+          <div className='relative flex flex-col gap-2 md:flex-row md:items-center md:justify-between'>
             <div>
               <h2 className='text-xl font-bold tracking-tight'>ACS Device Center</h2>
-              <p className='text-sm text-muted-foreground'>Monitoring CPE, summon offline, dan inventaris TR-069/GenieACS.</p>
+              <p className='text-sm text-white/80'>Monitoring CPE, summon offline, dan inventaris TR-069/GenieACS.</p>
             </div>
-            <div className='rounded-full border bg-muted/40 px-3 py-1 text-xs font-medium text-muted-foreground'>Mode ringan • refresh manual</div>
+            <div className='rounded-full border border-white/20 bg-white/15 px-3 py-1 text-xs font-semibold text-white'>Mode ringan • refresh manual</div>
           </div>
         </div>
         {isError && (
@@ -85,22 +87,25 @@ export function GenieACSPage() {
         )}
         {/* Lightweight KPI Cards */}
       <div className='grid gap-3 md:grid-cols-3'>
-        <Card className='border-l-4 border-l-primary'>
-          <CardContent className='flex items-center justify-between p-4'>
-            <div><p className='text-xs font-medium uppercase tracking-wide text-muted-foreground'>Total CPE</p><div className='text-3xl font-bold tabular-nums'>{devices?.length || 0}</div></div>
-            <div className='rounded-lg bg-primary/10 p-2'><Server className='h-5 w-5 text-primary' /></div>
+        <Card className='overflow-hidden border-0 bg-gradient-to-br from-blue-600 to-indigo-700 text-white shadow-sm'>
+          <CardContent className='relative flex items-center justify-between p-4'>
+            <div className='absolute -right-5 -top-5 h-20 w-20 rounded-full bg-white/10' />
+            <div><p className='text-xs font-bold uppercase tracking-wide text-white/70'>Total CPE</p><div className='text-3xl font-black tabular-nums'>{devices?.length || 0}</div></div>
+            <div className='rounded-lg bg-white/15 p-2'><Server className='h-5 w-5 text-white' /></div>
           </CardContent>
         </Card>
-        <Card className='border-l-4 border-l-emerald-500'>
-          <CardContent className='flex items-center justify-between p-4'>
-            <div><p className='text-xs font-medium uppercase tracking-wide text-muted-foreground'>Online</p><div className='text-3xl font-bold tabular-nums text-emerald-600'>{onlineCount}</div></div>
-            <div className='rounded-lg bg-emerald-500/10 p-2'><Wifi className='h-5 w-5 text-emerald-600' /></div>
+        <Card className='overflow-hidden border-0 bg-gradient-to-br from-emerald-500 to-teal-600 text-white shadow-sm'>
+          <CardContent className='relative flex items-center justify-between p-4'>
+            <div className='absolute -right-5 -top-5 h-20 w-20 rounded-full bg-white/10' />
+            <div><p className='text-xs font-bold uppercase tracking-wide text-white/70'>Online</p><div className='text-3xl font-black tabular-nums'>{onlineCount}</div></div>
+            <div className='rounded-lg bg-white/15 p-2'><Wifi className='h-5 w-5 text-white' /></div>
           </CardContent>
         </Card>
-        <Card className='border-l-4 border-l-red-500'>
-          <CardContent className='flex items-center justify-between p-4'>
-            <div><p className='text-xs font-medium uppercase tracking-wide text-muted-foreground'>Offline</p><div className='text-3xl font-bold tabular-nums text-red-600'>{(devices?.length || 0) - onlineCount}</div></div>
-            <div className='rounded-lg bg-red-500/10 p-2'><AlertTriangle className='h-5 w-5 text-red-600' /></div>
+        <Card className='overflow-hidden border-0 bg-gradient-to-br from-orange-500 to-rose-600 text-white shadow-sm'>
+          <CardContent className='relative flex items-center justify-between p-4'>
+            <div className='absolute -right-5 -top-5 h-20 w-20 rounded-full bg-white/10' />
+            <div><p className='text-xs font-bold uppercase tracking-wide text-white/70'>Offline</p><div className='text-3xl font-black tabular-nums'>{(devices?.length || 0) - onlineCount}</div></div>
+            <div className='rounded-lg bg-white/15 p-2'><AlertTriangle className='h-5 w-5 text-white' /></div>
           </CardContent>
         </Card>
       </div>
