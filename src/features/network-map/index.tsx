@@ -374,7 +374,7 @@ export default function NetworkMap() {
             closeButton: false,
             maxWidth: 360
         })
-        rMarker.on('click mouseover', () => rMarker.openPopup())
+        rMarker.on('click', () => rMarker.openPopup())
 
         // If popup is open, update its content live
         if (rMarker.isPopupOpen()) {
@@ -454,15 +454,10 @@ export default function NetworkMap() {
                         </div>
                     </div>
                 `, { className: 'premium-popup', closeButton: false, autoPan: true, autoPanPadding: [24, 24], maxWidth: 360 })
-                marker.on('click mouseover', () => marker.openPopup())
+                marker.on('click', () => marker.openPopup())
                 elementsRef.current.push(marker)
                 bounds.extend(pos)
                 hasPoints = true
-
-                if (layers.cables && isValidCoordinate(activeRouter?.lat, activeRouter?.lng)) {
-                    const line = L.polyline([[Number(activeRouter?.lat), Number(activeRouter?.lng)], pos], { color: '#ef4444', weight: 2, dashArray: '8, 8', opacity: 0.4 }).addTo(mapInstance)
-                    elementsRef.current.push(line)
-                }
             }
         })
     }
@@ -514,7 +509,7 @@ export default function NetworkMap() {
                         </div>
                     </div>
                 `, { className: 'premium-popup', closeButton: false, autoPan: true, autoPanPadding: [24, 24], maxWidth: 340 })
-                marker.on('click mouseover', () => marker.openPopup())
+                marker.on('click', () => marker.openPopup())
                 clusterGroup.addLayer(marker)
                 bounds.extend(pos)
                 hasPoints = true
