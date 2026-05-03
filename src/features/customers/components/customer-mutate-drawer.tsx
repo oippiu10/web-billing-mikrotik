@@ -36,6 +36,32 @@ interface Props {
   odps: { id: number, name: string }[]
 }
 
+const parseMapsCoordinates = (value?: string | null) => {
+  if (!value) return null
+  const text = decodeURIComponent(String(value))
+  const patterns = [
+    /@(-?\d+(?:\.\d+)?),\s*(-?\d+(?:\.\d+)?)/,
+    /[?&]q=(-?\d+(?:\.\d+)?),\s*(-?\d+(?:\.\d+)?)/,
+    /[?&]ll=(-?\d+(?:\.\d+)?),\s*(-?\d+(?:\.\d+)?)/,
+    /^\s*(-?\d+(?:\.\d+)?),\s*(-?\d+(?:\.\d+)?)\s*$/,
+  ]
+  for (const pattern of patterns) {
+    const match = text.match(pattern)
+    if (!match) continue
+    const lat = Number(match[1])
+    const lng = Number(match[2])
+    if (Number.isFinite(lat) && Number.isFinite(lng) && Math.abs(lat) <= 90 && Math.abs(lng) <= 180) {
+      return { lat: String(lat), lng: String(lng) }
+    }
+  }
+  return null
+}
+
+const buildMapsLink = (lat?: string | number | null, lng?: string | number | null) => {
+  if (lat === null || lat === undefined || lng === null || lng === undefined || lat === '' || lng === '') return ''
+  return `https://www.google.com/maps?q=${lat},${lng}`
+}
+
 export function CustomerMutateDialog({ isOpen, onClose, customer, profiles, odps }: Props) {
   const isEditing = !!customer
   const { activeRouter } = useRouterStore()
@@ -57,6 +83,8 @@ export function CustomerMutateDialog({ isOpen, onClose, customer, profiles, odps
       redaman: '',
       odp_id: '',
       maps: '',
+      lat: '',
+      lng: '',
       tanggal_dibuat: new Date().toISOString().split('T')[0],
     },
   })
@@ -83,6 +111,8 @@ export function CustomerMutateDialog({ isOpen, onClose, customer, profiles, odps
           redaman: '',
           odp_id: '',
           maps: '',
+          lat: '',
+          lng: '',
           tanggal_dibuat: new Date().toISOString().split('T')[0],
         })
       }
@@ -253,12 +283,68 @@ export function CustomerMutateDialog({ isOpen, onClose, customer, profiles, odps
                 <FormItem className="space-y-1">
                 <FormLabel className="text-xs">Link Google Maps</FormLabel>
                 <FormControl>
-                    <Input placeholder='https://goo.gl/maps/...' {...field} value={field.value || ''} className="h-8 text-xs" />
+                    <Input
+                      placeholder='https://www.google.com/maps?q=-6.2,106.8 atau link @lat,lng'
+                      {...field}
+                      value={field.value || ''}
+                      className="h-8 text-xs"
+                      onChange={(e) => {
+                        field.onChange(e)
+                        const coords = parseMapsCoordinates(e.target.value)
+                        if (coords) {
+                          form.setValue('lat', coords.lat, { shouldDirty: true })
+                          form.setValue('lng', coords.lng, { shouldDirty: true })
+                        }
+                      }}
+                    />
                 </FormControl>
+                <p className='text-[10px] text-muted-foreground'>Paste link Google Maps yang berisi koordinat, lat/lng akan terisi otomatis. Link pendek maps.app.goo.gl mungkin perlu isi manual.</p>
                 <FormMessage className="text-[10px]" />
                 </FormItem>
                 )}
                 />
+                <div className='grid grid-cols-[1fr_1fr_auto] gap-3'>
+                    <FormField
+                    control={form.control}
+                    name='lat'
+                    render={({ field }) => (
+                    <FormItem className="space-y-1">
+                    <FormLabel className="text-xs">Latitude</FormLabel>
+                    <FormControl>
+                        <Input placeholder='-6.208763' {...field} value={field.value || ''} className="h-8 text-xs" />
+                    </FormControl>
+                    <FormMessage className="text-[10px]" />
+                    </FormItem>
+                    )}
+                    />
+                    <FormField
+                    control={form.control}
+                    name='lng'
+                    render={({ field }) => (
+                    <FormItem className="space-y-1">
+                    <FormLabel className="text-xs">Longitude</FormLabel>
+                    <FormControl>
+                        <Input placeholder='106.845599' {...field} value={field.value || ''} className="h-8 text-xs" />
+                    </FormControl>
+                    <FormMessage className="text-[10px]" />
+                    </FormItem>
+                    )}
+                    />
+                    <Button
+                      type='button'
+                      variant='outline'
+                      size='sm'
+                      className='mt-6 h-8 text-[10px]'
+                      onClick={() => {
+                        const link = buildMapsLink(form.getValues('lat'), form.getValues('lng'))
+                        if (!link) return toast.error('Isi latitude dan longitude dulu')
+                        form.setValue('maps', link, { shouldDirty: true })
+                        toast.success('Link Google Maps dibuat dari koordinat')
+                      }}
+                    >
+                      Buat Link
+                    </Button>
+                </div>
                 <div className='grid grid-cols-2 gap-3'>
                     <FormField
                     control={form.control}

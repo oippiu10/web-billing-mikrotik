@@ -17,6 +17,11 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
 
+const mapsUrl = (customer: Customer) => {
+  if (customer.lat && customer.lng) return `https://www.google.com/maps?q=${customer.lat},${customer.lng}`
+  return customer.maps || ''
+}
+
 export const columns: ColumnDef<Customer>[] = [
   {
     id: 'rowNumber',
@@ -169,18 +174,21 @@ export const columns: ColumnDef<Customer>[] = [
       <DataTableColumnHeader column={column} title='Lokasi' />
     ),
     cell: ({ row }) => {
-        const maps = row.getValue('maps') as string
-        if (!maps) return '-'
+        const url = mapsUrl(row.original)
+        if (!url) return <span className='text-[10px] text-muted-foreground'>Belum ada</span>
         return (
-            <Button 
-                variant='ghost' 
-                size='sm' 
-                className='h-7 px-2 text-[10px] text-blue-600' 
-                onClick={(e) => e.stopPropagation()}
-                asChild
-            >
-                <a href={maps} target='_blank' rel='noreferrer'>Buka Maps</a>
-            </Button>
+            <div className='flex flex-col gap-1'>
+              <Button 
+                  variant='ghost' 
+                  size='sm' 
+                  className='h-7 px-2 text-[10px] text-blue-600' 
+                  onClick={(e) => e.stopPropagation()}
+                  asChild
+              >
+                  <a href={url} target='_blank' rel='noreferrer'>Buka Maps</a>
+              </Button>
+              {(!row.original.lat || !row.original.lng) && <span className='text-[9px] text-amber-600'>link saja</span>}
+            </div>
         )
     }
   },

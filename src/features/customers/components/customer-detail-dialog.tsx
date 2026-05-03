@@ -26,6 +26,7 @@ interface Props {
 
 export function CustomerDetailDialog({ isOpen, onClose, customer, onEdit, onDelete }: Props) {
   if (!customer) return null
+  const locationUrl = customer.lat && customer.lng ? `https://www.google.com/maps?q=${customer.lat},${customer.lng}` : customer.maps
 
 
 
@@ -119,17 +120,22 @@ export function CustomerDetailDialog({ isOpen, onClose, customer, onEdit, onDele
                             <p className="text-[10px] text-muted-foreground font-bold uppercase">Keterangan Alamat :</p>
                             <p className="text-xs font-medium leading-relaxed text-foreground/90"><PrivacyText>{customer.alamat || 'Tidak ada alamat'}</PrivacyText></p>
                         </div>
-                        {customer.maps && (
+                        {locationUrl && (
                             <Button 
                                 variant="outline" 
                                 size="sm" 
                                 className="w-full h-8 text-[10px] gap-2 bg-white hover:bg-blue-50 hover:text-blue-600 hover:border-blue-200 transition-colors"
-                                onClick={() => window.open(customer.maps!, '_blank')}
+                                onClick={() => window.open(locationUrl, '_blank')}
                             >
                                 <MapPin className="w-3 h-3" />
                                 Lihat Lokasi di Google Maps
                             </Button>
                         )}
+                        {customer.lat && customer.lng ? (
+                            <div className='rounded-md border bg-blue-50 px-2 py-1 text-[10px] font-mono text-blue-700'>Koordinat: {customer.lat}, {customer.lng}</div>
+                        ) : customer.maps ? (
+                            <div className='rounded-md border bg-amber-50 px-2 py-1 text-[10px] text-amber-700'>Lokasi masih berupa link. Edit pelanggan untuk isi lat/lng agar tampil di Network Maps.</div>
+                        ) : null}
                     </div>
                 </div>
             </div>
