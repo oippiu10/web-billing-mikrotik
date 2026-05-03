@@ -1,10 +1,11 @@
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
 import { api } from '@/lib/api'
 import { useRouterStore } from '@/stores/router-store'
+import { MapPicker } from '@/components/map-picker'
 import { customerSchema, type Customer } from '../data/schema'
 
 import {
@@ -25,6 +26,7 @@ import {
 } from '@/components/ui/form'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
+import { MapPin } from 'lucide-react'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { ScrollArea } from '@/components/ui/scroll-area'
 
@@ -66,6 +68,7 @@ export function CustomerMutateDialog({ isOpen, onClose, customer, profiles, odps
   const isEditing = !!customer
   const { activeRouter } = useRouterStore()
   const queryClient = useQueryClient()
+  const [isMapPickerOpen, setIsMapPickerOpen] = useState(false)
 
   const form = useForm<Customer>({
     resolver: zodResolver(customerSchema),
@@ -118,6 +121,24 @@ export function CustomerMutateDialog({ isOpen, onClose, customer, profiles, odps
       }
     }
   }, [isOpen, customer, form, profiles])
+
+  const resolveMapsMutation = useMutation({
+    mutationFn: async (url: string) => {
+      const res = await api.post('/maps_resolve.php', { url })
+      return res.data
+    },
+    onSuccess: (data) => {
+      if (data.success && data.lat && data.lng) {
+        form.setValue('lat', data.lat, { shouldDirty: true })
+        form.setValue('lng', data.lng, { shouldDirty: true })
+        form.setValue('maps', buildMapsLink(data.lat, data.lng), { shouldDirty: true })
+        toast.success('Link Maps berhasil dikonversi ke lat/lng')
+      } else {
+        toast.error(data.message || 'Koordinat tidak ditemukan dari link tersebut')
+      }
+    },
+    onError: (error: any) => toast.error(error.response?.data?.message || 'Gagal resolve link Google Maps')
+  })
 
   const mutation = useMutation({
     mutationFn: async (values: Customer) => {
@@ -282,27 +303,54 @@ export function CustomerMutateDialog({ isOpen, onClose, customer, profiles, odps
                 render={({ field }) => (
                 <FormItem className="space-y-1">
                 <FormLabel className="text-xs">Link Google Maps</FormLabel>
-                <FormControl>
-                    <Input
-                      placeholder='https://www.google.com/maps?q=-6.2,106.8 atau link @lat,lng'
-                      {...field}
-                      value={field.value || ''}
-                      className="h-8 text-xs"
-                      onChange={(e) => {
-                        field.onChange(e)
-                        const coords = parseMapsCoordinates(e.target.value)
-                        if (coords) {
-                          form.setValue('lat', coords.lat, { shouldDirty: true })
-                          form.setValue('lng', coords.lng, { shouldDirty: true })
-                        }
-                      }}
-                    />
-                </FormControl>
-                <p className='text-[10px] text-muted-foreground'>Paste link Google Maps yang berisi koordinat, lat/lng akan terisi otomatis. Link pendek maps.app.goo.gl mungkin perlu isi manual.</p>
+                <div className='flex gap-2'>
+                  <FormControl>
+                      <Input
+                        placeholder='https://maps.app.goo.gl/... atau link @lat,lng'
+                        {...field}
+                        value={field.value || ''}
+                        className="h-8 text-xs"
+                        onChange={(e) => {
+                          field.onChange(e)
+                          const coords = parseMapsCoordinates(e.target.value)
+                          if (coords) {
+                            form.setValue('lat', coords.lat, { shouldDirty: true })
+                            form.setValue('lng', coords.lng, { shouldDirty: true })
+                          }
+                        }}
+                      />
+                  </FormControl>
+                  <Button
+                    type='button'
+                    variant='outline'
+                    size='sm'
+                    className='h-8 shrink-0 text-[10px]'
+                    disabled={!field.value || resolveMapsMutation.isPending}
+                    onClick={() => resolveMapsMutation.mutate(String(field.value || ''))}
+                  >
+                    {resolveMapsMutation.isPending ? 'Convert...' : 'Convert'}
+                  </Button>
+                </div>
+                <p className='text-[10px] text-muted-foreground'>Link panjang otomatis terbaca. Untuk link pendek maps.app.goo.gl, klik Convert atau pilih manual lewat peta.</p>
                 <FormMessage className="text-[10px]" />
                 </FormItem>
                 )}
                 />
+                <div className='flex items-center justify-between rounded-lg border bg-muted/30 p-3'>
+                    <div className='flex flex-col'>
+                        <span className='text-[10px] font-black uppercase text-muted-foreground'>Titik Rumah Pelanggan</span>
+                        <span className='text-[8px] text-muted-foreground italic'>Klik/geser marker seperti penambahan ODP</span>
+                    </div>
+                    <Button
+                        type='button'
+                        variant='default'
+                        size='sm'
+                        className='h-8 gap-2 rounded-full bg-[#1e293b] px-4 text-[10px] font-black text-white shadow-md hover:bg-[#0f172a]'
+                        onClick={() => setIsMapPickerOpen(true)}
+                    >
+                        <MapPin className='h-3 w-3' /> Buka Peta
+                    </Button>
+                </div>
                 <div className='grid grid-cols-[1fr_1fr_auto] gap-3'>
                     <FormField
                     control={form.control}
@@ -345,6 +393,20 @@ export function CustomerMutateDialog({ isOpen, onClose, customer, profiles, odps
                       Buat Link
                     </Button>
                 </div>
+                <MapPicker
+                  isOpen={isMapPickerOpen}
+                  onClose={() => setIsMapPickerOpen(false)}
+                  initialLat={form.getValues('lat') ? Number(form.getValues('lat')) : null}
+                  initialLng={form.getValues('lng') ? Number(form.getValues('lng')) : null}
+                  onSelect={(lat, lng) => {
+                    const fixedLat = Number(lat.toFixed(7))
+                    const fixedLng = Number(lng.toFixed(7))
+                    form.setValue('lat', fixedLat, { shouldDirty: true })
+                    form.setValue('lng', fixedLng, { shouldDirty: true })
+                    form.setValue('maps', buildMapsLink(fixedLat, fixedLng), { shouldDirty: true })
+                    toast.success('Koordinat pelanggan tersimpan di form')
+                  }}
+                />
                 <div className='grid grid-cols-2 gap-3'>
                     <FormField
                     control={form.control}
