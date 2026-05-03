@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { useQuery } from '@tanstack/react-query'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { api } from '@/lib/api'
 import { useRouterStore } from '@/stores/router-store'
 import { Header } from '@/components/layout/header'
@@ -8,7 +8,8 @@ import { ProfileDropdown } from '@/components/profile-dropdown'
 import { ThemeSwitch } from '@/components/theme-switch'
 import { RouterSelector } from '@/components/router-selector'
 import { Button } from '@/components/ui/button'
-import { Plus, Network } from 'lucide-react'
+import { Link2, Plus, Network } from 'lucide-react'
+import { toast } from 'sonner'
 import { ODPTable } from './components/odp-table'
 import { ODPMutateDialog } from './components/odp-mutate-drawer'
 import { ODPSubNav } from './components/odp-sub-nav'
@@ -17,7 +18,9 @@ import { usePermission } from '@/lib/permissions'
 export default function ODPPage() {
   const { activeRouter } = useRouterStore()
   const permissions = usePermission()
+  const queryClient = useQueryClient()
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false)
+  const [isConvertingMaps, setIsConvertingMaps] = useState(false)
 
   const { data, isLoading } = useQuery({
     queryKey: ['odps', activeRouter?.id],
@@ -30,6 +33,27 @@ export default function ODPPage() {
     },
     enabled: !!activeRouter,
   })
+
+  const convertOdpMaps = async () => {
+    if (!activeRouter) return
+    setIsConvertingMaps(true)
+    try {
+      const res = await api.post('/odp_maps_bulk_convert.php', {
+        router_id: activeRouter.id,
+        limit: 25,
+      })
+      if (res.data?.success) {
+        toast.success(`ODP Maps: ${res.data.updated} berhasil, ${res.data.failed} gagal. Sisa ${res.data.remaining}.`)
+        queryClient.invalidateQueries({ queryKey: ['odps'] })
+      } else {
+        toast.error(res.data?.message || 'Gagal konversi maps ODP')
+      }
+    } catch (error: any) {
+      toast.error(error.response?.data?.message || 'Gagal konversi maps ODP')
+    } finally {
+      setIsConvertingMaps(false)
+    }
+  }
 
   return (
     <>
@@ -55,9 +79,14 @@ export default function ODPPage() {
             </p>
           </div>
           {permissions.canManageCustomers && (
-            <Button size='sm' onClick={() => setIsAddDialogOpen(true)} disabled={!activeRouter}>
-              <Plus className='mr-2 h-4 w-4' /> Tambah ODP
-            </Button>
+            <div className='flex flex-wrap gap-2'>
+              <Button size='sm' variant='outline' onClick={convertOdpMaps} disabled={!activeRouter || isConvertingMaps}>
+                <Link2 className='mr-2 h-4 w-4' /> {isConvertingMaps ? 'Convert...' : 'Convert Maps'}
+              </Button>
+              <Button size='sm' onClick={() => setIsAddDialogOpen(true)} disabled={!activeRouter}>
+                <Plus className='mr-2 h-4 w-4' /> Tambah ODP
+              </Button>
+            </div>
           )}
         </div>
 

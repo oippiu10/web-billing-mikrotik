@@ -26,7 +26,7 @@ import { Button } from '@/components/ui/button'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { MapPicker } from '@/components/map-picker'
-import { MapPin } from 'lucide-react'
+import { Link2, MapPin } from 'lucide-react'
 import { useState } from 'react'
 
 interface Props {
@@ -106,6 +106,70 @@ export function ODPMutateDialog({ isOpen, onClose, odp }: Props) {
 
   const onSubmit = (values: ODP) => {
     mutation.mutate(values)
+  }
+
+  const parseCoordsFromMaps = (text?: string | null) => {
+    if (!text) return null
+    const decoded = decodeURIComponent(text)
+    const patterns = [
+      /@(-?\d+(?:\.\d+)?),\s*(-?\d+(?:\.\d+)?)/,
+      /\/place\/(-?\d+(?:\.\d+)?),\s*(-?\d+(?:\.\d+)?)/,
+      /[?&]q=(-?\d+(?:\.\d+)?),\s*(-?\d+(?:\.\d+)?)/,
+      /[?&]ll=(-?\d+(?:\.\d+)?),\s*(-?\d+(?:\.\d+)?)/,
+      /!3d(-?\d+(?:\.\d+)?)!4d(-?\d+(?:\.\d+)?)/,
+      /^\s*(-?\d+(?:\.\d+)?),\s*(-?\d+(?:\.\d+)?)\s*$/,
+    ]
+    for (const pattern of patterns) {
+      const match = decoded.match(pattern)
+      if (match) {
+        const lat = Number(match[1])
+        const lng = Number(match[2])
+        if (Math.abs(lat) <= 90 && Math.abs(lng) <= 180) return { lat, lng }
+      }
+    }
+    return null
+  }
+
+  const fillMapsFromCoords = () => {
+    const lat = form.getValues('lat')
+    const lng = form.getValues('lng')
+    if (lat == null || lng == null) {
+      toast.error('Isi latitude dan longitude dulu')
+      return
+    }
+    form.setValue('maps_link', `https://www.google.com/maps?q=${lat},${lng}`, { shouldDirty: true })
+    toast.success('Link Google Maps dibuat dari koordinat')
+  }
+
+  const convertCurrentMapsLink = async () => {
+    const link = form.getValues('maps_link')
+    if (!link) {
+      toast.error('Link Google Maps masih kosong')
+      return
+    }
+    const direct = parseCoordsFromMaps(link)
+    if (direct) {
+      form.setValue('lat', direct.lat, { shouldDirty: true })
+      form.setValue('lng', direct.lng, { shouldDirty: true })
+      form.setValue('maps_link', `https://www.google.com/maps?q=${direct.lat},${direct.lng}`, { shouldDirty: true })
+      toast.success('Koordinat ODP berhasil diambil dari link')
+      return
+    }
+    try {
+      const res = await api.post('/maps_resolve.php', { url: link })
+      if (res.data?.success) {
+        const lat = Number(res.data.lat)
+        const lng = Number(res.data.lng)
+        form.setValue('lat', lat, { shouldDirty: true })
+        form.setValue('lng', lng, { shouldDirty: true })
+        form.setValue('maps_link', `https://www.google.com/maps?q=${lat},${lng}`, { shouldDirty: true })
+        toast.success('Link ODP berhasil dikonversi ke lat/lng')
+      } else {
+        toast.error(res.data?.message || 'Gagal membaca koordinat dari link')
+      }
+    } catch (error: any) {
+      toast.error(error.response?.data?.message || 'Gagal resolve link Google Maps')
+    }
   }
 
   const type = form.watch('type')
@@ -248,7 +312,12 @@ export function ODPMutateDialog({ isOpen, onClose, odp }: Props) {
                     <FormItem className="space-y-1">
                     <FormLabel className="text-xs">Link Google Maps</FormLabel>
                     <FormControl>
-                        <Input placeholder='https://goo.gl/maps/...' {...field} value={field.value || ''} className="h-8 text-xs" />
+                        <div className='flex gap-2'>
+                            <Input placeholder='https://goo.gl/maps/... atau lat,lng' {...field} value={field.value || ''} className="h-8 text-xs" />
+                            <Button type='button' variant='secondary' size='sm' className='h-8 px-3 text-[10px] font-black' onClick={convertCurrentMapsLink}>
+                                Convert
+                            </Button>
+                        </div>
                     </FormControl>
                     <FormMessage className="text-[10px]" />
                     </FormItem>
@@ -261,6 +330,9 @@ export function ODPMutateDialog({ isOpen, onClose, odp }: Props) {
                         <span className='text-[8px] text-muted-foreground italic'>Geser marker di peta</span>
                     </div>
                     <div className='flex gap-1'>
+                        <Button type='button' variant='outline' size='sm' className='h-8 text-[10px] font-black gap-2 rounded-full' onClick={fillMapsFromCoords}>
+                            <Link2 className='h-3 w-3' /> Buat Link
+                        </Button>
                         <Button 
                             type='button' variant='default' size='sm' 
                             className='h-8 text-[10px] font-black gap-2 bg-[#1e293b] text-white hover:bg-[#0f172a] px-4 rounded-full shadow-md border-none transition-all'
@@ -324,6 +396,7 @@ export function ODPMutateDialog({ isOpen, onClose, odp }: Props) {
                     onSelect={(lat, lng) => {
                         form.setValue('lat', lat)
                         form.setValue('lng', lng)
+                        form.setValue('maps_link', `https://www.google.com/maps?q=${lat},${lng}`)
                     }}
                 />
             </form>
