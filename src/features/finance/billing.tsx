@@ -22,7 +22,7 @@ import {
 } from '@/components/ui/dialog'
 import {
   Receipt, Download, Search, CheckCircle2, Clock, ChevronLeft,
-  ChevronRight, CheckCheck, XCircle, Wallet,
+  ChevronRight, CheckCheck, XCircle, Wallet, Printer,
 } from 'lucide-react'
 import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
@@ -34,6 +34,59 @@ import { usePermission } from '@/lib/permissions'
 const MONTHS_ID = ['Januari','Februari','Maret','April','Mei','Juni','Juli','Agustus','September','Oktober','November','Desember']
 const fmt = (n: number) =>
   new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', maximumFractionDigits: 0 }).format(n)
+
+const escapeHtml = (value: unknown) =>
+  String(value ?? '-')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#039;')
+
+const printInvoice = (row: any, month: number, year: number) => {
+  const invoiceNo = `INV-${year}${String(month).padStart(2, '0')}-${row.user_id || row.id || row.username}`
+  const amount = fmt(parseFloat(row.harga || row.paid_amount || 0))
+  const status = row.status === 'paid' ? 'LUNAS' : 'BELUM BAYAR'
+  const html = `<!doctype html>
+<html>
+<head>
+  <title>${escapeHtml(invoiceNo)}</title>
+  <style>
+    body{font-family:Arial,sans-serif;margin:0;padding:32px;color:#111827;background:#f3f4f6}
+    .paper{max-width:760px;margin:auto;background:white;padding:32px;border-radius:16px;box-shadow:0 10px 35px rgba(0,0,0,.08)}
+    .top{display:flex;justify-content:space-between;gap:24px;border-bottom:2px solid #111827;padding-bottom:18px;margin-bottom:24px}
+    h1{margin:0;font-size:28px}.muted{color:#6b7280;font-size:13px}.badge{display:inline-block;padding:8px 12px;border-radius:999px;font-weight:800;font-size:12px;background:${row.status === 'paid' ? '#dcfce7;color:#166534' : '#ffedd5;color:#9a3412'}}
+    table{width:100%;border-collapse:collapse;margin-top:24px}td,th{padding:12px;border-bottom:1px solid #e5e7eb;text-align:left}th{font-size:12px;text-transform:uppercase;color:#6b7280}.right{text-align:right}.total{font-size:22px;font-weight:900}.footer{margin-top:32px;font-size:12px;color:#6b7280;text-align:center}@media print{body{background:white;padding:0}.paper{box-shadow:none;border-radius:0}.no-print{display:none}}
+  </style>
+</head>
+<body>
+  <div class='paper'>
+    <div class='top'>
+      <div><h1>Invoice Tagihan</h1><div class='muted'>Web Billing MikroTik</div></div>
+      <div style='text-align:right'><strong>${escapeHtml(invoiceNo)}</strong><br/><span class='muted'>Periode ${MONTHS_ID[month - 1]} ${year}</span><br/><br/><span class='badge'>${status}</span></div>
+    </div>
+    <table>
+      <tr><th>Pelanggan</th><td>${escapeHtml(row.username)}</td></tr>
+      <tr><th>Alamat</th><td>${escapeHtml(row.alamat)}</td></tr>
+      <tr><th>Paket</th><td>${escapeHtml(row.profile)}</td></tr>
+      <tr><th>Tanggal Bayar</th><td>${escapeHtml(row.paid_at || '-')}</td></tr>
+    </table>
+    <table>
+      <thead><tr><th>Deskripsi</th><th class='right'>Nominal</th></tr></thead>
+      <tbody><tr><td>Tagihan internet ${escapeHtml(MONTHS_ID[month - 1])} ${year}</td><td class='right'>${amount}</td></tr></tbody>
+      <tfoot><tr><td class='total'>Total</td><td class='right total'>${amount}</td></tr></tfoot>
+    </table>
+    <div class='footer'>Terima kasih atas pembayaran Anda. Simpan invoice ini sebagai bukti pembayaran.</div>
+    <p class='no-print' style='text-align:center;margin-top:24px'><button onclick='window.print()' style='padding:10px 18px;border:0;border-radius:10px;background:#111827;color:white;font-weight:700'>Print / Save PDF</button></p>
+  </div>
+</body>
+</html>`
+  const win = window.open('', '_blank', 'width=900,height=700')
+  if (!win) return
+  win.document.write(html)
+  win.document.close()
+  win.focus()
+}
 
 export function FinanceBilling() {
   const { activeRouter } = useRouterStore()
@@ -265,17 +318,23 @@ export function FinanceBilling() {
                     </TableCell>
                     {permissions.canManageFinance && (
                       <TableCell className='text-right pr-4'>
-                        {row.status === 'paid' ? (
-                          <Button size='sm' variant='ghost' className='h-7 text-[10px] text-red-500 hover:text-red-600 hover:bg-red-50'
-                            onClick={() => markUnpaid.mutate(row.payment_id)}>
-                            <XCircle className='h-3.5 w-3.5 mr-1' /> Batal
+                        <div className='flex justify-end gap-1'>
+                          <Button size='sm' variant='outline' className='h-7 text-[10px]'
+                            onClick={() => printInvoice(row, month, year)}>
+                            <Printer className='h-3.5 w-3.5 mr-1' /> Invoice
                           </Button>
-                        ) : (
-                          <Button size='sm' className='h-7 text-[10px] bg-green-500 hover:bg-green-600'
-                            onClick={() => { setPaidDialog(row); setPaidAmount(row.harga || ''); }}>
-                            <CheckCheck className='h-3.5 w-3.5 mr-1' /> Lunas
-                          </Button>
-                        )}
+                          {row.status === 'paid' ? (
+                            <Button size='sm' variant='ghost' className='h-7 text-[10px] text-red-500 hover:text-red-600 hover:bg-red-50'
+                              onClick={() => markUnpaid.mutate(row.payment_id)}>
+                              <XCircle className='h-3.5 w-3.5 mr-1' /> Batal
+                            </Button>
+                          ) : (
+                            <Button size='sm' className='h-7 text-[10px] bg-green-500 hover:bg-green-600'
+                              onClick={() => { setPaidDialog(row); setPaidAmount(row.harga || ''); }}>
+                              <CheckCheck className='h-3.5 w-3.5 mr-1' /> Lunas
+                            </Button>
+                          )}
+                        </div>
                       </TableCell>
                     )}
                   </TableRow>
