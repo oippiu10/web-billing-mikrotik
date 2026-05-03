@@ -22,7 +22,7 @@ declare const L: any
 
 const popupStyles = `
   .map-marker-wrap { background: transparent !important; border: 0 !important; }
-  .mn-marker { position: relative; display:flex; align-items:center; justify-content:center; border:3px solid #fff; box-shadow:0 10px 24px rgba(15,23,42,.35); }
+  .mn-marker { position: relative; display:flex; align-items:center; justify-content:center; border:3px solid #fff; box-shadow:0 10px 24px rgba(15,23,42,.35); cursor:pointer; pointer-events:auto; }
   .mn-marker::after { content:''; position:absolute; inset:-7px; border-radius:inherit; background:currentColor; opacity:.16; animation:mn-pulse 2s infinite; }
   .mn-marker svg { position:relative; z-index:1; filter:drop-shadow(0 1px 1px rgba(0,0,0,.25)); }
   .mn-server { width:44px; height:44px; border-radius:14px; color:#ef4444; background:linear-gradient(135deg,#ef4444,#7f1d1d); }
@@ -31,13 +31,14 @@ const popupStyles = `
   .mn-user.online { color:#22c55e; background:linear-gradient(135deg,#22c55e,#047857); }
   .mn-user.offline { color:#ef4444; background:linear-gradient(135deg,#ef4444,#b91c1c); }
   .mn-user.disabled { color:#7f1d1d; background:linear-gradient(135deg,#f43f5e,#7f1d1d); }
-  .mn-label { position:absolute; left:50%; top:100%; transform:translateX(-50%); margin-top:4px; max-width:110px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; border-radius:999px; background:rgba(15,23,42,.82); color:white; padding:2px 7px; font-size:9px; font-weight:900; letter-spacing:.02em; box-shadow:0 4px 12px rgba(0,0,0,.25); }
+  .mn-label { position:absolute; left:50%; top:100%; transform:translateX(-50%); margin-top:4px; max-width:110px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; border-radius:999px; background:rgba(15,23,42,.82); color:white; padding:2px 7px; font-size:9px; font-weight:900; letter-spacing:.02em; box-shadow:0 4px 12px rgba(0,0,0,.25); pointer-events:none; }
   .marker-cluster-small, .marker-cluster-medium, .marker-cluster-large { background:rgba(37,99,235,.18) !important; }
   .marker-cluster div { background:linear-gradient(135deg,#2563eb,#7c3aed) !important; color:white !important; font-weight:900 !important; border:3px solid white; box-shadow:0 8px 22px rgba(37,99,235,.38); }
   .leaflet-overlay-pane path.cable-flow { stroke-dasharray: 16 12; animation: cable-flow 1.1s linear infinite; filter: drop-shadow(0 0 5px rgba(255,255,255,.55)); }
   .leaflet-overlay-pane path.cable-flow.offline { stroke-dasharray: 10 12; animation-duration: 1.4s; }
   @keyframes cable-flow { to { stroke-dashoffset: -56; } }
   @keyframes mn-pulse { 0%,100%{transform:scale(.88);opacity:.12} 50%{transform:scale(1.18);opacity:.22} }
+  .premium-popup { z-index: 1200 !important; }
   .premium-popup .leaflet-popup-content-wrapper {
     background: transparent !important;
     border: none !important;
@@ -360,9 +361,12 @@ export default function NetworkMap() {
         // Update popup content without closing it if possible, or bind normally
         rMarker.bindPopup(popupContent, { 
             className: 'premium-popup',
-            autoPan: false,
-            closeButton: false
+            autoPan: true,
+            autoPanPadding: [24, 24],
+            closeButton: false,
+            maxWidth: 360
         })
+        rMarker.on('click mouseover', () => rMarker.openPopup())
 
         // If popup is open, update its content live
         if (rMarker.isPopupOpen()) {
@@ -401,7 +405,7 @@ export default function NetworkMap() {
                     </tr>
                 `).join('')
                 marker.bindPopup(`
-                    <div class='w-[260px] overflow-hidden rounded-2xl bg-white text-slate-900 shadow-2xl dark:bg-slate-900 dark:text-white'>
+                    <div class='w-[300px] overflow-hidden rounded-2xl bg-white text-slate-900 shadow-2xl dark:bg-slate-900 dark:text-white'>
                         <div style='background:${color}' class='p-4 text-white'>
                             <div class='flex items-center justify-between gap-3'>
                                 <div>
@@ -441,7 +445,8 @@ export default function NetworkMap() {
                             ${odp.maps_link ? `<a href='${odp.maps_link}' target='_blank' class='block rounded-xl bg-blue-600 px-3 py-2.5 text-center text-[10px] font-black uppercase tracking-widest text-white'>Buka di Google Maps</a>` : ''}
                         </div>
                     </div>
-                `, { className: 'premium-popup', closeButton: false })
+                `, { className: 'premium-popup', closeButton: false, autoPan: true, autoPanPadding: [24, 24], maxWidth: 360 })
+                marker.on('click mouseover', () => marker.openPopup())
                 elementsRef.current.push(marker)
                 bounds.extend(pos)
                 hasPoints = true
@@ -500,7 +505,8 @@ export default function NetworkMap() {
                             <button onclick='window.checkLiveByUsername("${user.username}")' class='w-full rounded-xl bg-indigo-600 px-3 py-2.5 text-[10px] font-black uppercase tracking-widest text-white shadow-lg hover:bg-indigo-700'>Cek Live Status</button>
                         </div>
                     </div>
-                `, { className: 'premium-popup', closeButton: false })
+                `, { className: 'premium-popup', closeButton: false, autoPan: true, autoPanPadding: [24, 24], maxWidth: 340 })
+                marker.on('click mouseover', () => marker.openPopup())
                 clusterGroup.addLayer(marker)
                 bounds.extend(pos)
                 hasPoints = true
