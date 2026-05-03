@@ -77,13 +77,24 @@ function OltCenter() {
             <Select value={form.brand} onValueChange={(brand) => setForm({ ...form, brand })}>
               <SelectTrigger className='mt-1'><SelectValue /></SelectTrigger>
               <SelectContent>
-                <SelectItem value='Generic'>Generic</SelectItem>
-                <SelectItem value='Huawei'>Huawei</SelectItem>
-                <SelectItem value='ZTE'>ZTE</SelectItem>
-                <SelectItem value='Fiberhome'>Fiberhome</SelectItem>
-                <SelectItem value='VSOL'>VSOL</SelectItem>
-                <SelectItem value='BDCOM'>BDCOM</SelectItem>
-                <SelectItem value='C-Data'>C-Data</SelectItem>
+                <SelectItem value='Generic'>Generic / Unknown</SelectItem>
+                <SelectItem value='Huawei MA5600/MA5608/MA5680'>Huawei MA5600/MA5608/MA5680</SelectItem>
+                <SelectItem value='Huawei MA5800'>Huawei MA5800</SelectItem>
+                <SelectItem value='ZTE C300/C320'>ZTE C300/C320</SelectItem>
+                <SelectItem value='ZTE C600/C650'>ZTE C600/C650</SelectItem>
+                <SelectItem value='Fiberhome AN5516'>Fiberhome AN5516</SelectItem>
+                <SelectItem value='Fiberhome AN6000'>Fiberhome AN6000</SelectItem>
+                <SelectItem value='VSOL V1600'>VSOL V1600 Series</SelectItem>
+                <SelectItem value='VSOL V2800'>VSOL V2800 Series</SelectItem>
+                <SelectItem value='BDCOM GP3600'>BDCOM GP3600 Series</SelectItem>
+                <SelectItem value='BDCOM GP1700'>BDCOM GP1700 Series</SelectItem>
+                <SelectItem value='C-Data FD1600'>C-Data FD1600 Series</SelectItem>
+                <SelectItem value='C-Data FD8000'>C-Data FD8000 Series</SelectItem>
+                <SelectItem value='Raisecom'>Raisecom</SelectItem>
+                <SelectItem value='Dasan/Zhone'>Dasan / Zhone</SelectItem>
+                <SelectItem value='Nokia/Alcatel ISAM'>Nokia / Alcatel ISAM</SelectItem>
+                <SelectItem value='MikroTik GPEN'>MikroTik GPEN</SelectItem>
+                <SelectItem value='TP-Link OLT'>TP-Link OLT</SelectItem>
               </SelectContent>
             </Select>
           </div>
