@@ -29,8 +29,8 @@ const popupStyles = `
   .mn-odp { width:34px; height:34px; border-radius:999px; }
   .mn-user { width:30px; height:30px; border-radius:12px; }
   .mn-user.online { color:#22c55e; background:linear-gradient(135deg,#22c55e,#047857); }
-  .mn-user.offline { color:#64748b; background:linear-gradient(135deg,#94a3b8,#475569); }
-  .mn-user.disabled { color:#ef4444; background:linear-gradient(135deg,#fb7185,#991b1b); }
+  .mn-user.offline { color:#ef4444; background:linear-gradient(135deg,#ef4444,#b91c1c); }
+  .mn-user.disabled { color:#7f1d1d; background:linear-gradient(135deg,#f43f5e,#7f1d1d); }
   .mn-label { position:absolute; left:50%; top:100%; transform:translateX(-50%); margin-top:4px; max-width:110px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; border-radius:999px; background:rgba(15,23,42,.82); color:white; padding:2px 7px; font-size:9px; font-weight:900; letter-spacing:.02em; box-shadow:0 4px 12px rgba(0,0,0,.25); }
   .marker-cluster-small, .marker-cluster-medium, .marker-cluster-large { background:rgba(37,99,235,.18) !important; }
   .marker-cluster div { background:linear-gradient(135deg,#2563eb,#7c3aed) !important; color:white !important; font-weight:900 !important; border:3px solid white; box-shadow:0 8px 22px rgba(37,99,235,.38); }
@@ -812,7 +812,7 @@ export default function NetworkMap() {
                 <div className='flex items-center gap-4 rounded-2xl border border-white/40 bg-white/95 px-4 py-2.5 text-xs shadow-xl backdrop-blur-xl dark:border-white/10 dark:bg-slate-950/90'>
                     <div className='flex items-center gap-2 font-bold'><Wifi className='h-4 w-4 text-emerald-500' /> {onlineUsers} Online</div>
                     <div className='h-4 w-px bg-border' />
-                    <div className='flex items-center gap-2 font-bold'><WifiOff className='h-4 w-4 text-slate-500' /> {offlineUsers} Offline</div>
+                    <div className='flex items-center gap-2 font-bold'><WifiOff className='h-4 w-4 text-red-500' /> {offlineUsers} Offline</div>
                     <div className='h-4 w-px bg-border' />
                     <div className='flex items-center gap-2 font-bold'><Box className='h-4 w-4 text-blue-500' /> {totalOdp} ODP</div>
                     <div className='h-4 w-px bg-border' />
