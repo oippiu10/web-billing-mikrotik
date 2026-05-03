@@ -36,7 +36,8 @@ export function GenieACSPage() {
       const res = await api.get(`/genieacs_proxy.php?path=/devices&projection=${projection}`)
       return res.data || []
     },
-    refetchInterval: 30000, // Refresh every 30s
+    refetchInterval: false,
+    staleTime: 60_000,
   })
 
   const onlineCount = (devices?.filter((d: any) => {
@@ -62,7 +63,7 @@ export function GenieACSPage() {
         <ProfileDropdown />
       </Header>
 
-      <Main className='space-y-6' fluid>
+      <Main className='space-y-4' fluid>
         {isError && (
             <Alert variant="destructive" className="bg-destructive/10 border-destructive/20 text-destructive">
                 <AlertTriangle className="h-4 w-4" />
@@ -73,44 +74,24 @@ export function GenieACSPage() {
                 </AlertDescription>
             </Alert>
         )}
-        {/* KPI Cards */}
-      <div className='grid gap-4 md:grid-cols-3'>
-        <Card className="bg-gradient-to-br from-indigo-600 to-violet-700 border-0 text-white overflow-hidden relative group shadow-lg">
-          <div className="absolute top-0 right-0 p-4 opacity-20 group-hover:scale-110 transition-transform">
-             <Server className="w-16 h-16" />
-          </div>
-          <CardHeader className='flex flex-row items-center justify-between space-y-0 pb-2'>
-            <CardTitle className='text-xs font-black uppercase tracking-widest opacity-70'>Total CPE Devices</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className='text-5xl font-black tabular-nums'>{devices?.length || 0}</div>
-            <p className='text-[10px] bg-white/20 inline-block px-2 py-0.5 rounded-full font-bold mt-2 uppercase tracking-tighter'>ACS Management System</p>
+        {/* Lightweight KPI Cards */}
+      <div className='grid gap-3 md:grid-cols-3'>
+        <Card>
+          <CardContent className='flex items-center justify-between p-4'>
+            <div><p className='text-xs text-muted-foreground'>Total CPE</p><div className='text-2xl font-bold'>{devices?.length || 0}</div></div>
+            <Server className='h-5 w-5 text-primary' />
           </CardContent>
         </Card>
-
-        <Card className="bg-gradient-to-br from-emerald-500 to-teal-600 border-0 text-white overflow-hidden relative group shadow-lg">
-          <div className="absolute top-0 right-0 p-4 opacity-20 group-hover:scale-110 transition-transform">
-             <Wifi className="w-16 h-16" />
-          </div>
-          <CardHeader className='flex flex-row items-center justify-between space-y-0 pb-2'>
-            <CardTitle className='text-xs font-black uppercase tracking-widest opacity-70'>Online CPE</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className='text-5xl font-black tabular-nums'>{onlineCount}</div>
-            <p className='text-[10px] bg-white/20 inline-block px-2 py-0.5 rounded-full font-bold mt-2 uppercase tracking-tighter'>ACS Management System</p>
+        <Card>
+          <CardContent className='flex items-center justify-between p-4'>
+            <div><p className='text-xs text-muted-foreground'>Online</p><div className='text-2xl font-bold text-emerald-600'>{onlineCount}</div></div>
+            <Wifi className='h-5 w-5 text-emerald-600' />
           </CardContent>
         </Card>
-
-        <Card className="bg-gradient-to-br from-orange-500 to-rose-600 border-0 text-white overflow-hidden relative group shadow-lg">
-          <div className="absolute top-0 right-0 p-4 opacity-20 group-hover:scale-110 transition-transform">
-             <AlertTriangle className="w-16 h-16" />
-          </div>
-          <CardHeader className='flex flex-row items-center justify-between space-y-0 pb-2'>
-            <CardTitle className='text-xs font-black uppercase tracking-widest opacity-70'>Offline CPE</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className='text-5xl font-black tabular-nums'>{(devices?.length || 0) - onlineCount}</div>
-            <p className='text-[10px] bg-white/20 inline-block px-2 py-0.5 rounded-full font-bold mt-2 uppercase tracking-tighter'>ACS Management System</p>
+        <Card>
+          <CardContent className='flex items-center justify-between p-4'>
+            <div><p className='text-xs text-muted-foreground'>Offline</p><div className='text-2xl font-bold text-red-600'>{(devices?.length || 0) - onlineCount}</div></div>
+            <AlertTriangle className='h-5 w-5 text-red-600' />
           </CardContent>
         </Card>
       </div>
@@ -122,7 +103,7 @@ export function GenieACSPage() {
           </div>
         )}
 
-        <Card className='border-none shadow-xl bg-card/50 backdrop-blur-xl'>
+        <Card>
           <CardHeader className='pb-3'>
             <div className='flex items-center justify-between'>
               <div>
@@ -130,7 +111,7 @@ export function GenieACSPage() {
                   <Server className='w-5 h-5 text-teal-500' />
                   CPE Inventory List
                 </CardTitle>
-                <p className="text-xs text-muted-foreground mt-1">Mengelola semua modem/router pelanggan via TR-069.</p>
+                <p className="text-xs text-muted-foreground mt-1">Mode ringan: refresh manual agar halaman tidak berat.</p>
               </div>
             </div>
           </CardHeader>

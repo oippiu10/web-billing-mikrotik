@@ -52,6 +52,7 @@ export function GenieACSDeviceTable({ data, isLoading }: Props) {
   const [selectedDeviceId, setSelectedDeviceId] = useState<string | null>(null)
   const [detailDialogOpen, setDetailDialogOpen] = useState(false)
   const [statusFilter, setStatusFilter] = useState<'all' | 'online' | 'offline'>('all')
+  const [pageSize, setPageSize] = useState(20)
 
   const safeText = (value: any): string => {
     if (value === null || value === undefined || value === '') return ''
@@ -350,6 +351,9 @@ export function GenieACSDeviceTable({ data, isLoading }: Props) {
     getFilteredRowModel: getFilteredRowModel(),
     getPaginationRowModel: getPaginationRowModel(),
     getSortedRowModel: getSortedRowModel(),
+    initialState: {
+      pagination: { pageSize },
+    },
   })
 
   return (
@@ -384,6 +388,20 @@ export function GenieACSDeviceTable({ data, isLoading }: Props) {
             )}
         </div>
         <div className='flex flex-wrap items-center justify-end gap-2'>
+          <select
+            className='h-8 rounded-md border bg-background px-2 text-xs'
+            value={pageSize}
+            onChange={(e) => {
+              const size = Number(e.target.value)
+              setPageSize(size)
+              table.setPageSize(size)
+            }}
+          >
+            <option value={10}>10/baris</option>
+            <option value={20}>20/baris</option>
+            <option value={50}>50/baris</option>
+            <option value={100}>100/baris</option>
+          </select>
           <div className='flex items-center rounded-md border bg-background p-1'>
             <Button size='sm' variant={statusFilter === 'all' ? 'secondary' : 'ghost'} className='h-7 px-2 text-xs' onClick={() => setStatusFilter('all')}>All {data.length}</Button>
             <Button size='sm' variant={statusFilter === 'online' ? 'secondary' : 'ghost'} className='h-7 px-2 text-xs text-emerald-600' onClick={() => setStatusFilter('online')}>Online {onlineCount}</Button>
@@ -420,7 +438,7 @@ export function GenieACSDeviceTable({ data, isLoading }: Props) {
           </Button>
         </div>
       </div>
-      <div className='overflow-hidden rounded-xl border bg-card/50 backdrop-blur-md shadow-lg'>
+      <div className='overflow-x-auto rounded-md border'>
         <Table>
           <TableHeader className="bg-muted/50">
             {table.getHeaderGroups().map((headerGroup) => (
@@ -440,7 +458,7 @@ export function GenieACSDeviceTable({ data, isLoading }: Props) {
               table.getRowModel().rows.map((row) => (
                 <TableRow 
                   key={row.id} 
-                  className='hover:bg-muted/30 transition-colors cursor-pointer group'
+                  className='hover:bg-muted/30 cursor-pointer'
                   onClick={(e) => {
                       // Jangan buka dialog jika mengklik checkbox atau menu aksi
                       const target = e.target as HTMLElement;
