@@ -153,11 +153,13 @@ export default function NetworkMap() {
     }
 
     const map = L.map(mapRef.current, {
-        zoomControl: false 
+        zoomControl: false,
+        maxZoom: 22
     }).setView(center, 14)
     
     L.tileLayer('https://mt{s}.google.com/vt/lyrs=y&x={x}&y={y}&z={z}', {
-      maxZoom: 20,
+      maxZoom: 22,
+      maxNativeZoom: 20,
       subdomains: ['0', '1', '2', '3'],
       attribution: '&copy; Google Maps'
     }).addTo(map)
@@ -506,9 +508,11 @@ export default function NetworkMap() {
                         const isOnline = user.status === 'online'
                         const line = L.polyline([[parseFloat(odp.lat), parseFloat(odp.lng)], pos], {
                             color: isOnline ? '#22c55e' : '#ef4444',
-                            weight: isOnline ? 2 : 1.8,
-                            opacity: isOnline ? 0.55 : 0.4,
-                            dashArray: isOnline ? undefined : '4, 8'
+                            weight: isOnline ? 5 : 4.5,
+                            opacity: isOnline ? 0.82 : 0.72,
+                            dashArray: isOnline ? undefined : '10, 10',
+                            lineCap: 'round',
+                            lineJoin: 'round'
                         }).addTo(mapInstance)
                         line.bindTooltip(`${user.username} → ${odp.name}`, { direction: 'center', sticky: true, opacity: 0.9 })
                         elementsRef.current.push(line)
@@ -531,7 +535,7 @@ export default function NetworkMap() {
         })
     }
     if (hasPoints && mapInstance && lastFittedId.current !== activeRouter?.id) {
-        mapInstance.fitBounds(bounds, { padding: [100, 100], maxZoom: 16 })
+        mapInstance.fitBounds(bounds, { padding: [100, 100], maxZoom: 18 })
         lastFittedId.current = activeRouter?.id || null
     }
   }, [mapInstance, clusterGroup, odpList, usersList, linesList, activeRouter, layers, routerSummary, statusFilter])
@@ -540,7 +544,7 @@ export default function NetworkMap() {
     if (!searchQuery || !usersList || !mapInstance) return
     const user = usersList.find((u: any) => u.username.toLowerCase().includes(searchQuery.toLowerCase()))
     if (user && user.lat && user.lng) {
-        mapInstance.flyTo([user.lat, user.lng], 19, { duration: 2 })
+        mapInstance.flyTo([user.lat, user.lng], 21, { duration: 2 })
         toast.success(`Menuju lokasi ${user.username}`)
     } else {
         toast.error('Lokasi pelanggan tidak ditemukan')
@@ -571,12 +575,12 @@ export default function NetworkMap() {
         hasPoints = true
       }
     })
-    if (hasPoints) mapInstance.fitBounds(bounds, { padding: [100, 100], maxZoom: 16 })
+    if (hasPoints) mapInstance.fitBounds(bounds, { padding: [100, 100], maxZoom: 18 })
   }
 
   const goToRouter = () => {
     if (mapInstance && activeRouter?.lat && activeRouter?.lng) {
-      mapInstance.flyTo([parseFloat(activeRouter.lat), parseFloat(activeRouter.lng)], 17, { duration: 1.5 })
+      mapInstance.flyTo([parseFloat(activeRouter.lat), parseFloat(activeRouter.lng)], 19, { duration: 1.5 })
     }
   }
 
