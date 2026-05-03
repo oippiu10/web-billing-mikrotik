@@ -151,22 +151,21 @@ export const sidebarData: SidebarData = {
         },
         {
           title: 'ACS / TR-069',
-          url: '/acs',
           icon: Bot,
           requiredRoles: ['admin', 'administrator', 'super_admin', 'super admin', 'superadministrator', 'operator'],
-        },
-        {
-          title: 'GenieACS',
-          icon: Server,
-          requiredRoles: ['admin', 'administrator', 'super_admin', 'super admin', 'superadministrator'],
           items: [
             {
-              title: 'Devices',
+              title: 'Overview ACS',
+              url: '/acs',
+              icon: Bot,
+            },
+            {
+              title: 'GenieACS Devices',
               url: '/genieacs',
               icon: Monitor,
             },
             {
-              title: 'Settings',
+              title: 'GenieACS Settings',
               url: '/genieacs/settings',
               icon: Settings,
             },
