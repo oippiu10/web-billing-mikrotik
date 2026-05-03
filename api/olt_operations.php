@@ -223,23 +223,40 @@ function olt_snmp_walk_limited(string $host, string $community, string $baseOid,
         $rows = raw_snmp_walk_limited($host, $community, $baseOid, $limit, 0.7);
     }
     if (empty($rows)) {
-        // Fallback terakhir: baca OID umum satu per satu pakai native SNMP GET.
-        $common = [
-            '1.3.6.1.2.1.1.1.0' => 'sysDescr',
-            '1.3.6.1.2.1.1.3.0' => 'sysUpTime',
-            '1.3.6.1.2.1.1.4.0' => 'sysContact',
-            '1.3.6.1.2.1.1.5.0' => 'sysName',
-            '1.3.6.1.2.1.1.6.0' => 'sysLocation',
-        ];
-        foreach ($common as $oid => $name) {
-            if (strpos($oid, $baseOid) !== 0 && strpos($baseOid, '1.3.6.1.2.1.1') !== 0) continue;
-            $v = raw_snmp_get($host, $community, $oid);
-            if ($v !== false && $v !== '') $rows[] = ['oid'=>$oid.' ('.$name.')', 'value'=>(string)$v];
-            if (count($rows) >= $limit) break;
-        }
+        $rows = olt_native_known_oid_scan($host, $community, $baseOid, $limit);
     }
-    if (empty($rows)) return ['success'=>false,'message'=>'SNMP walk belum berhasil. Untuk walk penuh install PHP SNMP atau Net-SNMP snmpwalk; native fallback hanya baca OID umum.'];
+    if (empty($rows)) return ['success'=>false,'message'=>'SNMP walk belum menemukan data pada OID '.$baseOid.'. System OID sudah OK, tapi walk vendor penuh tetap paling akurat jika install Net-SNMP/PHP SNMP.'];
     return ['success'=>true,'message'=>'SNMP walk OK','oid'=>$baseOid,'count'=>count($rows),'data'=>$rows];
+}
+
+function olt_native_known_oid_scan(string $host, string $community, string $baseOid, int $limit = 80): array {
+    $baseOid = rtrim($baseOid, '.');
+    $known = [
+        '1.3.6.1.2.1.1.1.0' => 'sysDescr', '1.3.6.1.2.1.1.2.0' => 'sysObjectID', '1.3.6.1.2.1.1.3.0' => 'sysUpTime', '1.3.6.1.2.1.1.4.0' => 'sysContact', '1.3.6.1.2.1.1.5.0' => 'sysName', '1.3.6.1.2.1.1.6.0' => 'sysLocation',
+        '1.3.6.1.2.1.2.1.0' => 'ifNumber',
+    ];
+    for ($i=1; $i<=32; $i++) {
+        $known['1.3.6.1.2.1.2.2.1.1.'.$i] = 'ifIndex '.$i;
+        $known['1.3.6.1.2.1.2.2.1.2.'.$i] = 'ifDescr '.$i;
+        $known['1.3.6.1.2.1.2.2.1.3.'.$i] = 'ifType '.$i;
+        $known['1.3.6.1.2.1.2.2.1.5.'.$i] = 'ifSpeed '.$i;
+        $known['1.3.6.1.2.1.2.2.1.7.'.$i] = 'ifAdminStatus '.$i;
+        $known['1.3.6.1.2.1.2.2.1.8.'.$i] = 'ifOperStatus '.$i;
+    }
+    $vendorRoots = ['3320','17409','5875','34592','37950','3902','2011','14988','45555','4413'];
+    foreach ($vendorRoots as $root) {
+        $known['1.3.6.1.4.1.'.$root] = 'enterprise root '.$root;
+        $known['1.3.6.1.4.1.'.$root.'.1.1.1.0'] = 'vendor candidate '.$root;
+        $known['1.3.6.1.4.1.'.$root.'.1.1.5.1.1.1.1'] = 'vendor candidate '.$root.' onu/pon';
+    }
+    $rows = [];
+    foreach ($known as $oid => $label) {
+        if (strpos($oid.'.', $baseOid.'.') !== 0 && $oid !== $baseOid) continue;
+        $v = raw_snmp_get($host, $community, $oid, 0.45);
+        if ($v !== false && $v !== '') $rows[] = ['oid'=>$oid.' ('.$label.')', 'value'=>(string)$v];
+        if (count($rows) >= $limit) break;
+    }
+    return $rows;
 }
 
 function olt_snmp_basic(string $host, string $community = 'public'): array {
