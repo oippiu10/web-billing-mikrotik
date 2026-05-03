@@ -11,7 +11,7 @@ import { RouterSelector } from '@/components/router-selector'
 import { CustomersTable } from './components/customers-table'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
-import { UserPlus, SearchIcon, RefreshCw, LayoutGrid, Users, Wifi, WifiOff, CheckCircle2 } from 'lucide-react'
+import { UserPlus, SearchIcon, RefreshCw, LayoutGrid, Users, Wifi, WifiOff, CheckCircle2, MapPin } from 'lucide-react'
 import { toast } from 'sonner'
 import { CustomerMutateDialog } from './components/customer-mutate-drawer'
 import { BatchEditCustomers } from './components/batch-edit-customers'
@@ -60,6 +60,26 @@ export function Customers() {
   })
 
   const profiles = profilesData?.map((p: any) => p.name) || []
+
+  const mapsConvertMutation = useMutation({
+    mutationFn: async () => {
+      if (!activeRouter) throw new Error('Pilih router terlebih dahulu')
+      const res = await api.post('/maps_bulk_convert.php', {
+        router_id: activeRouter.id,
+        limit: 25,
+      })
+      return res.data
+    },
+    onSuccess: (data) => {
+      if (data.success) {
+        toast.success(`Maps dikonversi: ${data.updated} berhasil, ${data.failed} gagal. Sisa ${data.remaining}.`)
+        queryClient.invalidateQueries({ queryKey: ['customers'] })
+      } else {
+        toast.error(data.message || 'Gagal konversi maps')
+      }
+    },
+    onError: (error: any) => toast.error(error.response?.data?.message || 'Gagal konversi maps')
+  })
 
   const syncMutation = useMutation({
     mutationFn: async () => {
@@ -160,6 +180,18 @@ export function Customers() {
                           >
                               <LayoutGrid className='mr-2 h-4 w-4 text-primary' />
                               Penataan Data (Batch Edit)
+                          </Button>
+                        )}
+                        {permissions.canManageCustomers && (
+                          <Button
+                              variant='outline'
+                              size='sm'
+                              className='h-9 text-xs font-bold border-blue-200 text-blue-700 hover:bg-blue-50'
+                              onClick={() => mapsConvertMutation.mutate()}
+                              disabled={!activeRouter || mapsConvertMutation.isPending}
+                          >
+                              <MapPin className='mr-2 h-4 w-4' />
+                              {mapsConvertMutation.isPending ? 'Convert Maps...' : 'Convert Maps'}
                           </Button>
                         )}
                         <Button
