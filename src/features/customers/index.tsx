@@ -65,7 +65,7 @@ export function Customers() {
     mutationFn: async () => {
       if (!activeRouter) throw new Error('Pilih router terlebih dahulu')
       const res = await api.post('/maps_bulk_convert.php', {
-        router_id: activeRouter.id,
+        router_id: activeRouter.software_id || activeRouter.id,
         limit: 25,
       })
       return res.data

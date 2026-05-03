@@ -68,6 +68,17 @@ function resolve_maps_coords_bulk(string $url): array
 $input = json_decode(file_get_contents('php://input'), true) ?: [];
 $limit = max(1, min(100, (int)($input['limit'] ?? 25)));
 $routerId = trim((string)($input['router_id'] ?? ''));
+if ($routerId !== '' && ctype_digit($routerId)) {
+    $stmtR = $conn->prepare("SELECT software_id FROM mikrotik_routers WHERE id = ? LIMIT 1");
+    $numericRouterId = (int)$routerId;
+    $stmtR->bind_param('i', $numericRouterId);
+    $stmtR->execute();
+    $routerRow = $stmtR->get_result()->fetch_assoc();
+    $stmtR->close();
+    if (!empty($routerRow['software_id'])) {
+        $routerId = (string)$routerRow['software_id'];
+    }
+}
 
 $where = "maps IS NOT NULL AND maps <> '' AND (lat IS NULL OR lng IS NULL OR lat = 0 OR lng = 0)";
 $params = [];
