@@ -21,6 +21,20 @@ import { usePermission } from '@/lib/permissions'
 declare const L: any
 
 const popupStyles = `
+  .map-marker-wrap { background: transparent !important; border: 0 !important; }
+  .mn-marker { position: relative; display:flex; align-items:center; justify-content:center; border:3px solid #fff; box-shadow:0 10px 24px rgba(15,23,42,.35); }
+  .mn-marker::after { content:''; position:absolute; inset:-7px; border-radius:inherit; background:currentColor; opacity:.16; animation:mn-pulse 2s infinite; }
+  .mn-marker svg { position:relative; z-index:1; filter:drop-shadow(0 1px 1px rgba(0,0,0,.25)); }
+  .mn-server { width:44px; height:44px; border-radius:14px; color:#ef4444; background:linear-gradient(135deg,#ef4444,#7f1d1d); }
+  .mn-odp { width:34px; height:34px; border-radius:999px; }
+  .mn-user { width:30px; height:30px; border-radius:12px; }
+  .mn-user.online { color:#22c55e; background:linear-gradient(135deg,#22c55e,#047857); }
+  .mn-user.offline { color:#64748b; background:linear-gradient(135deg,#94a3b8,#475569); }
+  .mn-user.disabled { color:#ef4444; background:linear-gradient(135deg,#fb7185,#991b1b); }
+  .mn-label { position:absolute; left:50%; top:100%; transform:translateX(-50%); margin-top:4px; max-width:110px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; border-radius:999px; background:rgba(15,23,42,.82); color:white; padding:2px 7px; font-size:9px; font-weight:900; letter-spacing:.02em; box-shadow:0 4px 12px rgba(0,0,0,.25); }
+  .marker-cluster-small, .marker-cluster-medium, .marker-cluster-large { background:rgba(37,99,235,.18) !important; }
+  .marker-cluster div { background:linear-gradient(135deg,#2563eb,#7c3aed) !important; color:white !important; font-weight:900 !important; border:3px solid white; box-shadow:0 8px 22px rgba(37,99,235,.38); }
+  @keyframes mn-pulse { 0%,100%{transform:scale(.88);opacity:.12} 50%{transform:scale(1.18);opacity:.22} }
   .premium-popup .leaflet-popup-content-wrapper {
     background: transparent !important;
     border: none !important;
@@ -152,8 +166,9 @@ export default function NetworkMap() {
 
     const clusters = L.markerClusterGroup({
         showCoverageOnHover: false,
-        maxClusterRadius: 50,
-        spiderfyOnMaxZoom: true
+        maxClusterRadius: 55,
+        spiderfyOnMaxZoom: true,
+        disableClusteringAtZoom: 18
     })
     map.addLayer(clusters)
     
@@ -241,10 +256,10 @@ export default function NetworkMap() {
         if (!rMarker) {
             rMarker = L.marker(rPos, {
                 icon: L.divIcon({
-                    className: 'router-icon',
-                    html: `<div style="background-color: #ef4444; width: 36px; height: 36px; border-radius: 10px; border: 3px solid white; box-shadow: 0 4px 12px rgba(0,0,0,0.4); display: flex; align-items: center; justify-content: center; color: white;"><svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="2" width="20" height="8" rx="2" ry="2"/><rect x="2" y="14" width="20" height="8" rx="2" ry="2"/><line x1="6" y1="6" x2="6.01" y2="6"/><line x1="6" y1="18" x2="6.01" y2="18"/></svg></div>`,
-                    iconSize: [36, 36],
-                    iconAnchor: [18, 18]
+                    className: 'map-marker-wrap',
+                    html: `<div class="mn-marker mn-server"><svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="2" width="20" height="8" rx="2"/><rect x="2" y="14" width="20" height="8" rx="2"/><line x1="6" y1="6" x2="6.01" y2="6"/><line x1="6" y1="18" x2="6.01" y2="18"/></svg><span class="mn-label">SERVER</span></div>`,
+                    iconSize: [44, 54],
+                    iconAnchor: [22, 22]
                 })
             }).addTo(mapInstance)
             rMarker._isRouter = true
@@ -361,10 +376,10 @@ export default function NetworkMap() {
                 const color = getODPColor(odp.total_users, odp.ratio_total)
                 const marker = L.marker(pos, {
                     icon: L.divIcon({
-                        className: 'odp-icon',
-                        html: `<div style="background-color: ${color}; width: 28px; height: 28px; border-radius: 50%; border: 2.5px solid white; box-shadow: 0 2px 10px rgba(0,0,0,0.3); display: flex; align-items: center; justify-content: center; color: white;"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg></div>`,
-                        iconSize: [28, 28],
-                        iconAnchor: [14, 14]
+                        className: 'map-marker-wrap',
+                        html: `<div class="mn-marker mn-odp" style="color:${color};background:linear-gradient(135deg,${color},#0f172a)"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><path d="M3.3 7 12 12l8.7-5"/><path d="M12 22V12"/></svg><span class="mn-label">${odp.name}</span></div>`,
+                        iconSize: [34, 46],
+                        iconAnchor: [17, 17]
                     })
                 }).addTo(mapInstance)
                 const used = Number(odp.total_users || 0)
@@ -424,12 +439,16 @@ export default function NetworkMap() {
           .forEach((user: any) => {
             if (user.lat && user.lng) {
                 const pos = [parseFloat(user.lat), parseFloat(user.lng)]
-                const marker = L.circleMarker(pos, {
-                    radius: 5,
-                    fillColor: user.status === 'online' ? '#22c55e' : '#94a3b8',
-                    color: '#fff', weight: 1.5, opacity: 1, fillOpacity: 0.9
+                const isDisabled = user.disabled === 'yes'
+                const markerClass = isDisabled ? 'disabled' : user.status === 'online' ? 'online' : 'offline'
+                const marker = L.marker(pos, {
+                    icon: L.divIcon({
+                        className: 'map-marker-wrap',
+                        html: `<div class="mn-marker mn-user ${markerClass}"><svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 10.5 12 3l9 7.5"/><path d="M5 10v10h14V10"/><path d="M9 20v-6h6v6"/></svg><span class="mn-label">${user.username}</span></div>`,
+                        iconSize: [30, 42],
+                        iconAnchor: [15, 15]
+                    })
                 })
-                const statusColor = user.status === 'online' ? '#22c55e' : '#94a3b8'
                 const profile = user.profile || user.paket || '-'
                 marker.bindPopup(`
                     <div class='w-[280px] overflow-hidden rounded-2xl bg-white text-slate-900 shadow-2xl dark:bg-slate-900 dark:text-white'>
