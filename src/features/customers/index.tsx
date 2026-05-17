@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useMemo } from 'react'
 import { cn } from '@/lib/utils'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { api } from '@/lib/api'
@@ -25,13 +25,14 @@ export function Customers() {
   const permissions = usePermission()
   const [page, setPage] = useState(1)
   const [search, setSearch] = useState('')
+  const [status, setStatus] = useState<'all' | 'online' | 'offline'>('all')
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false)
   const [isBatchEditView, setIsBatchEditView] = useState(false)
   const [selectedCustomers, setSelectedCustomers] = useState<Customer[]>([])
   const perPage = isBatchEditView ? 10 : 20
 
   const { data, isLoading } = useQuery({
-    queryKey: ['customers', activeRouter?.id, page, search, perPage],
+    queryKey: ['customers', activeRouter?.id, page, search, perPage, status],
     queryFn: async () => {
       if (!activeRouter) return null
       const res = await api.get('/get_all_users_paginated.php', {
@@ -40,6 +41,7 @@ export function Customers() {
           page,
           per_page: perPage,
           search,
+          status: status !== 'all' ? status : undefined
         },
       })
       return res.data
@@ -58,6 +60,52 @@ export function Customers() {
     },
     enabled: !!activeRouter,
   })
+
+  const { data: acsDevices } = useQuery({
+    queryKey: ['genieacs-devices'],
+    queryFn: async () => {
+      const projection = [
+        '_id',
+        'VirtualParameters.RXPower',
+        'VirtualParameters.pppoeUsername'
+      ].join(',')
+      const res = await api.get(`/genieacs_proxy.php?path=/devices&projection=${projection}`)
+      return res.data || []
+    },
+    refetchInterval: 15000,
+    staleTime: 10000,
+  })
+
+  const mappedData = useMemo(() => {
+    if (!data?.data) return []
+    
+    const getNestedParam = (obj: any, path: string) => {
+        if (!obj) return ''
+        const parts = path.split('.')
+        let current = obj
+        for (const part of parts) {
+            if (current && typeof current === 'object' && part in current) current = current[part]
+            else return ''
+        }
+        if (current === null || current === undefined) return ''
+        if (typeof current === 'string' || typeof current === 'number') return String(current)
+        if (current._value !== undefined) return String(current._value)
+        if (current.value !== undefined) return String(current.value)
+        return ''
+    }
+
+    return data.data.map((customer: any) => {
+        const acsDevice = acsDevices?.find((d: any) => getNestedParam(d, 'VirtualParameters.pppoeUsername') === customer.username)
+        const rx = acsDevice ? getNestedParam(acsDevice, 'VirtualParameters.RXPower') : ''
+        if (rx) {
+            return {
+                ...customer,
+                redaman_live: rx
+            }
+        }
+        return customer
+    })
+  }, [data?.data, acsDevices])
 
   const profiles = profilesData?.map((p: any) => p.name) || []
 
@@ -159,14 +207,21 @@ export function Customers() {
         ) : (
             <div className='space-y-4 rounded-xl border bg-card p-4 shadow-sm'>
                 <div className='flex flex-wrap items-center justify-between gap-3 rounded-lg bg-muted/30 p-3'>
-                    <div className='relative flex-1 max-w-md'>
-                        <SearchIcon className='absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground' />
-                        <Input
-                            placeholder='Cari username, alamat, atau WA...'
-                            className='pl-9 h-9 text-xs'
-                            value={search}
-                            onChange={(e) => setSearch(e.target.value)}
-                        />
+                    <div className='flex flex-1 items-center gap-3'>
+                        <div className='relative w-full max-w-sm'>
+                            <SearchIcon className='absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground' />
+                            <Input
+                                placeholder='Cari username, alamat, atau WA...'
+                                className='pl-9 h-9 text-xs'
+                                value={search}
+                                onChange={(e) => setSearch(e.target.value)}
+                            />
+                        </div>
+                        <div className='hidden sm:flex items-center rounded-md border bg-background p-1 shadow-sm'>
+                            <Button size='sm' variant={status === 'all' ? 'secondary' : 'ghost'} className='h-7 px-3 text-xs font-semibold' onClick={() => setStatus('all')}>Semua <span className='ml-1.5 text-muted-foreground'>{data?.total_all ?? data?.total ?? 0}</span></Button>
+                            <Button size='sm' variant={status === 'online' ? 'secondary' : 'ghost'} className='h-7 px-3 text-xs font-semibold text-emerald-600' onClick={() => setStatus('online')}>Online <span className='ml-1.5'>{data?.active ?? '-'}</span></Button>
+                            <Button size='sm' variant={status === 'offline' ? 'secondary' : 'ghost'} className='h-7 px-3 text-xs font-semibold text-red-600' onClick={() => setStatus('offline')}>Offline <span className='ml-1.5'>{data?.total_all !== undefined && data?.active !== undefined ? Math.max(0, data.total_all - data.active) : '-'}</span></Button>
+                        </div>
                     </div>
 
                     <div className='flex items-center gap-2'>
@@ -219,9 +274,10 @@ export function Customers() {
                 </div>
 
                 <div className='flex-1 overflow-auto'>
-                <CustomersTable
-                    data={data?.data || []}
-                    total={data?.total || 0}
+                {!isBatchEditView && (
+                <CustomersTable 
+                    data={mappedData} 
+                    total={data?.total ?? 0}
                     page={page}
                     perPage={perPage}
                     _onPageChange={setPage}
@@ -233,6 +289,7 @@ export function Customers() {
                         setIsBatchEditView(true)
                     }}
                 />
+            )}
                 </div>
             </div>
         )}

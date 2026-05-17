@@ -78,8 +78,12 @@ export function CustomerDetailDialog({ isOpen, onClose, customer, onEdit, onDele
                 {/* Technical Info */}
                 <div className="space-y-3 p-3 bg-muted/30 rounded-lg border border-border/50">
                     <div className="flex justify-between items-center text-xs">
-                        <span className="text-muted-foreground">Redaman</span>
-                        <span className="font-bold text-blue-600">{customer.redaman || '-'} dB</span>
+                        <span className="text-muted-foreground">Redaman Live <span className="text-[9px] opacity-70">(ACS)</span></span>
+                        <span className="font-bold text-blue-600">{(customer as any).redaman_live ? `${(customer as any).redaman_live} dB` : '-'}</span>
+                    </div>
+                    <div className="flex justify-between items-center text-xs">
+                        <span className="text-muted-foreground">Redaman Awal <span className="text-[9px] opacity-70">(Manual)</span></span>
+                        <span className="font-bold text-slate-500">{customer.redaman ? `${customer.redaman} dB` : '-'}</span>
                     </div>
                     <div className="flex justify-between items-center text-xs">
                         <span className="text-muted-foreground">Tagihan</span>

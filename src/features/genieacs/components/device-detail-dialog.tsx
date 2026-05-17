@@ -1,3 +1,4 @@
+import { useState, useEffect } from 'react'
 import { 
   Wifi, 
   Cpu, 
@@ -14,6 +15,7 @@ import {
   Settings2,
   Monitor
 } from 'lucide-react'
+import { toast } from 'sonner'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { 
@@ -27,7 +29,7 @@ import {
   TabsTrigger 
 } from '@/components/ui/tabs'
 import { Input } from '@/components/ui/input'
-import { useQuery } from '@tanstack/react-query'
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import api from '@/lib/api'
 import { cn } from '@/lib/utils'
 
@@ -69,6 +71,66 @@ export function DeviceDetailDialog({ deviceId, open, onOpenChange }: DeviceDetai
 
   const lastInform = device?._lastInform
   const isOnline = lastInform ? (new Date().getTime() - new Date(lastInform).getTime()) < 300000 : false
+
+  const queryClient = useQueryClient()
+  const [ssid, setSsid] = useState('')
+  const [password, setPassword] = useState('')
+
+  useEffect(() => {
+    if (device) {
+       setSsid(getParam('VirtualParameters.WiFi SSID') || getParam('InternetGatewayDevice.LANDevice.1.WLANConfiguration.1.SSID') || '')
+    }
+  }, [device])
+
+  const syncMutation = useMutation({
+    mutationFn: async () => {
+      const res = await api.post(`/genieacs_proxy.php?path=/devices/${deviceId}/tasks?timeout=3000&connection_request`, { name: 'refreshObject', objectName: '' })
+      return res.data
+    },
+    onSuccess: () => {
+      toast.success('Sync task initiated', { description: 'GenieACS is fetching latest data from CPE.' })
+      queryClient.invalidateQueries({ queryKey: ['genieacs-device-detail', deviceId] })
+    },
+    onError: () => toast.error('Failed to sync data from device')
+  })
+
+  const rebootMutation = useMutation({
+    mutationFn: async () => {
+      const res = await api.post(`/genieacs_proxy.php?path=/devices/${deviceId}/tasks?timeout=3000&connection_request`, { name: 'reboot' })
+      return res.data
+    },
+    onSuccess: () => toast.success('Reboot command sent', { description: 'The device should restart shortly.' }),
+    onError: () => toast.error('Failed to send reboot command')
+  })
+
+  const wifiMutation = useMutation({
+    mutationFn: async () => {
+      // Trying common parameters. GenieACS handles this gracefully usually.
+      const paramPath = getParam('InternetGatewayDevice.LANDevice.1.WLANConfiguration.1.SSID') !== undefined 
+          ? 'InternetGatewayDevice.LANDevice.1.WLANConfiguration.1.SSID' 
+          : 'VirtualParameters.WiFi SSID'
+      
+      const values: any[] = [[paramPath, ssid, 'xsd:string']]
+      if (password) {
+          const passPath = getParam('InternetGatewayDevice.LANDevice.1.WLANConfiguration.1.KeyPassphrase') !== undefined
+              ? 'InternetGatewayDevice.LANDevice.1.WLANConfiguration.1.KeyPassphrase'
+              : 'VirtualParameters.WiFi Password'
+          values.push([passPath, password, 'xsd:string'])
+      }
+
+      const res = await api.post(`/genieacs_proxy.php?path=/devices/${deviceId}/tasks?timeout=3000&connection_request`, {
+         name: 'setParameterValues',
+         parameterValues: values
+      })
+      return res.data
+    },
+    onSuccess: () => {
+      toast.success('WiFi Config Saved', { description: 'Parameters have been queued to the device.' })
+      setPassword('') // Clear password field for security
+      queryClient.invalidateQueries({ queryKey: ['genieacs-device-detail', deviceId] })
+    },
+    onError: () => toast.error('Failed to update WiFi configuration')
+  })
 
   const getConnectedDevices = () => {
     const hosts: any[] = []
@@ -193,15 +255,32 @@ export function DeviceDetailDialog({ deviceId, open, onOpenChange }: DeviceDetai
                          <h5 className="text-[10px] font-black uppercase text-slate-500 tracking-widest mb-4">Wireless Identity</h5>
                          <div className="space-y-3">
                             <label className="text-[10px] font-bold text-muted-foreground uppercase">SSID Name</label>
-                            <Input defaultValue={getParam('VirtualParameters.WiFi SSID')} className="h-10 bg-white" />
+                            <Input 
+                                value={ssid} 
+                                onChange={(e) => setSsid(e.target.value)} 
+                                placeholder="My WiFi Network" 
+                                className="h-10 bg-white" 
+                            />
                             <label className="text-[10px] font-bold text-muted-foreground uppercase">Security Key</label>
-                            <Input type="password" placeholder="••••••••" className="h-10 bg-white" />
+                            <Input 
+                                type="password" 
+                                value={password} 
+                                onChange={(e) => setPassword(e.target.value)} 
+                                placeholder="•••••••• (Leave blank to keep current)" 
+                                className="h-10 bg-white" 
+                            />
                          </div>
                       </div>
                       <div className="flex flex-col justify-center items-center p-8 border-2 border-dashed rounded-2xl gap-4">
                          <ShieldCheck className="w-12 h-12 text-emerald-500/30" />
                          <p className="text-center text-xs text-muted-foreground px-10">Konfigurasi WiFi akan langsung diterapkan ke perangkat setelah Anda menyimpan.</p>
-                         <Button className="w-full h-12 rounded-xl font-black text-xs uppercase tracking-widest shadow-lg">Save Config</Button>
+                         <Button 
+                            className="w-full h-12 rounded-xl font-black text-xs uppercase tracking-widest shadow-lg"
+                            onClick={() => wifiMutation.mutate()}
+                            disabled={wifiMutation.isPending || (!ssid && !password)}
+                         >
+                            {wifiMutation.isPending ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Saving...</> : 'Save Config'}
+                         </Button>
                       </div>
                    </div>
                 </TabsContent>
@@ -235,15 +314,29 @@ export function DeviceDetailDialog({ deviceId, open, onOpenChange }: DeviceDetai
                          <p className="text-sm font-bold">System Reboot</p>
                          <p className="text-[10px] text-muted-foreground mt-1 px-4 text-balance">Restart perangkat secara aman dari jarak jauh.</p>
                       </div>
-                      <Button variant="outline" className="w-full h-10 border-orange-100 text-orange-600 font-bold text-[10px] uppercase">Execute Reboot</Button>
+                      <Button 
+                          variant="outline" 
+                          className="w-full h-10 border-orange-100 text-orange-600 font-bold text-[10px] uppercase"
+                          onClick={() => rebootMutation.mutate()}
+                          disabled={rebootMutation.isPending}
+                      >
+                          {rebootMutation.isPending ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Executing...</> : 'Execute Reboot'}
+                      </Button>
                    </div>
                    <div className="p-6 border rounded-2xl flex flex-col items-center text-center gap-4 hover:border-blue-200 transition-colors">
-                      <RefreshCw className="w-8 h-8 text-blue-500" />
+                      <RefreshCw className={cn("w-8 h-8 text-blue-500", syncMutation.isPending && "animate-spin")} />
                       <div>
                          <p className="text-sm font-bold">Fetch Parameters</p>
                          <p className="text-[10px] text-muted-foreground mt-1 px-4 text-balance">Paksa GenieACS mengambil data terbaru dari CPE.</p>
                       </div>
-                      <Button variant="outline" className="w-full h-10 border-blue-100 text-blue-600 font-bold text-[10px] uppercase">Sync Now</Button>
+                      <Button 
+                          variant="outline" 
+                          className="w-full h-10 border-blue-100 text-blue-600 font-bold text-[10px] uppercase"
+                          onClick={() => syncMutation.mutate()}
+                          disabled={syncMutation.isPending}
+                      >
+                          {syncMutation.isPending ? 'Syncing...' : 'Sync Now'}
+                      </Button>
                    </div>
                 </TabsContent>
               </Tabs>

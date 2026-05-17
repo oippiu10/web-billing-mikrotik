@@ -131,12 +131,37 @@ export default function NetworkMap() {
     refetchInterval: 2000,
   })
 
+  const { data: acsDevices } = useQuery({
+    queryKey: ['genieacs-devices'],
+    queryFn: async () => {
+      const res = await api.get('/genieacs_proxy.php?path=/devices')
+      return res.data || []
+    },
+    refetchInterval: 15000,
+    staleTime: 10000,
+  })
+
   const isValidCoordinate = (lat: any, lng: any) => {
     const latNum = Number(lat)
     const lngNum = Number(lng)
     if (!Number.isFinite(latNum) || !Number.isFinite(lngNum)) return false
     if (Math.abs(latNum) < 0.000001 && Math.abs(lngNum) < 0.000001) return false
     return Math.abs(latNum) <= 90 && Math.abs(lngNum) <= 180
+  }
+
+  const getNestedParam = (obj: any, path: string) => {
+      if (!obj) return ''
+      const parts = path.split('.')
+      let current = obj
+      for (const part of parts) {
+          if (current && typeof current === 'object' && part in current) current = current[part]
+          else return ''
+      }
+      if (current === null || current === undefined) return ''
+      if (typeof current === 'string' || typeof current === 'number') return String(current)
+      if (current._value !== undefined) return String(current._value)
+      if (current.value !== undefined) return String(current.value)
+      return ''
   }
 
   const formatBps = (bits: any) => {
@@ -401,12 +426,21 @@ export default function NetworkMap() {
                     const filled = i < used
                     return `<span title='Port ${i + 1} ${filled ? 'terpakai' : 'kosong'}' class='inline-block h-3 w-3 rounded-[3px] border ${filled ? 'border-emerald-600 bg-emerald-500' : 'border-slate-300 bg-slate-100 dark:border-slate-700 dark:bg-slate-800'}'></span>`
                 }).join('') : ''
-                const userRows = odpUsers.slice(0, 5).map((u: any, i: number) => `
+                const userRows = odpUsers.slice(0, 5).map((u: any, i: number) => {
+                    const acsDevice = acsDevices?.find((d: any) => getNestedParam(d, 'VirtualParameters.pppoeUsername') === u.username)
+                    const redamanLive = acsDevice ? getNestedParam(acsDevice, 'VirtualParameters.RXPower') : null
+                    const redamanAwal = u.redaman
+                    
+                    const badge = redamanLive ? 
+                        `<span class='shrink-0 rounded bg-blue-100 px-1 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400'>${redamanLive} dB</span>` : 
+                        (redamanAwal ? `<span class='shrink-0 rounded bg-slate-100 px-1 text-slate-500 dark:bg-slate-800 dark:text-slate-400'>${redamanAwal} dB</span>` : `<span class='shrink-0 text-slate-400'>-</span>`)
+                        
+                    return `
                     <div class='flex items-center justify-between gap-2 border-b border-slate-100 py-1 text-[10px] last:border-0 dark:border-slate-800'>
                         <span class='min-w-0 truncate font-bold'>${i + 1}. ${u.username}</span>
-                        <span class='shrink-0 font-black text-orange-500'>${u.redaman || '-'} dB</span>
+                        ${badge}
                     </div>
-                `).join('')
+                `}).join('')
                 marker.bindPopup(`
                     <div class='w-[240px] overflow-hidden rounded-xl bg-white text-slate-900 shadow-xl dark:bg-slate-900 dark:text-white'>
                         <div style='background:${color}' class='px-3 py-2.5 text-white'>
@@ -462,6 +496,9 @@ export default function NetworkMap() {
                     })
                 })
                 const profile = user.profile || user.paket || '-'
+                const acsDevice = acsDevices?.find((d: any) => getNestedParam(d, 'VirtualParameters.pppoeUsername') === user.username)
+                const redamanLive = acsDevice ? getNestedParam(acsDevice, 'VirtualParameters.RXPower') : null
+                const redamanAwal = user.redaman
                 marker.bindPopup(`
                     <div class='w-[230px] overflow-hidden rounded-xl bg-white text-slate-900 shadow-xl dark:bg-slate-900 dark:text-white'>
                         <div class='px-3 py-2.5 ${user.status === 'online' ? 'bg-emerald-600' : 'bg-red-600'} text-white'>
@@ -474,6 +511,10 @@ export default function NetworkMap() {
                             <div class='grid grid-cols-2 gap-1.5'>
                                 <div class='rounded-lg bg-slate-50 p-2 dark:bg-slate-800/70'><p class='truncate text-[11px] font-black'>${profile}</p><p class='text-[8px] font-black uppercase text-slate-500'>Profile</p></div>
                                 <div class='rounded-lg bg-slate-50 p-2 dark:bg-slate-800/70'><p class='truncate text-[11px] font-black'>${user.ip_address || user.address || '-'}</p><p class='text-[8px] font-black uppercase text-slate-500'>IP</p></div>
+                            </div>
+                            <div class='grid grid-cols-2 gap-1.5 mt-1.5'>
+                                ${redamanLive ? `<div class='rounded-lg bg-blue-50 border border-blue-100 p-2 dark:bg-blue-900/20 dark:border-blue-900/30'><p class='text-[11px] font-black text-blue-700 dark:text-blue-400'>${redamanLive} dB</p><p class='text-[8px] font-black uppercase text-blue-500'>RX Live (ACS)</p></div>` : `<div class='rounded-lg bg-slate-50 p-2 dark:bg-slate-800/70'><p class='text-[11px] font-black text-slate-500'>-</p><p class='text-[8px] font-black uppercase text-slate-500'>RX Live (ACS)</p></div>`}
+                                ${redamanAwal ? `<div class='rounded-lg bg-slate-50 p-2 dark:bg-slate-800/70'><p class='text-[11px] font-black text-slate-600'>${redamanAwal} dB</p><p class='text-[8px] font-black uppercase text-slate-500'>RX Awal (Manual)</p></div>` : `<div class='rounded-lg bg-slate-50 p-2 dark:bg-slate-800/70'><p class='text-[11px] font-black text-slate-500'>-</p><p class='text-[8px] font-black uppercase text-slate-500'>RX Awal (Manual)</p></div>`}
                             </div>
                             ${user.alamat ? `<p class='line-clamp-2 rounded-lg bg-slate-50 p-2 text-[9px] font-bold text-slate-500 dark:bg-slate-800/70'>${user.alamat}</p>` : ''}
                             <button onclick='window.checkLiveByUsername("${user.username}")' class='w-full rounded-lg bg-indigo-600 px-2 py-2 text-[9px] font-black uppercase text-white hover:bg-indigo-700'>Cek Live</button>

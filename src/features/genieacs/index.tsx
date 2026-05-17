@@ -14,30 +14,11 @@ export function GenieACSPage() {
   const { data: devices, isLoading, isError, error } = useQuery({
     queryKey: ['genieacs-devices'],
     queryFn: async () => {
-      // Query parameters for device summary
-      const projection = [
-        '_id',
-        '_lastInform',
-        'Device.DeviceInfo.SerialNumber',
-        'Device.DeviceInfo.ProductClass',
-        'Device.DeviceInfo.Manufacturer',
-        'InternetGatewayDevice.DeviceInfo.SerialNumber',
-        'InternetGatewayDevice.DeviceInfo.ModelName',
-        'InternetGatewayDevice.DeviceInfo.Manufacturer',
-        'Device.ManagementServer.ConnectionRequestURL',
-        'InternetGatewayDevice.ManagementServer.ConnectionRequestURL',
-        'VirtualParameters.RXPower',
-        'VirtualParameters.gettemp',
-        'VirtualParameters.activedevices',
-        'VirtualParameters.pppoeUsername',
-        'VirtualParameters.WiFi SSID'
-      ].join(',')
-      
-      const res = await api.get(`/genieacs_proxy.php?path=/devices&projection=${projection}`)
+      const res = await api.get(`/genieacs_proxy.php?path=/devices`)
       return res.data || []
     },
-    refetchInterval: false,
-    staleTime: 60_000,
+    refetchInterval: 15000, // Auto-refresh setiap 15 detik untuk deteksi online
+    staleTime: 10000,
   })
 
   const onlineCount = (devices?.filter((d: any) => {

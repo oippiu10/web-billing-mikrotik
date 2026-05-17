@@ -245,6 +245,12 @@ export const sidebarData: SidebarData = {
           icon: ListTodo,
           requiredRoles: ['admin', 'administrator', 'super_admin', 'super admin', 'superadministrator'],
         },
+        {
+          title: 'Manajemen Klien (SaaS)',
+          url: '/tenants',
+          icon: Server,
+          requiredRoles: ['admin', 'administrator', 'super_admin', 'super admin', 'superadministrator'],
+        },
       ],
     },
     {

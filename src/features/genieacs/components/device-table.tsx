@@ -15,9 +15,19 @@ import { DataTablePagination, DataTableToolbar, DataTableColumnHeader } from '@/
 import { Separator } from '@/components/ui/separator'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
-import { MoreHorizontal, RefreshCw, Power, Monitor, Wifi, User, Zap, Activity, Globe, RadioTower } from 'lucide-react'
+import { MoreHorizontal, RefreshCw, Power, Monitor, Wifi, User, Zap, Activity, Globe, RadioTower, AlertTriangle } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { Checkbox } from '@/components/ui/checkbox'
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog'
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -53,6 +63,7 @@ export function GenieACSDeviceTable({ data, isLoading }: Props) {
   const [detailDialogOpen, setDetailDialogOpen] = useState(false)
   const [statusFilter, setStatusFilter] = useState<'all' | 'online' | 'offline'>('all')
   const [pageSize, setPageSize] = useState(20)
+  const [summonOfflineIds, setSummonOfflineIds] = useState<string[]>([])
 
   const safeText = (value: any): string => {
     if (value === null || value === undefined || value === '') return ''
@@ -374,12 +385,16 @@ export function GenieACSDeviceTable({ data, isLoading }: Props) {
                         className="h-8 text-[10px] uppercase font-black"
                         onClick={() => {
                             const selectedIds = table.getFilteredSelectedRowModel().rows.map(r => r.original._id)
-                            toast.promise(Promise.allSettled(selectedIds.map(id => actionMutation.mutateAsync({ deviceId: id, action: 'summon', connectionRequest: true }))), {
-                                loading: `Summon ${selectedIds.length} selected CPE...`,
-                                success: 'Summon selected selesai dikirim',
-                                error: 'Sebagian summon gagal dikirim'
-                            })
-                            setRowSelection({})
+                            if (selectedIds.length > 5) {
+                                setSummonOfflineIds(selectedIds)
+                            } else {
+                                toast.promise(Promise.allSettled(selectedIds.map(id => actionMutation.mutateAsync({ deviceId: id, action: 'summon', connectionRequest: true }))), {
+                                    loading: `Summon ${selectedIds.length} selected CPE...`,
+                                    success: 'Summon selected selesai dikirim',
+                                    error: 'Sebagian summon gagal dikirim'
+                                })
+                                setRowSelection({})
+                            }
                         }}
                     >
                         <RadioTower className="w-3 h-3 mr-1" />
@@ -408,25 +423,7 @@ export function GenieACSDeviceTable({ data, isLoading }: Props) {
             <Button size='sm' variant={statusFilter === 'online' ? 'secondary' : 'ghost'} className='h-7 px-2 text-xs font-semibold text-emerald-600' onClick={() => setStatusFilter('online')}>Online <span className='ml-1'>{onlineCount}</span></Button>
             <Button size='sm' variant={statusFilter === 'offline' ? 'secondary' : 'ghost'} className='h-7 px-2 text-xs font-semibold text-red-600' onClick={() => setStatusFilter('offline')}>Offline <span className='ml-1'>{offlineCount}</span></Button>
           </div>
-          <Button
-              variant="outline"
-              size="sm"
-              className="h-8"
-              onClick={() => {
-                const offlineIds = filteredData.filter((d) => !isDeviceOnline(d)).map((d) => d._id)
-                if (!offlineIds.length) return toast.success('Tidak ada CPE offline')
-                if (!confirm(`Summon ${offlineIds.length} CPE offline via Connection Request?`)) return
-                toast.promise(Promise.allSettled(offlineIds.map(id => actionMutation.mutateAsync({ deviceId: id, action: 'summon', connectionRequest: true }))), {
-                  loading: `Mengirim summon ke ${offlineIds.length} CPE offline...`,
-                  success: 'Summon offline selesai dikirim',
-                  error: 'Sebagian summon gagal dikirim'
-                })
-              }}
-              disabled={isLoading || actionMutation.isPending}
-          >
-              <RadioTower className={cn("w-3 h-3 mr-2", actionMutation.isPending && "animate-pulse")} />
-              Summon Offline
-          </Button>
+
           <Button 
               variant="outline" 
               size="sm" 
@@ -493,6 +490,38 @@ export function GenieACSDeviceTable({ data, isLoading }: Props) {
         open={detailDialogOpen}
         onOpenChange={setDetailDialogOpen}
       />
+
+      <AlertDialog open={summonOfflineIds.length > 0} onOpenChange={(open) => !open && setSummonOfflineIds([])}>
+        <AlertDialogContent className="max-w-md">
+          <AlertDialogHeader>
+            <AlertDialogTitle className="flex items-center gap-2 text-orange-500">
+               <AlertTriangle className="w-5 h-5" />
+               Konfirmasi Summon Massal
+            </AlertDialogTitle>
+            <AlertDialogDescription className="text-foreground/80 space-y-3 mt-2">
+               <p>Anda memilih <strong>{summonOfflineIds.length}</strong> perangkat untuk disummon sekaligus.</p>
+               <p>Proses massal ini akan mengkonsumsi cukup banyak CPU server GenieACS dan jaringan Mikrotik Anda.</p>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter className="mt-4">
+            <AlertDialogCancel>Batal</AlertDialogCancel>
+            <AlertDialogAction 
+                className="bg-orange-500 hover:bg-orange-600 text-white"
+                onClick={() => {
+                   toast.promise(Promise.allSettled(summonOfflineIds.map(id => actionMutation.mutateAsync({ deviceId: id, action: 'summon', connectionRequest: true }))), {
+                      loading: `Mengirim summon ke ${summonOfflineIds.length} CPE...`,
+                      success: 'Summon massal selesai dikirim',
+                      error: 'Sebagian summon gagal dikirim'
+                   })
+                   setSummonOfflineIds([])
+                   setRowSelection({})
+                }}
+            >
+                Ya, Lanjutkan
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   )
 }

@@ -143,12 +143,24 @@ export const columns: ColumnDef<Customer>[] = [
       <DataTableColumnHeader column={column} title='Redaman' />
     ),
     cell: ({ row }) => {
-        const val = row.getValue('redaman') as string
-        if (!val) return '-'
+        const live = (row.original as any).redaman_live as string
+        const manual = row.original.redaman as string
+        
+        if (!live && !manual) return <span className="text-muted-foreground">-</span>
+        
         return (
-            <Badge variant='outline' className='font-mono text-[10px] border-blue-200 text-blue-700 bg-blue-50'>
-                {val} dB
-            </Badge>
+            <div className="flex flex-col gap-1 min-w-[70px]">
+                {live ? (
+                    <Badge variant='outline' className='font-mono text-[10px] border-blue-200 text-blue-700 bg-blue-50 w-fit px-1.5'>
+                        ACS: {live} dB
+                    </Badge>
+                ) : null}
+                {manual ? (
+                    <Badge variant='outline' className='font-mono text-[9px] border-slate-200 text-slate-500 bg-slate-50 w-fit px-1.5 opacity-80'>
+                        Manual: {manual} dB
+                    </Badge>
+                ) : null}
+            </div>
         )
     },
   },
