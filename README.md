@@ -93,6 +93,11 @@ Permission sudah diterapkan pada:
 - Add/edit/enable/disable PPP Secret.
 - Delete PPP Secret dibatasi admin.
 - PPPoE profile management dibatasi admin.
+- **Real-Time Connection & Traffic Monitoring (Network Map Integration):**
+  - Mengambil live IP address dan uptime sesi PPPoE langsung dari `/ppp/active`.
+  - Mengukur real-time throughput (RX/TX bits per second) langsung dari interface router menggunakan `/interface/monitor-traffic`.
+- **Robust Interface Recognition (Fallback Mechanism):**
+  - Backend secara dinamis mendeteksi dan mendukung penamaan interface dynamic `<pppoe-username>` maupun server-binding statis `pppoe-username`.
 - Ping/live status via MikroTik action.
 - Cache PPP Secret dan PPP active untuk performa.
 
@@ -455,6 +460,7 @@ GET  /api/auth/verify_session.php
   - search/filter atas
   - bottom status bar
   - popup ODP/pelanggan premium
+  - **Integrasi MikroTik Real-Time:** Penarikan langsung data live IP & throughput lalu-lintas data (RX/TX bps) langsung dari router via event `popupopen`, lengkap dengan fallback deteksi nama interface (`<pppoe-username>` dan `pppoe-username`).
 
 ---
 

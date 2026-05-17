@@ -179,6 +179,43 @@ try {
             $response['data'] = $res;
             break;
 
+        case 'user_status':
+            $username = $params['username'] ?? '';
+            if (empty($username)) throw new Exception("Username wajib");
+            
+            $ip = '-';
+            $uptime = '-';
+            $rx = 0;
+            $tx = 0;
+            
+            // 1. Cari di ppp active
+            $ppp = $api->comm('/ppp/active/print', ['?name' => $username]);
+            if (!empty($ppp) && !isset($ppp['!trap'])) {
+                $ip = $ppp[0]['address'] ?? '-';
+                $uptime = $ppp[0]['uptime'] ?? '-';
+                
+                // 2. Cari traffic di interface (Interface name bisa <pppoe-username> atau pppoe-username)
+                $ifaceName = "<pppoe-{$username}>";
+                $iface = $api->comm('/interface/monitor-traffic', ['interface' => $ifaceName, 'once' => 'yes']);
+                if (empty($iface) || isset($iface['!trap'])) {
+                    $ifaceName = "pppoe-{$username}";
+                    $iface = $api->comm('/interface/monitor-traffic', ['interface' => $ifaceName, 'once' => 'yes']);
+                }
+                
+                if (!empty($iface) && !isset($iface['!trap'])) {
+                    $rx = intval($iface[0]['rx-bits-per-second'] ?? 0);
+                    $tx = intval($iface[0]['tx-bits-per-second'] ?? 0);
+                }
+            }
+            
+            $response['data'] = [
+                'ip' => $ip,
+                'uptime' => $uptime,
+                'rx_bps' => $rx,
+                'tx_bps' => $tx
+            ];
+            break;
+
         default:
             throw new Exception("Aksi '$action' tidak dikenali.");
     }
