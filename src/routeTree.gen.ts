@@ -28,7 +28,6 @@ import { Route as ClerkauthRouteRouteImport } from './routes/clerk/(auth)/route'
 import { Route as AuthenticatedSettingsRouteRouteImport } from './routes/_authenticated/settings/route'
 import { Route as AuthenticatedUsersIndexRouteImport } from './routes/_authenticated/users/index'
 import { Route as AuthenticatedTicketsIndexRouteImport } from './routes/_authenticated/tickets/index'
-import { Route as AuthenticatedTenantsIndexRouteImport } from './routes/_authenticated/tenants/index'
 import { Route as AuthenticatedTasksIndexRouteImport } from './routes/_authenticated/tasks/index'
 import { Route as AuthenticatedSystemToolsIndexRouteImport } from './routes/_authenticated/system-tools/index'
 import { Route as AuthenticatedSettingsIndexRouteImport } from './routes/_authenticated/settings/index'
@@ -166,12 +165,6 @@ const AuthenticatedTicketsIndexRoute =
   AuthenticatedTicketsIndexRouteImport.update({
     id: '/tickets/',
     path: '/tickets/',
-    getParentRoute: () => AuthenticatedRouteRoute,
-  } as any)
-const AuthenticatedTenantsIndexRoute =
-  AuthenticatedTenantsIndexRouteImport.update({
-    id: '/tenants/',
-    path: '/tenants/',
     getParentRoute: () => AuthenticatedRouteRoute,
   } as any)
 const AuthenticatedTasksIndexRoute = AuthenticatedTasksIndexRouteImport.update({
@@ -488,7 +481,6 @@ export interface FileRoutesByFullPath {
   '/settings/': typeof AuthenticatedSettingsIndexRoute
   '/system-tools/': typeof AuthenticatedSystemToolsIndexRoute
   '/tasks/': typeof AuthenticatedTasksIndexRoute
-  '/tenants/': typeof AuthenticatedTenantsIndexRoute
   '/tickets/': typeof AuthenticatedTicketsIndexRoute
   '/users/': typeof AuthenticatedUsersIndexRoute
 }
@@ -550,7 +542,6 @@ export interface FileRoutesByTo {
   '/settings': typeof AuthenticatedSettingsIndexRoute
   '/system-tools': typeof AuthenticatedSystemToolsIndexRoute
   '/tasks': typeof AuthenticatedTasksIndexRoute
-  '/tenants': typeof AuthenticatedTenantsIndexRoute
   '/tickets': typeof AuthenticatedTicketsIndexRoute
   '/users': typeof AuthenticatedUsersIndexRoute
 }
@@ -617,7 +608,6 @@ export interface FileRoutesById {
   '/_authenticated/settings/': typeof AuthenticatedSettingsIndexRoute
   '/_authenticated/system-tools/': typeof AuthenticatedSystemToolsIndexRoute
   '/_authenticated/tasks/': typeof AuthenticatedTasksIndexRoute
-  '/_authenticated/tenants/': typeof AuthenticatedTenantsIndexRoute
   '/_authenticated/tickets/': typeof AuthenticatedTicketsIndexRoute
   '/_authenticated/users/': typeof AuthenticatedUsersIndexRoute
 }
@@ -682,7 +672,6 @@ export interface FileRouteTypes {
     | '/settings/'
     | '/system-tools/'
     | '/tasks/'
-    | '/tenants/'
     | '/tickets/'
     | '/users/'
   fileRoutesByTo: FileRoutesByTo
@@ -744,7 +733,6 @@ export interface FileRouteTypes {
     | '/settings'
     | '/system-tools'
     | '/tasks'
-    | '/tenants'
     | '/tickets'
     | '/users'
   id:
@@ -810,7 +798,6 @@ export interface FileRouteTypes {
     | '/_authenticated/settings/'
     | '/_authenticated/system-tools/'
     | '/_authenticated/tasks/'
-    | '/_authenticated/tenants/'
     | '/_authenticated/tickets/'
     | '/_authenticated/users/'
   fileRoutesById: FileRoutesById
@@ -963,13 +950,6 @@ declare module '@tanstack/react-router' {
       path: '/tickets'
       fullPath: '/tickets/'
       preLoaderRoute: typeof AuthenticatedTicketsIndexRouteImport
-      parentRoute: typeof AuthenticatedRouteRoute
-    }
-    '/_authenticated/tenants/': {
-      id: '/_authenticated/tenants/'
-      path: '/tenants'
-      fullPath: '/tenants/'
-      preLoaderRoute: typeof AuthenticatedTenantsIndexRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
     '/_authenticated/tasks/': {
@@ -1348,7 +1328,6 @@ interface AuthenticatedRouteRouteChildren {
   AuthenticatedReportsIndexRoute: typeof AuthenticatedReportsIndexRoute
   AuthenticatedSystemToolsIndexRoute: typeof AuthenticatedSystemToolsIndexRoute
   AuthenticatedTasksIndexRoute: typeof AuthenticatedTasksIndexRoute
-  AuthenticatedTenantsIndexRoute: typeof AuthenticatedTenantsIndexRoute
   AuthenticatedTicketsIndexRoute: typeof AuthenticatedTicketsIndexRoute
   AuthenticatedUsersIndexRoute: typeof AuthenticatedUsersIndexRoute
 }
@@ -1392,7 +1371,6 @@ const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedReportsIndexRoute: AuthenticatedReportsIndexRoute,
   AuthenticatedSystemToolsIndexRoute: AuthenticatedSystemToolsIndexRoute,
   AuthenticatedTasksIndexRoute: AuthenticatedTasksIndexRoute,
-  AuthenticatedTenantsIndexRoute: AuthenticatedTenantsIndexRoute,
   AuthenticatedTicketsIndexRoute: AuthenticatedTicketsIndexRoute,
   AuthenticatedUsersIndexRoute: AuthenticatedUsersIndexRoute,
 }

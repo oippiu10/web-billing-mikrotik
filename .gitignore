@@ -61,3 +61,7 @@ dist-ssr
 # Vitest artifacts (browser screenshots/attachments)
 **/__screenshots__/
 .vitest-attachments/
+
+# Archives
+*.zip
+*.rar
