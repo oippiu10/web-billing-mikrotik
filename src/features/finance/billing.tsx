@@ -972,9 +972,13 @@ export function FinanceBilling() {
                               <CheckCircle2 className='h-3.5 w-3.5 text-emerald-600 dark:text-emerald-400 shrink-0' />
                               Lunas
                             </Badge>
-                            {row.method && (
+                            {row.note && row.note.includes('[Angsuran:') ? (
+                              <span className="text-[9px] font-extrabold text-indigo-600 dark:text-indigo-400 uppercase tracking-wider flex items-center gap-0.5 select-none bg-indigo-50/50 dark:bg-indigo-950/20 px-1.5 py-0.5 rounded border border-indigo-100/50 dark:border-indigo-900/20 mt-0.5 scale-95 shadow-2xs">
+                                <History className="h-2.5 w-2.5 text-indigo-500 shrink-0" /> Angsuran
+                              </span>
+                            ) : row.method ? (
                               <span className="text-[9px] font-bold text-muted-foreground uppercase tracking-wider">{row.method}</span>
-                            )}
+                            ) : null}
                           </div>
                         )
                       ) : (
