@@ -174,7 +174,7 @@ export function Customers() {
       <Main className='flex flex-col gap-4' fluid>
         <CustomersSubNav active='/customers' />
 
-        <div className='grid gap-3 grid-cols-2 lg:grid-cols-6'>
+        <div className='grid gap-3 md:grid-cols-4'>
           <div className='rounded-xl bg-gradient-to-br from-blue-600 to-indigo-700 p-4 text-white shadow-sm'>
             <div className='flex items-center justify-between'><div><p className='text-xs font-bold uppercase text-white/70'>Total</p><p className='text-3xl font-black'>{data?.total_all ?? data?.total ?? 0}</p></div><Users className='h-6 w-6 text-white/80' /></div>
           </div>
@@ -183,12 +183,6 @@ export function Customers() {
           </div>
           <div className='rounded-xl bg-gradient-to-br from-orange-500 to-rose-600 p-4 text-white shadow-sm'>
             <div className='flex items-center justify-between'><div><p className='text-xs font-bold uppercase text-white/70'>Offline</p><p className='text-3xl font-black'>{data?.total_all !== undefined && data?.active !== undefined ? Math.max(0, data.total_all - data.active) : '-'}</p></div><WifiOff className='h-6 w-6 text-white/80' /></div>
-          </div>
-          <div className='rounded-xl bg-gradient-to-br from-emerald-600 to-emerald-700/80 p-4 text-white shadow-sm'>
-            <div className='flex items-center justify-between'><div><p className='text-xs font-bold uppercase text-white/70'>Prabayar</p><p className='text-3xl font-black'>{data?.total_prabayar ?? 0}</p></div><CheckCircle2 className='h-6 w-6 text-white/80' /></div>
-          </div>
-          <div className='rounded-xl bg-gradient-to-br from-blue-500 to-indigo-600 p-4 text-white shadow-sm'>
-            <div className='flex items-center justify-between'><div><p className='text-xs font-bold uppercase text-white/70'>Pascabayar</p><p className='text-3xl font-black'>{data?.total_pascabayar ?? 0}</p></div><Users className='h-6 w-6 text-white/80' /></div>
           </div>
           <div className='rounded-xl bg-gradient-to-br from-sky-500 to-blue-600 p-4 text-white shadow-sm'>
             <div className='flex items-center justify-between'><div><p className='text-xs font-bold uppercase text-white/70'>Data Lengkap</p><p className='text-3xl font-black'>{data?.total_complete ?? 0}</p></div><CheckCircle2 className='h-6 w-6 text-white/80' /></div>
