@@ -208,7 +208,7 @@ try {
     $sqlSortBy = ($sortBy === 'status') ? 'username' : $sortBy;
     $dataSQL = "SELECT
                     u.id, u.username, u.password, u.profile, u.wa, u.maps, u.lat, u.lng, u.foto,
-                    DATE_FORMAT(u.tanggal_dibuat, '%Y-%m-%d %H:%i:%s') as tanggal_dibuat, u.odp_id, u.created_at, u.updated_at, u.alamat, u.redaman, u.tanggal_tagihan,
+                    DATE_FORMAT(u.tanggal_dibuat, '%Y-%m-%d %H:%i:%s') as tanggal_dibuat, u.odp_id, u.created_at, u.updated_at, u.alamat, u.redaman, u.tanggal_tagihan, u.tipe_langganan,
                     o.name as odp_name
                  FROM users u
                  LEFT JOIN odp o ON u.odp_id = o.id

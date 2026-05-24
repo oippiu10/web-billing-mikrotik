@@ -76,6 +76,30 @@ export const columns: ColumnDef<Customer>[] = [
     cell: ({ row }) => <Badge variant='secondary'>{row.getValue('profile')}</Badge>,
   },
   {
+    accessorKey: 'tipe_langganan',
+    header: ({ column }) => (
+      <DataTableColumnHeader column={column} title='Tipe' />
+    ),
+    cell: ({ row }) => {
+      const type = row.getValue('tipe_langganan') as string || 'pascabayar'
+      const isPrabayar = type === 'prabayar'
+      return (
+        <Badge 
+          variant='outline' 
+          className={cn(
+            'text-[10px] font-black uppercase tracking-wider px-2 py-0.5 rounded-md border shadow-2xs transition-all',
+            isPrabayar 
+              ? 'border-emerald-500 text-emerald-600 bg-emerald-50' 
+              : 'border-blue-500 text-blue-600 bg-blue-50'
+          )}
+        >
+          {isPrabayar ? 'Pra' : 'Pasca'}
+        </Badge>
+      )
+    },
+    enableSorting: true,
+  },
+  {
     accessorKey: 'status',
     header: ({ column }) => (
       <DataTableColumnHeader column={column} title='Status' />

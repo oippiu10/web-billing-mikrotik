@@ -83,6 +83,7 @@ export function CustomerMutateDialog({ isOpen, onClose, customer, profiles, odps
       disabled: 'no',
       status: 'offline',
       tanggal_tagihan: '',
+      tipe_langganan: 'pascabayar',
       redaman: '',
       odp_id: '',
       maps: '',
@@ -111,6 +112,7 @@ export function CustomerMutateDialog({ isOpen, onClose, customer, profiles, odps
           disabled: 'no',
           status: 'offline',
           tanggal_tagihan: '',
+          tipe_langganan: 'pascabayar',
           redaman: '',
           odp_id: '',
           maps: '',
@@ -156,6 +158,7 @@ export function CustomerMutateDialog({ isOpen, onClose, customer, profiles, odps
             odp_id: values.odp_id,
             tanggal_tagihan: values.tanggal_tagihan,
             tanggal_dibuat: values.tanggal_dibuat,
+            tipe_langganan: values.tipe_langganan || 'pascabayar',
           }
         : {
             ...values,
@@ -442,15 +445,23 @@ export function CustomerMutateDialog({ isOpen, onClose, customer, profiles, odps
                 <div className='grid grid-cols-2 gap-3'>
                     <FormField
                     control={form.control}
-                    name='tanggal_dibuat'
+                    name='tipe_langganan'
                     render={({ field }) => (
-                    <FormItem className="space-y-1">
-                    <FormLabel className="text-xs">Tanggal Pasang</FormLabel>
-                    <FormControl>
-                        <Input type='date' {...field} value={field.value?.split(' ')[0] || ''} className="h-8 text-xs" />
-                    </FormControl>
-                    <FormMessage className="text-[10px]" />
-                    </FormItem>
+                        <FormItem className="space-y-1">
+                        <FormLabel className="text-xs">Tipe Langganan</FormLabel>
+                        <Select onValueChange={field.onChange} value={field.value || 'pascabayar'}>
+                            <FormControl>
+                            <SelectTrigger className="h-8 text-xs">
+                                <SelectValue placeholder='Pilih tipe' />
+                            </SelectTrigger>
+                            </FormControl>
+                            <SelectContent>
+                                <SelectItem value='prabayar' className="text-xs">Prabayar</SelectItem>
+                                <SelectItem value='pascabayar' className="text-xs">Pascabayar</SelectItem>
+                            </SelectContent>
+                        </Select>
+                        <FormMessage className="text-[10px]" />
+                        </FormItem>
                     )}
                     />
                     <FormField
@@ -467,6 +478,19 @@ export function CustomerMutateDialog({ isOpen, onClose, customer, profiles, odps
                     )}
                     />
                 </div>
+                <FormField
+                control={form.control}
+                name='tanggal_dibuat'
+                render={({ field }) => (
+                <FormItem className="space-y-1">
+                <FormLabel className="text-xs">Tanggal Pasang</FormLabel>
+                <FormControl>
+                    <Input type='date' {...field} value={field.value?.split(' ')[0] || ''} className="h-8 text-xs" />
+                </FormControl>
+                <FormMessage className="text-[10px]" />
+                </FormItem>
+                )}
+                />
                 {!isEditing && (
                 <FormField
                 control={form.control}

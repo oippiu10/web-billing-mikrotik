@@ -50,7 +50,8 @@ export function BatchEditCustomers({
       alamat: c.alamat || '',
       redaman: c.redaman || '',
       tanggal_tagihan: c.tanggal_tagihan?.toString() || '',
-      odp_id: c.odp_id?.toString() || 'none'
+      odp_id: c.odp_id?.toString() || 'none',
+      tipe_langganan: c.tipe_langganan || 'pascabayar'
     })))
   }, [selectedCustomers])
 
@@ -71,7 +72,8 @@ export function BatchEditCustomers({
         row.alamat !== (original.alamat || '') ||
         row.redaman !== (original.redaman || '') ||
         row.tanggal_tagihan !== (original.tanggal_tagihan?.toString() || '') ||
-        row.odp_id !== (original.odp_id?.toString() || 'none')
+        row.odp_id !== (original.odp_id?.toString() || 'none') ||
+        row.tipe_langganan !== (original.tipe_langganan || 'pascabayar')
       )
     })
   }, [editedData, selectedCustomers])
@@ -109,7 +111,7 @@ export function BatchEditCustomers({
   })
 
   const stats = editedData.reduce((acc, curr) => {
-    const isMissing = !curr.wa || !curr.alamat || !curr.redaman || curr.odp_id === 'none' || !curr.tanggal_tagihan
+    const isMissing = !curr.wa || !curr.alamat || !curr.redaman || curr.odp_id === 'none' || (curr.tipe_langganan !== 'prabayar' && !curr.tanggal_tagihan)
     if (isMissing) acc.missing++
     else acc.complete++
     return acc
@@ -218,13 +220,14 @@ export function BatchEditCustomers({
                 <TableHead className="min-w-[200px] border-b font-black text-xs uppercase tracking-widest text-muted-foreground/70">Alamat Pemasangan</TableHead>
                 <TableHead className="min-w-[100px] border-b font-black text-xs uppercase tracking-widest text-muted-foreground/70">Redaman</TableHead>
                 <TableHead className="min-w-[180px] border-b font-black text-xs uppercase tracking-widest text-muted-foreground/70">Lokasi ODP</TableHead>
+                <TableHead className="min-w-[120px] border-b font-black text-xs uppercase tracking-widest text-muted-foreground/70">Tipe</TableHead>
                 <TableHead className="min-w-[100px] border-b font-black text-xs uppercase tracking-widest text-muted-foreground/70">Tagihan</TableHead>
                 </TableRow>
             </TableHeader>
             <TableBody>
                 {editedData.map((row, idx) => {
                 const isModified = isRowModified(row.id)
-                const isComplete = row.wa && row.alamat && row.redaman && row.odp_id !== 'none' && row.tanggal_tagihan
+                const isComplete = row.wa && row.alamat && row.redaman && row.odp_id !== 'none' && (row.tipe_langganan === 'prabayar' || row.tanggal_tagihan)
                 
                 return (
                     <TableRow key={row.username} className={cn(
@@ -290,6 +293,20 @@ export function BatchEditCustomers({
                         <SelectContent>
                             <SelectItem value="none" className="text-xs">-- Pilih ODP --</SelectItem>
                             {odps.map(o => <SelectItem key={o.id} value={o.id.toString()} className="text-xs font-medium">{o.name}</SelectItem>)}
+                        </SelectContent>
+                        </Select>
+                    </TableCell>
+                    <TableCell className="border-b">
+                        <Select 
+                        value={row.tipe_langganan || 'pascabayar'} 
+                        onValueChange={(v) => handleFieldChange(idx, 'tipe_langganan', v)}
+                        >
+                        <SelectTrigger className="h-9 text-xs border-transparent bg-transparent hover:border-input transition-all font-semibold">
+                            <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                            <SelectItem value="prabayar" className="text-xs">Prabayar</SelectItem>
+                            <SelectItem value="pascabayar" className="text-xs">Pascabayar</SelectItem>
                         </SelectContent>
                         </Select>
                     </TableCell>

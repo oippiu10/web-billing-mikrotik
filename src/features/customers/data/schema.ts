@@ -19,6 +19,7 @@ export const customerSchema = z.object({
   redaman: z.string().optional().nullable(),
   tanggal_tagihan: z.string().optional().nullable(),
   tanggal_dibuat: z.string().optional().nullable(),
+  tipe_langganan: z.string().optional().nullable(),
   odp_id: z.number().or(z.string()).optional().nullable(),
   odp_name: z.string().optional().nullable(),
   created_at: z.string().optional(),

@@ -148,10 +148,11 @@ try {
         $tanggalDibuat = $input['tanggal_dibuat'] ?? null;
         $lat = ($input['lat'] ?? '') !== '' && $input['lat'] !== null ? floatval($input['lat']) : null;
         $lng = ($input['lng'] ?? '') !== '' && $input['lng'] !== null ? floatval($input['lng']) : null;
+        $tipeLangganan = $input['tipe_langganan'] ?? 'pascabayar';
 
-        $stmt = $conn->prepare("UPDATE users SET wa=?, alamat=?, maps=?, redaman=?, odp_id=?, tanggal_tagihan=?, tanggal_dibuat=?, lat=?, lng=?, updated_at=NOW() WHERE username=? AND router_id=?");
+        $stmt = $conn->prepare("UPDATE users SET wa=?, alamat=?, maps=?, redaman=?, odp_id=?, tanggal_tagihan=?, tanggal_dibuat=?, lat=?, lng=?, tipe_langganan=?, updated_at=NOW() WHERE username=? AND router_id=?");
         if (!$stmt) throw new Exception($conn->error);
-        $stmt->bind_param('ssssiisddss', $wa, $alamat, $maps, $redaman, $odpId, $tanggalTagihan, $tanggalDibuat, $lat, $lng, $username, $routerId);
+        $stmt->bind_param('ssssiisddsss', $wa, $alamat, $maps, $redaman, $odpId, $tanggalTagihan, $tanggalDibuat, $lat, $lng, $tipeLangganan, $username, $routerId);
         $stmt->execute();
         $affected = $stmt->affected_rows;
         $stmt->close();
@@ -200,8 +201,9 @@ try {
         }
         $chk->close();
 
-        $stmt = $conn->prepare("INSERT INTO users (router_id, username, password, profile, wa, alamat, maps, redaman, odp_id, tanggal_tagihan, tanggal_dibuat, on_router, lat, lng) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?)");
-        $stmt->bind_param('ssssssssiisdd', $routerId, $username, $password, $profile, $wa, $alamat, $maps, $redaman, $odpId, $tanggalTagihan, $tanggalDibuat, $lat, $lng);
+        $tipeLangganan = $input['tipe_langganan'] ?? 'pascabayar';
+        $stmt = $conn->prepare("INSERT INTO users (router_id, username, password, profile, wa, alamat, maps, redaman, odp_id, tanggal_tagihan, tanggal_dibuat, on_router, lat, lng, tipe_langganan) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?, ?)");
+        $stmt->bind_param('ssssssssiisdds', $routerId, $username, $password, $profile, $wa, $alamat, $maps, $redaman, $odpId, $tanggalTagihan, $tanggalDibuat, $lat, $lng, $tipeLangganan);
         $stmt->execute();
         $stmt->close();
 
@@ -232,6 +234,11 @@ try {
             $vals[] = $tanggalDibuat;
             $types .= 's';
         }
+        
+        $tipeLangganan = $input['tipe_langganan'] ?? 'pascabayar';
+        $sets[] = 'tipe_langganan=?';
+        $vals[] = $tipeLangganan;
+        $types .= 's';
 
         if (empty($routerId)) {
             echo json_encode(['success' => false, 'message' => 'Parameter router_id wajib']);

@@ -70,7 +70,7 @@ try {
 
             if ($exists) {
                 // UPDATE
-                $fields = ['profile', 'password', 'wa', 'alamat', 'maps', 'redaman', 'tanggal_tagihan', 'odp_id'];
+                $fields = ['profile', 'password', 'wa', 'alamat', 'maps', 'redaman', 'tanggal_tagihan', 'odp_id', 'tipe_langganan'];
                 $setParts = [];
                 $params = [];
                 $types = '';
@@ -111,12 +111,13 @@ try {
                 $redaman = $row['redaman'] ?? '';
                 $tagihan = $row['tanggal_tagihan'] ?? null;
                 $odp_id = $row['odp_id'] ?? null;
+                $tipe_langganan = $row['tipe_langganan'] ?? 'pascabayar';
                 
                 if ($tagihan === '' || $tagihan === 'none') $tagihan = null;
                 if ($odp_id === '' || $odp_id === 'none') $odp_id = null;
 
-                $stmt = $conn->prepare("INSERT INTO users (router_id, username, password, profile, wa, alamat, maps, redaman, tanggal_tagihan, odp_id, tanggal_dibuat, on_router) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), 1)");
-                $stmt->bind_param("sssssssssi", $routerId, $username, $password, $profile, $wa, $alamat, $maps, $redaman, $tagihan, $odp_id);
+                $stmt = $conn->prepare("INSERT INTO users (router_id, username, password, profile, wa, alamat, maps, redaman, tanggal_tagihan, odp_id, tanggal_dibuat, on_router, tipe_langganan) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), 1, ?)");
+                $stmt->bind_param("sssssssssis", $routerId, $username, $password, $profile, $wa, $alamat, $maps, $redaman, $tagihan, $odp_id, $tipe_langganan);
                 $stmt->execute();
                 $successCount++;
                 $stmt->close();
