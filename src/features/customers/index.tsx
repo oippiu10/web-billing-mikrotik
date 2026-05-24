@@ -11,13 +11,6 @@ import { RouterSelector } from '@/components/router-selector'
 import { CustomersTable } from './components/customers-table'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select'
 import { UserPlus, SearchIcon, RefreshCw, LayoutGrid, Users, Wifi, WifiOff, CheckCircle2, MapPin } from 'lucide-react'
 import { toast } from 'sonner'
 import { CustomerMutateDialog } from './components/customer-mutate-drawer'
@@ -25,6 +18,13 @@ import { BatchEditCustomers } from './components/batch-edit-customers'
 import { CustomersSubNav } from './components/customers-sub-nav'
 import { type Customer } from './data/schema'
 import { usePermission } from '@/lib/permissions'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
 
 export function Customers() {
   const { activeRouter } = useRouterStore()
@@ -173,17 +173,7 @@ export function Customers() {
 
       <Main className='flex flex-col gap-4' fluid>
         <CustomersSubNav active='/customers' />
-        <div className='relative overflow-hidden rounded-xl border-0 bg-gradient-to-r from-blue-600 via-indigo-600 to-violet-600 p-5 text-white shadow-sm'>
-          <div className='absolute -right-10 -top-10 h-32 w-32 rounded-full bg-white/10' />
-          <div className='absolute bottom-0 right-24 h-20 w-20 rounded-full bg-white/10' />
-          <div className='relative flex flex-col gap-2 md:flex-row md:items-center md:justify-between'>
-            <div>
-              <h2 className='text-xl font-bold tracking-tight'>Database Pelanggan</h2>
-              <p className='text-sm text-white/80'>Kelola PPPoE, billing, ODP, WhatsApp, lokasi, dan data instalasi pelanggan.</p>
-            </div>
-            <div className='rounded-full border border-white/20 bg-white/15 px-3 py-1 text-xs font-semibold'>Load dari database • sync manual</div>
-          </div>
-        </div>
+
         <div className='grid gap-3 grid-cols-2 lg:grid-cols-6'>
           <div className='rounded-xl bg-gradient-to-br from-blue-600 to-indigo-700 p-4 text-white shadow-sm'>
             <div className='flex items-center justify-between'><div><p className='text-xs font-bold uppercase text-white/70'>Total</p><p className='text-3xl font-black'>{data?.total_all ?? data?.total ?? 0}</p></div><Users className='h-6 w-6 text-white/80' /></div>
@@ -233,20 +223,37 @@ export function Customers() {
                             />
                         </div>
                         <Select
-                          value={tipe || 'all'}
-                          onValueChange={(v) => {
-                            setTipe(v === 'all' ? 'all' : (v as any))
-                            setPage(1)
-                          }}
+                            value={status}
+                            onValueChange={(v) => {
+                                setStatus(v as 'all' | 'online' | 'offline')
+                                setPage(1)
+                            }}
                         >
-                          <SelectTrigger className='h-9 w-36 text-xs font-semibold bg-background border-border rounded-lg shadow-sm focus:ring-0 focus:ring-offset-0 shrink-0'>
-                            <SelectValue placeholder='Semua Tipe' />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value='all'>Semua Tipe</SelectItem>
-                            <SelectItem value='prabayar'>Prabayar</SelectItem>
-                            <SelectItem value='pascabayar'>Pascabayar</SelectItem>
-                          </SelectContent>
+                            <SelectTrigger className='h-9 w-36 text-xs font-semibold bg-background border-border rounded-lg shadow-sm focus:ring-0 focus:ring-offset-0 shrink-0'>
+                                <SelectValue placeholder='Semua Status' />
+                            </SelectTrigger>
+                            <SelectContent>
+                                <SelectItem value='all'>Semua Status</SelectItem>
+                                <SelectItem value='online'>🟢 Online ({data?.active ?? '-'})</SelectItem>
+                                <SelectItem value='offline'>🔴 Offline ({data?.total_all !== undefined && data?.active !== undefined ? Math.max(0, data.total_all - data.active) : '-'})</SelectItem>
+                            </SelectContent>
+                        </Select>
+
+                        <Select
+                            value={tipe}
+                            onValueChange={(v) => {
+                                setTipe(v as 'all' | 'prabayar' | 'pascabayar')
+                                setPage(1)
+                            }}
+                        >
+                            <SelectTrigger className='h-9 w-36 text-xs font-semibold bg-background border-border rounded-lg shadow-sm focus:ring-0 focus:ring-offset-0 shrink-0'>
+                                <SelectValue placeholder='Semua Tipe' />
+                            </SelectTrigger>
+                            <SelectContent>
+                                <SelectItem value='all'>Semua Tipe</SelectItem>
+                                <SelectItem value='prabayar'>🟢 Prabayar ({data?.total_prabayar ?? 0})</SelectItem>
+                                <SelectItem value='pascabayar'>🔵 Pascabayar ({data?.total_pascabayar ?? 0})</SelectItem>
+                            </SelectContent>
                         </Select>
                     </div>
 
