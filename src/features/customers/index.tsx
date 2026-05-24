@@ -26,13 +26,14 @@ export function Customers() {
   const [page, setPage] = useState(1)
   const [search, setSearch] = useState('')
   const [status, setStatus] = useState<'all' | 'online' | 'offline'>('all')
+  const [tipe, setTipe] = useState<'all' | 'prabayar' | 'pascabayar'>('all')
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false)
   const [isBatchEditView, setIsBatchEditView] = useState(false)
   const [selectedCustomers, setSelectedCustomers] = useState<Customer[]>([])
   const perPage = isBatchEditView ? 10 : 20
 
   const { data, isLoading } = useQuery({
-    queryKey: ['customers', activeRouter?.id, page, search, perPage, status],
+    queryKey: ['customers', activeRouter?.id, page, search, perPage, status, tipe],
     queryFn: async () => {
       if (!activeRouter) return null
       const res = await api.get('/get_all_users_paginated.php', {
@@ -41,7 +42,8 @@ export function Customers() {
           page,
           per_page: perPage,
           search,
-          status: status !== 'all' ? status : undefined
+          status: status !== 'all' ? status : undefined,
+          tipe: tipe !== 'all' ? tipe : undefined
         },
       })
       return res.data
@@ -175,7 +177,7 @@ export function Customers() {
             <div className='rounded-full border border-white/20 bg-white/15 px-3 py-1 text-xs font-semibold'>Load dari database • sync manual</div>
           </div>
         </div>
-        <div className='grid gap-3 md:grid-cols-4'>
+        <div className='grid gap-3 grid-cols-2 lg:grid-cols-6'>
           <div className='rounded-xl bg-gradient-to-br from-blue-600 to-indigo-700 p-4 text-white shadow-sm'>
             <div className='flex items-center justify-between'><div><p className='text-xs font-bold uppercase text-white/70'>Total</p><p className='text-3xl font-black'>{data?.total_all ?? data?.total ?? 0}</p></div><Users className='h-6 w-6 text-white/80' /></div>
           </div>
@@ -184,6 +186,12 @@ export function Customers() {
           </div>
           <div className='rounded-xl bg-gradient-to-br from-orange-500 to-rose-600 p-4 text-white shadow-sm'>
             <div className='flex items-center justify-between'><div><p className='text-xs font-bold uppercase text-white/70'>Offline</p><p className='text-3xl font-black'>{data?.total_all !== undefined && data?.active !== undefined ? Math.max(0, data.total_all - data.active) : '-'}</p></div><WifiOff className='h-6 w-6 text-white/80' /></div>
+          </div>
+          <div className='rounded-xl bg-gradient-to-br from-emerald-600 to-emerald-700/80 p-4 text-white shadow-sm'>
+            <div className='flex items-center justify-between'><div><p className='text-xs font-bold uppercase text-white/70'>Prabayar</p><p className='text-3xl font-black'>{data?.total_prabayar ?? 0}</p></div><CheckCircle2 className='h-6 w-6 text-white/80' /></div>
+          </div>
+          <div className='rounded-xl bg-gradient-to-br from-blue-500 to-indigo-600 p-4 text-white shadow-sm'>
+            <div className='flex items-center justify-between'><div><p className='text-xs font-bold uppercase text-white/70'>Pascabayar</p><p className='text-3xl font-black'>{data?.total_pascabayar ?? 0}</p></div><Users className='h-6 w-6 text-white/80' /></div>
           </div>
           <div className='rounded-xl bg-gradient-to-br from-sky-500 to-blue-600 p-4 text-white shadow-sm'>
             <div className='flex items-center justify-between'><div><p className='text-xs font-bold uppercase text-white/70'>Data Lengkap</p><p className='text-3xl font-black'>{data?.total_complete ?? 0}</p></div><CheckCircle2 className='h-6 w-6 text-white/80' /></div>
@@ -221,6 +229,11 @@ export function Customers() {
                             <Button size='sm' variant={status === 'all' ? 'secondary' : 'ghost'} className='h-7 px-3 text-xs font-semibold' onClick={() => setStatus('all')}>Semua <span className='ml-1.5 text-muted-foreground'>{data?.total_all ?? data?.total ?? 0}</span></Button>
                             <Button size='sm' variant={status === 'online' ? 'secondary' : 'ghost'} className='h-7 px-3 text-xs font-semibold text-emerald-600' onClick={() => setStatus('online')}>Online <span className='ml-1.5'>{data?.active ?? '-'}</span></Button>
                             <Button size='sm' variant={status === 'offline' ? 'secondary' : 'ghost'} className='h-7 px-3 text-xs font-semibold text-red-600' onClick={() => setStatus('offline')}>Offline <span className='ml-1.5'>{data?.total_all !== undefined && data?.active !== undefined ? Math.max(0, data.total_all - data.active) : '-'}</span></Button>
+                        </div>
+                        <div className='hidden sm:flex items-center rounded-md border bg-background p-1 shadow-sm'>
+                            <Button size='sm' variant={tipe === 'all' ? 'secondary' : 'ghost'} className='h-7 px-3 text-xs font-semibold' onClick={() => setTipe('all')}>Semua Tipe</Button>
+                            <Button size='sm' variant={tipe === 'prabayar' ? 'secondary' : 'ghost'} className='h-7 px-3 text-xs font-semibold text-emerald-600' onClick={() => setTipe('prabayar')}>Prabayar <span className='ml-1 text-[10px] bg-emerald-100 text-emerald-700 px-1.5 py-0.5 rounded-full font-bold'>{data?.total_prabayar ?? 0}</span></Button>
+                            <Button size='sm' variant={tipe === 'pascabayar' ? 'secondary' : 'ghost'} className='h-7 px-3 text-xs font-semibold text-blue-600' onClick={() => setTipe('pascabayar')}>Pascabayar <span className='ml-1 text-[10px] bg-blue-100 text-blue-700 px-1.5 py-0.5 rounded-full font-bold'>{data?.total_pascabayar ?? 0}</span></Button>
                         </div>
                     </div>
 

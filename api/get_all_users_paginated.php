@@ -27,6 +27,7 @@ $perPage = max(1, intval($_GET['per_page'] ?? 20));
 $search = trim($_GET['search'] ?? '');
 $profile = trim($_GET['profile'] ?? '');
 $odp = trim($_GET['odp'] ?? '');
+$tipeFilter = trim($_GET['tipe'] ?? ''); // 'prabayar'/'pascabayar'/''
 $statusFilter = trim($_GET['status'] ?? ''); // 'active'/'disabled'/''
 
 // Sorting logic
@@ -202,6 +203,13 @@ try {
         $params[] = $odp;
         $types .= 's';
     }
+    if ($tipeFilter !== '') {
+        if ($tipeFilter === 'prabayar') {
+            $where[] = "u.tipe_langganan = 'prabayar'";
+        } else {
+            $where[] = "(u.tipe_langganan = 'pascabayar' OR u.tipe_langganan IS NULL OR u.tipe_langganan = '')";
+        }
+    }
 
     $whereSQL = $where ? 'WHERE ' . implode(' AND ', $where) : '';
 
@@ -357,11 +365,28 @@ try {
     $unpaid = ($unpaidRes ? $unpaidRes->fetch_assoc()['unpaid'] : 0) ?? 0;
     $stmtU->close();
 
+    // Hitung prabayar dan pascabayar
+    $stmtTipe = $conn->prepare("
+        SELECT 
+            SUM(CASE WHEN tipe_langganan = 'prabayar' THEN 1 ELSE 0 END) as prabayar,
+            SUM(CASE WHEN tipe_langganan != 'prabayar' OR tipe_langganan IS NULL THEN 1 ELSE 0 END) as pascabayar
+        FROM users
+        WHERE router_id = ?
+    ");
+    $stmtTipe->bind_param("s", $routerId);
+    $stmtTipe->execute();
+    $tipeRes = $stmtTipe->get_result()->fetch_assoc();
+    $totalPrabayar = (int)($tipeRes['prabayar'] ?? 0);
+    $totalPascabayar = (int)($tipeRes['pascabayar'] ?? 0);
+    $stmtTipe->close();
+
     $output = json_encode([
         'success' => true,
         'data' => $paginatedUsers,
         'total' => $totalFiltered,
         'total_complete' => (int) $totalComplete,
+        'total_prabayar' => $totalPrabayar,
+        'total_pascabayar' => $totalPascabayar,
         'page' => $page,
         'per_page' => $perPage,
         'profiles' => $profiles,

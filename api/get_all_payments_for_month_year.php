@@ -20,6 +20,7 @@ $per_page = max(5, intval($_GET['per_page'] ?? 25));
 $search = trim($_GET['search'] ?? '');
 $status = trim($_GET['status'] ?? '');
 $profile = trim($_GET['profile'] ?? '');
+$tipe = trim($_GET['tipe'] ?? '');
 $offset = ($page - 1) * $per_page;
 
 // Normalisasi id router numeric ke software_id karena tabel users/payments memakai software_id.
@@ -52,6 +53,14 @@ if ($profile !== '') {
     $types .= "s";
 }
 
+if ($tipe !== '') {
+    if ($tipe === 'prabayar') {
+        $where[] = "u.tipe_langganan = 'prabayar'";
+    } else {
+        $where[] = "(u.tipe_langganan = 'pascabayar' OR u.tipe_langganan IS NULL OR u.tipe_langganan = '')";
+    }
+}
+
 if ($status === 'paid') {
     $where[] = "p.id IS NOT NULL";
 } elseif ($status === 'unpaid') {
@@ -82,7 +91,7 @@ $totalFiltered = $cntStmt->get_result()->fetch_assoc()['total'] ?? 0;
 $cntStmt->close();
 
 // 2. Data Pagination
-$dataSQL = "SELECT u.id as user_id, u.username, u.alamat, u.profile, u.tanggal_tagihan, u.wa,
+$dataSQL = "SELECT u.id as user_id, u.username, u.alamat, u.profile, u.tanggal_tagihan, u.wa, u.tipe_langganan,
                    IFNULL(p.id, u.id) as id, p.id as payment_id, p.amount as paid_amount, p.payment_date as paid_at,
                    p.method, p.note,
                    IF(p.id IS NOT NULL, 'paid', 'unpaid') as status,

@@ -157,6 +157,7 @@ export function FinanceBilling() {
   const [search, setSearch] = useState('')
   const [status, setStatus] = useState('')
   const [profile, setProfile] = useState('')
+  const [tipe, setTipe] = useState('')
   const [page, setPage] = useState(1)
   const [perPage, setPerPage] = useState(20)
 
@@ -196,6 +197,7 @@ export function FinanceBilling() {
       status,
       profile,
       page,
+      tipe,
     ],
     queryFn: async () => {
       const res = await api.get('/get_all_payments_for_month_year.php', {
@@ -208,6 +210,7 @@ export function FinanceBilling() {
           profile,
           page,
           per_page: perPage,
+          tipe: tipe || undefined,
         },
       })
       return res.data
@@ -732,6 +735,24 @@ export function FinanceBilling() {
               </SelectContent>
             </Select>
 
+            {/* Tipe Langganan */}
+            <Select
+              value={tipe || 'all'}
+              onValueChange={(v) => {
+                setTipe(v === 'all' ? '' : v)
+                setPage(1)
+              }}
+            >
+              <SelectTrigger className='h-9 w-36 text-xs font-semibold bg-background border-border rounded-lg shadow-sm focus:ring-0 focus:ring-offset-0 shrink-0'>
+                <SelectValue placeholder='Semua Tipe' />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value='all'>Semua Tipe</SelectItem>
+                <SelectItem value='prabayar'>Prabayar</SelectItem>
+                <SelectItem value='pascabayar'>Pascabayar</SelectItem>
+              </SelectContent>
+            </Select>
+
             {/* Profile */}
             <Select
               value={profile || 'all'}
@@ -882,7 +903,20 @@ export function FinanceBilling() {
                         })
                       }
                     >
-                      <PrivacyText>{row.username}</PrivacyText>
+                      <div className="flex items-center gap-2">
+                        <PrivacyText>{row.username}</PrivacyText>
+                        <Badge 
+                          variant='outline' 
+                          className={cn(
+                            'text-[9px] font-black uppercase tracking-wider px-1.5 py-0 rounded border shadow-3xs scale-90 origin-left transition-all',
+                            row.tipe_langganan === 'prabayar'
+                              ? 'border-emerald-500 text-emerald-600 bg-emerald-50' 
+                              : 'border-blue-500 text-blue-600 bg-blue-50'
+                          )}
+                        >
+                          {row.tipe_langganan === 'prabayar' ? 'Pra' : 'Pasca'}
+                        </Badge>
+                      </div>
                     </TableCell>
                     <TableCell className='hidden max-w-[180px] truncate text-xs text-muted-foreground md:table-cell'>
                       <PrivacyText>{row.alamat || '-'}</PrivacyText>
