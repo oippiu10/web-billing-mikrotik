@@ -22,6 +22,7 @@ import {
   MessageCircle,
   PenLine,
   MoreHorizontal,
+  Trash2,
 } from 'lucide-react'
 import {
   DropdownMenu,
@@ -233,8 +234,8 @@ export function FinanceBilling() {
         username: row.username,
         payment_id: row.user_id,
         amount: row.calculatedAmount !== undefined ? row.calculatedAmount : (parseFloat(paidAmount) || parseFloat(row.harga) || 0),
-        paid_date: paidDate,
-        method: paidMethod,
+        paid_date: row.calculatedDate !== undefined ? row.calculatedDate : paidDate,
+        method: row.calculatedMethod !== undefined ? row.calculatedMethod : paidMethod,
         note: row.calculatedNote !== undefined ? row.calculatedNote : paidNote,
         month,
         year,
@@ -248,6 +249,7 @@ export function FinanceBilling() {
         queryClient.invalidateQueries({ queryKey: ['receivable'] })
         queryClient.invalidateQueries({ queryKey: ['finance-kpi'] })
         queryClient.invalidateQueries({ queryKey: ['finance-annual'] })
+        queryClient.invalidateQueries({ queryKey: ['billing-user-history'] })
         setPaidDialog(null)
       } else toast.error(d.message || 'Gagal')
     },
@@ -307,6 +309,41 @@ export function FinanceBilling() {
       } else toast.error(d.message || 'Gagal')
     },
   })
+
+  const handleDeleteAngsuran = (pay: any, itemContent: string, itemRawLine: string) => {
+    if (!window.confirm(`Apakah Anda yakin ingin menghapus angsuran ini?\n\n"${itemContent}"\n\nNominal pembayaran akan otomatis dikurangkan kembali.`)) {
+      return;
+    }
+
+    // 1. Extract amount from the raw line
+    const match = itemRawLine.match(/(?:\+?Rp\s*)([\d.]+)/);
+    const amtToDeduct = match ? parseFloat(match[1].replace(/\./g, '')) : 0;
+
+    // 2. Subtract from total paid_amount
+    const currentTotal = parseFloat(String(pay.amount || 0));
+    const newTotal = Math.max(0, currentTotal - amtToDeduct);
+
+    // 3. Remove the line from note
+    const lines = pay.note.split('\n');
+    const newLines = lines.filter((l: string) => l.trim() !== itemRawLine.trim());
+    const newNote = newLines.join('\n');
+    
+    // 4. Trigger markPaid mutation to update database!
+    markPaid.mutate({
+      ...pay,
+      username: historyUser?.username || pay.username,
+      calculatedAmount: newTotal,
+      calculatedNote: newNote,
+      calculatedDate: pay.payment_date,
+      calculatedMethod: pay.method,
+    }, {
+      onSuccess: (d) => {
+        if (d.success) {
+          toast.success('Angsuran berhasil dihapus!');
+        }
+      }
+    });
+  };
 
   const toggleSelectAll = () => {
     if (selectedRows.size === (data?.data || []).length && data?.data?.length > 0) {
@@ -1754,9 +1791,23 @@ export function FinanceBilling() {
                                       )}
                                     >
                                       {item.isStructured ? (
-                                        <div className='flex items-center gap-2 w-full'>
-                                          <div className='h-1.5 w-1.5 rounded-full bg-indigo-500 shrink-0 shadow-xs' />
-                                          <span className='w-full break-all'>{item.content}</span>
+                                        <div className='flex items-center justify-between w-full gap-2'>
+                                          <div className='flex items-center gap-2'>
+                                            <div className='h-1.5 w-1.5 rounded-full bg-indigo-500 shrink-0 shadow-xs' />
+                                            <span className='break-all'>{item.content}</span>
+                                          </div>
+                                          {item.content.includes('Angsuran:') && (
+                                            <Button
+                                              type='button'
+                                              variant='ghost'
+                                              size='icon'
+                                              onClick={() => handleDeleteAngsuran(pay, item.content, `[${item.content}]`)}
+                                              className='h-5 w-5 rounded text-rose-500 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/30 shrink-0 transition-colors'
+                                              title='Hapus setoran angsuran ini'
+                                            >
+                                              <Trash2 className='h-3.5 w-3.5' />
+                                            </Button>
+                                          )}
                                         </div>
                                       ) : (
                                         <div className='flex items-center gap-2 w-full'>
