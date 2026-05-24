@@ -12,6 +12,7 @@ import {
   AlertTriangle,
   BarChart3,
   Wifi,
+  ArrowDownCircle,
   WifiOff,
   KeyRound,
   Shield,
@@ -203,18 +204,13 @@ export const sidebarData: SidebarData = {
               icon: AlertTriangle,
             },
             {
-              title: 'Laporan Tahunan',
-              url: '/finance/report',
-              icon: BarChart3,
+              title: 'Pengeluaran',
+              url: '/finance/expenses',
+              icon: ArrowDownCircle,
             },
           ],
         },
-        {
-          title: 'Billing Lengkap',
-          url: '/billing',
-          icon: FileText,
-          requiredRoles: ['admin', 'administrator', 'super_admin', 'super admin', 'superadministrator', 'finance'],
-        },
+
         {
           title: 'Automation',
           url: '/automation',

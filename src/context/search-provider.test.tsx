@@ -22,6 +22,42 @@ vi.mock('@/context/theme-provider', () => ({
   useTheme: () => ({ setTheme: mocks.setTheme }),
 }))
 
+// Mock sidebarData dynamically to decouple tests from real sidebar config changes
+vi.mock('@/components/layout/data/sidebar-data', () => ({
+  sidebarData: {
+    user: {
+      name: 'Admin',
+      email: 'admin@test.com',
+      avatar: '',
+    },
+    teams: [],
+    navGroups: [
+      {
+        title: 'Monitoring',
+        items: [
+          {
+            title: 'Dashboard',
+            url: '/',
+          },
+          {
+            title: 'Tasks',
+            url: '/tasks',
+          },
+          {
+            title: 'Settings',
+            items: [
+              {
+                title: 'Account',
+                url: '/settings/account',
+              },
+            ],
+          },
+        ],
+      },
+    ],
+  },
+}))
+
 type ShortcutModifier = 'Control' | 'Meta'
 
 async function renderWithSearchProvider() {

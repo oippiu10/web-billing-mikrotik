@@ -38,7 +38,9 @@ if (!$secretId) { $api->disconnect(); echo json_encode(['success'=>false,'messag
 $disabled = (($found[0]['disabled'] ?? 'false') === 'true');
 if ($disabled) $api->comm('/ppp/secret/enable', ['.id' => $secretId]);
 $api->disconnect();
-$cache = new MikrotikCache($conn); $cache->invalidate('mt_' . $router['host'] . '_' . (intval($router['port']) ?: 8728) . '_ppp_secret');
+$cache = new MikrotikCache($conn);
+$cache->invalidate("mt_{$router['id']}_ppp_secret");
+$cache->invalidate('mt_' . $router['host'] . '_' . (intval($router['port']) ?: 8728) . '_ppp_secret');
 log_admin_activity($conn, 'auto_open_isolate', 'Buka isolir PPP secret '.$username, intval($_SESSION['admin_id'] ?? 0));
 insert_automation_log($conn, $router_id, 'open_isolate', $username, $disabled ? 'enabled' : 'already_enabled', intval($_SESSION['admin_id'] ?? 0), $secretId);
 echo json_encode(['success'=>true,'message'=>$disabled?'Layanan berhasil diaktifkan':'Layanan sudah aktif','username'=>$username,'was_disabled'=>$disabled]);

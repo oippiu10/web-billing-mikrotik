@@ -1,12 +1,12 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { render, type RenderResult } from 'vitest-browser-react'
 import { type Locator, userEvent } from 'vitest/browser'
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { UserAuthForm } from './user-auth-form'
 
 const FORM_MESSAGES = {
-  emailEmpty: 'Please enter your email.',
-  passwordEmpty: 'Please enter your password.',
-  passwordShort: 'Password must be at least 7 characters long.',
+  emailEmpty: 'Masukkan username.',
+  passwordEmpty: 'Masukkan password.',
 } as const
 
 const navigate = vi.fn()
@@ -49,7 +49,20 @@ vi.mock('@/lib/utils', async (orig) => ({
   sleep: vi.fn(() => Promise.resolve()),
 }))
 
+const postMock = vi.fn()
+
+vi.mock('@/lib/api', () => ({
+  api: {
+    post: (...args: any[]) => postMock(...args),
+  },
+  default: {
+    post: (...args: any[]) => postMock(...args),
+  },
+}))
+
 describe('UserAuthForm', () => {
+  const queryClient = new QueryClient()
+
   describe('Rendering without redirectTo', () => {
     let screen: RenderResult
     let emailInput: Locator
@@ -59,8 +72,25 @@ describe('UserAuthForm', () => {
 
     beforeEach(async () => {
       vi.clearAllMocks()
-      screen = await render(<UserAuthForm />)
-      emailInput = screen.getByRole('textbox', { name: /^Email$/i })
+      postMock.mockResolvedValue({
+        data: {
+          success: true,
+          message: 'Login berhasil',
+          data: {
+            id: 1,
+            username: 'admin',
+            full_name: 'Administrator',
+            role: 'admin',
+            role_id: 1,
+          },
+        },
+      })
+      screen = await render(
+        <QueryClientProvider client={queryClient}>
+          <UserAuthForm />
+        </QueryClientProvider>
+      )
+      emailInput = screen.getByRole('textbox', { name: /^Username$/i })
       passwordInput = screen.getByLabelText(/^Password$/i)
       signInButton = screen.getByRole('button', { name: /^Sign in$/i })
       forgotPasswordLink = screen.getByText(/^Forgot password\?$/i)
@@ -85,7 +115,7 @@ describe('UserAuthForm', () => {
     })
 
     it('authenticates and navigates to default route on success', async () => {
-      await userEvent.fill(emailInput, 'a@b.com')
+      await userEvent.fill(emailInput, 'admin')
       await userEvent.fill(passwordInput, '1234567')
 
       await userEvent.click(signInButton)
@@ -93,14 +123,15 @@ describe('UserAuthForm', () => {
       await vi.waitFor(() => expect(setUserMock).toHaveBeenCalledOnce())
       expect(setUserMock).toHaveBeenCalledWith(
         expect.objectContaining({
-          email: 'a@b.com',
-          accountNo: expect.any(String),
-          role: expect.any(Array),
-          exp: expect.any(Number),
+          id: 1,
+          username: 'admin',
+          fullName: 'Administrator',
+          role: 'admin',
+          roleId: 1,
         })
       )
       expect(setAccessTokenMock).toHaveBeenCalledOnce()
-      expect(setAccessTokenMock).toHaveBeenCalledWith('mock-access-token')
+      expect(setAccessTokenMock).toHaveBeenCalledWith('php-session')
 
       await vi.waitFor(() =>
         expect(navigate).toHaveBeenCalledWith({ to: '/', replace: true })
@@ -110,12 +141,27 @@ describe('UserAuthForm', () => {
 
   it('navigates to redirectTo when provided', async () => {
     vi.clearAllMocks()
+    postMock.mockResolvedValue({
+      data: {
+        success: true,
+        message: 'Login berhasil',
+        data: {
+          id: 1,
+          username: 'admin',
+          full_name: 'Administrator',
+          role: 'admin',
+          role_id: 1,
+        },
+      },
+    })
 
     const { getByRole, getByLabelText } = await render(
-      <UserAuthForm redirectTo='/settings' />
+      <QueryClientProvider client={queryClient}>
+        <UserAuthForm redirectTo='/settings' />
+      </QueryClientProvider>
     )
 
-    await userEvent.fill(getByRole('textbox', { name: /Email/i }), 'a@b.com')
+    await userEvent.fill(getByRole('textbox', { name: /Username/i }), 'admin')
     await userEvent.fill(getByLabelText('Password'), '1234567')
 
     await userEvent.click(getByRole('button', { name: /Sign in/i }))

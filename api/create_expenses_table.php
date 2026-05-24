@@ -1,9 +1,10 @@
 <?php
 require_once 'config.php';
+/** @var mysqli $conn */
 
 $sql = "CREATE TABLE IF NOT EXISTS expenses (
     id INT AUTO_INCREMENT PRIMARY KEY,
-    router_id INT NOT NULL,
+    router_id VARCHAR(100) NOT NULL,
     category VARCHAR(100) NOT NULL,
     amount DECIMAL(15, 2) NOT NULL,
     note TEXT,

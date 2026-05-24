@@ -37,8 +37,8 @@ ini_set('log_errors', 1);
 $host = $_ENV['DB_HOST'] ?? getenv('DB_HOST') ?: '127.0.0.1';
 $db = $_ENV['DB_NAME'] ?? getenv('DB_NAME') ?: 'pppoe_monitor';
 $user = $_ENV['DB_USER'] ?? getenv('DB_USER') ?: 'root';
-$pass = $_ENV['DB_PASS'] ?? getenv('DB_PASS') ?: '';
-
+$pass = $_ENV['DB_PASS'] ?? getenv('DB_PASS') ?: 'yahahahusein112';
+  
 $conn = mysqli_init();
 mysqli_options($conn, MYSQLI_OPT_CONNECT_TIMEOUT, 5); // 5 seconds timeout
 if (!@mysqli_real_connect($conn, $host, $user, $pass, $db)) {

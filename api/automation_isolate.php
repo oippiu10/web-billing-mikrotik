@@ -111,6 +111,7 @@ if (!$dry_run && count($candidates) > 0) {
     $api->disconnect();
 
     $cache = new MikrotikCache($conn);
+    $cache->invalidate("mt_{$router_id}_ppp_secret");
     $cache->invalidate('mt_' . $router['host'] . '_' . (intval($router['port']) ?: 8728) . '_ppp_secret');
     log_admin_activity($conn, 'auto_isolate', 'Menjalankan auto isolir periode ' . $month . '/' . $year . ' router ID ' . $router_id, (int)($_SESSION['admin_id'] ?? 0));
 } else {

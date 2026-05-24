@@ -13,7 +13,7 @@ export function PrivacyText({ children, className, mask = '••••••' }
   const privacyMode = usePrivacyStore((state) => state.privacyMode)
 
   if (privacyMode) {
-    return <span className={cn('select-none tracking-widest blur-[3px]', className)}>{mask}</span>
+    return <span className={cn('select-none tracking-widest opacity-80', className)}>••••••</span>
   }
 
   return <span className={className}>{children}</span>

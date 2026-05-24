@@ -82,8 +82,9 @@ $totalFiltered = $cntStmt->get_result()->fetch_assoc()['total'] ?? 0;
 $cntStmt->close();
 
 // 2. Data Pagination
-$dataSQL = "SELECT u.id as user_id, u.username, u.alamat, u.profile, u.tanggal_tagihan, 
+$dataSQL = "SELECT u.id as user_id, u.username, u.alamat, u.profile, u.tanggal_tagihan, u.wa,
                    IFNULL(p.id, u.id) as id, p.id as payment_id, p.amount as paid_amount, p.payment_date as paid_at,
+                   p.method, p.note,
                    IF(p.id IS NOT NULL, 'paid', 'unpaid') as status,
                    pr.price as harga
             FROM $tables 
@@ -104,19 +105,19 @@ while ($row = $result->fetch_assoc()) {
 }
 $dataStmt->close();
 
-// 3. Summary (Need to calculate paid vs unpaid without search filters, just for the month)
+// 3. Summary (Dynamic based on search and filters)
 $sumSQL = "SELECT 
              SUM(IF(p.id IS NOT NULL, 1, 0)) as total_paid,
              SUM(IF(p.id IS NULL, 1, 0)) as total_unpaid,
              SUM(IFNULL(p.amount, 0)) as collected,
              SUM(IF(p.id IS NULL, IFNULL(pr.price, 0), 0)) as receivable,
              SUM(IFNULL(pr.price, 0)) as target_amount
-           FROM users u 
-           LEFT JOIN payments p ON p.user_id = u.id AND p.payment_month = ? AND p.payment_year = ? AND p.router_id = u.router_id
-           LEFT JOIN ppp_profile_pricing pr ON pr.profile_name = u.profile AND pr.router_id = u.router_id
-           WHERE u.router_id = ?";
+           FROM $tables 
+           $whereSQL";
 $sumStmt = $conn->prepare($sumSQL);
-$sumStmt->bind_param("iis", $month, $year, $router_id);
+if ($types) {
+    $sumStmt->bind_param($types, ...$params);
+}
 $sumStmt->execute();
 $sumResult = $sumStmt->get_result()->fetch_assoc();
 $paid = (int)($sumResult['total_paid'] ?? 0);

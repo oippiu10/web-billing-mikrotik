@@ -7,7 +7,7 @@ const navItems = [
   { label: 'Dashboard', url: '/finance' },
   { label: 'Tagihan Bulanan', url: '/finance/billing' },
   { label: 'Piutang', url: '/finance/receivable' },
-  { label: 'Laporan Tahunan', url: '/finance/report' },
+  { label: 'Pengeluaran', url: '/finance/expenses' },
 ]
 
 interface FinanceSubNavProps {

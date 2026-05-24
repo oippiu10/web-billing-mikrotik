@@ -1,39 +1,96 @@
 import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { api } from '@/lib/api'
+import {
+  Receipt,
+  Download,
+  Search,
+  CheckCircle2,
+  Clock,
+  ChevronLeft,
+  ChevronRight,
+  ChevronsLeft,
+  ChevronsRight,
+  CheckCheck,
+  XCircle,
+  Wallet,
+  Printer,
+  History,
+  Calendar,
+  FileText,
+  RefreshCw,
+  MessageCircle,
+  PenLine,
+  MoreHorizontal,
+} from 'lucide-react'
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu'
+import { toast } from 'sonner'
+import { usePrivacyStore } from '@/stores/privacy-store'
 import { useRouterStore } from '@/stores/router-store'
-import { Header } from '@/components/layout/header'
-import { Main } from '@/components/layout/main'
-import { RouterSelector } from '@/components/router-selector'
-import { ProfileDropdown } from '@/components/profile-dropdown'
-import { ThemeSwitch } from '@/components/theme-switch'
-import { Card, CardContent } from '@/components/ui/card'
+import { api } from '@/lib/api'
+import { usePermission } from '@/lib/permissions'
+import { cn } from '@/lib/utils'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import {
-  Select, SelectContent, SelectItem, SelectTrigger, SelectValue
-} from '@/components/ui/select'
-import {
-  Table, TableBody, TableCell, TableHead, TableHeader, TableRow
-} from '@/components/ui/table'
-import {
-  Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
 } from '@/components/ui/dialog'
+import { Input } from '@/components/ui/input'
+import { ScrollArea } from '@/components/ui/scroll-area'
 import {
-  Receipt, Download, Search, CheckCircle2, Clock, ChevronLeft,
-  ChevronRight, CheckCheck, XCircle, Wallet, Printer,
-} from 'lucide-react'
-import { toast } from 'sonner'
-import { cn } from '@/lib/utils'
-import { FinanceSubNav } from './components/finance-sub-nav'
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
+import { Checkbox } from '@/components/ui/checkbox'
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table'
+import { Header } from '@/components/layout/header'
+import { Main } from '@/components/layout/main'
 import { PrivacyText } from '@/components/privacy'
-import { usePrivacyStore } from '@/stores/privacy-store'
-import { usePermission } from '@/lib/permissions'
+import { ProfileDropdown } from '@/components/profile-dropdown'
+import { RouterSelector } from '@/components/router-selector'
+import { ThemeSwitch } from '@/components/theme-switch'
+import { FinanceSubNav } from './components/finance-sub-nav'
 
-const MONTHS_ID = ['Januari','Februari','Maret','April','Mei','Juni','Juli','Agustus','September','Oktober','November','Desember']
+const MONTHS_ID = [
+  'Januari',
+  'Februari',
+  'Maret',
+  'April',
+  'Mei',
+  'Juni',
+  'Juli',
+  'Agustus',
+  'September',
+  'Oktober',
+  'November',
+  'Desember',
+]
 const fmt = (n: number) =>
-  new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', maximumFractionDigits: 0 }).format(n)
+  new Intl.NumberFormat('id-ID', {
+    style: 'currency',
+    currency: 'IDR',
+    maximumFractionDigits: 0,
+  }).format(n)
 
 const escapeHtml = (value: unknown) =>
   String(value ?? '-')
@@ -95,25 +152,63 @@ export function FinanceBilling() {
   const permissions = usePermission()
   const now = new Date()
 
-  const [month, setMonth]   = useState(now.getMonth() + 1)
-  const [year, setYear]     = useState(now.getFullYear())
+  const [month, setMonth] = useState(now.getMonth() + 1)
+  const [year, setYear] = useState(now.getFullYear())
   const [search, setSearch] = useState('')
   const [status, setStatus] = useState('')
   const [profile, setProfile] = useState('')
-  const [page, setPage]     = useState(1)
-  const perPage = 20
+  const [page, setPage] = useState(1)
+  const [perPage, setPerPage] = useState(20)
+
+  // Selection states
+  const [selectedRows, setSelectedRows] = useState<Set<number>>(new Set())
 
   // Paid dialog
   const [paidDialog, setPaidDialog] = useState<any>(null)
+  const [bulkPaidDialog, setBulkPaidDialog] = useState<boolean>(false)
   const [paidAmount, setPaidAmount] = useState('')
-  const [paidDate, setPaidDate]     = useState(now.toISOString().slice(0, 10))
+  const [paidDate, setPaidDate] = useState(now.toISOString().slice(0, 10))
   const [paidMethod, setPaidMethod] = useState('cash')
+  const [paidNote, setPaidNote] = useState('')
+
+  // History dialog state
+  const [historyUser, setHistoryUser] = useState<any>(null)
+
+  // Fetch payment history for selected user
+  const { data: userHistory, isLoading: isHistoryLoading } = useQuery({
+    queryKey: ['billing-user-history', historyUser?.id],
+    queryFn: async () => {
+      const res = await api.get('/get_user_payment_history.php', {
+        params: { user_id: historyUser?.id },
+      })
+      return res.data.data || []
+    },
+    enabled: !!historyUser?.id,
+  })
 
   const { data, isLoading } = useQuery({
-    queryKey: ['billing', activeRouter?.id, month, year, search, status, profile, page],
+    queryKey: [
+      'billing',
+      activeRouter?.id,
+      month,
+      year,
+      search,
+      status,
+      profile,
+      page,
+    ],
     queryFn: async () => {
       const res = await api.get('/get_all_payments_for_month_year.php', {
-        params: { router_id: activeRouter?.software_id || activeRouter?.id, month, year, search, status, profile, page, per_page: perPage }
+        params: {
+          router_id: activeRouter?.software_id || activeRouter?.id,
+          month,
+          year,
+          search,
+          status,
+          profile,
+          page,
+          per_page: perPage,
+        },
       })
       return res.data
     },
@@ -133,7 +228,9 @@ export function FinanceBilling() {
         amount: parseFloat(paidAmount) || parseFloat(row.harga) || 0,
         paid_date: paidDate,
         method: paidMethod,
-        month, year,
+        note: paidNote,
+        month,
+        year,
       })
       return res.data
     },
@@ -146,7 +243,7 @@ export function FinanceBilling() {
         queryClient.invalidateQueries({ queryKey: ['finance-annual'] })
         setPaidDialog(null)
       } else toast.error(d.message || 'Gagal')
-    }
+    },
   })
 
   const markUnpaid = useMutation({
@@ -166,10 +263,321 @@ export function FinanceBilling() {
         queryClient.invalidateQueries({ queryKey: ['finance-kpi'] })
         queryClient.invalidateQueries({ queryKey: ['finance-annual'] })
       } else toast.error(d.message || 'Gagal')
-    }
+    },
   })
 
-  const summary = data?.summary || { paid: 0, unpaid: 0, collected: 0, receivable: 0, target_amount: 0, collection_rate: 0 }
+  const bulkMarkPaid = useMutation({
+    mutationFn: async () => {
+      const usersToPay = (data?.data || []).filter((r: any) => selectedRows.has(r.user_id) && r.status !== 'paid')
+      if (usersToPay.length === 0) return { success: false, message: 'Tidak ada data valid untuk dilunasi' }
+      
+      const payload = {
+        action: 'bulk_mark_paid',
+        router_id: activeRouter?.software_id || activeRouter?.id,
+        month,
+        year,
+        paid_date: paidDate,
+        method: paidMethod,
+        note: paidNote,
+        users: usersToPay.map((u: any) => ({
+          user_id: u.user_id,
+          username: u.username,
+          amount: parseFloat(u.harga || 0)
+        }))
+      }
+      const res = await api.post('/payment_operations.php', payload)
+      return res.data
+    },
+    onSuccess: (d) => {
+      if (d.success) {
+        toast.success(d.message || 'Pembayaran massal berhasil!')
+        setSelectedRows(new Set())
+        setBulkPaidDialog(false)
+        queryClient.invalidateQueries({ queryKey: ['billing'] })
+        queryClient.invalidateQueries({ queryKey: ['receivable'] })
+        queryClient.invalidateQueries({ queryKey: ['finance-kpi'] })
+        queryClient.invalidateQueries({ queryKey: ['finance-annual'] })
+      } else toast.error(d.message || 'Gagal')
+    },
+  })
+
+  const toggleSelectAll = () => {
+    if (selectedRows.size === (data?.data || []).length && data?.data?.length > 0) {
+      setSelectedRows(new Set())
+    } else {
+      setSelectedRows(new Set((data?.data || []).map((r: any) => r.user_id)))
+    }
+  }
+
+  const toggleSelectRow = (userId: number) => {
+    const newSet = new Set(selectedRows)
+    if (newSet.has(userId)) newSet.delete(userId)
+    else newSet.add(userId)
+    setSelectedRows(newSet)
+  }
+
+  const humanizeName = (username: string) => {
+    if (!username) return 'Pelanggan'
+    let name = username.includes('@') ? (username.split('@').pop() || username) : username
+    return name.charAt(0).toUpperCase() + name.slice(1)
+  }
+
+  const handleWA = (row: any) => {
+    const phone = row.wa?.replace(/^0/, '62') || ''
+    if (!phone) {
+      toast.error('Nomor WA tidak tersedia untuk pelanggan ini')
+      return
+    }
+    const amount = fmt(parseFloat(row.harga || row.paid_amount || 0))
+    const bulan = MONTHS_ID[month - 1]
+    const customerName = humanizeName(row.username)
+    
+    let msg = ''
+    if (row.status === 'paid') {
+      msg = `Halo Saudara/i *${customerName}*,\nTerima kasih, pembayaran internet Anda untuk periode *${bulan} ${year}* sebesar *${amount}* telah kami terima dan lunas.\n\nSimpan pesan ini sebagai bukti pembayaran yang sah.\n\nTerima kasih,\n*Admin Internet*`
+    } else {
+      msg = `Halo Saudara/i *${customerName}*,\nKami informasikan bahwa tagihan internet Anda untuk periode *${bulan} ${year}* sebesar *${amount}* telah terbit.\n\nMohon untuk segera melakukan pembayaran agar layanan internet tetap berjalan lancar.\n\nTerima kasih,\n*Admin Internet*`
+    }
+    
+    window.open(`https://wa.me/${phone}?text=${encodeURIComponent(msg)}`, '_blank')
+  }
+
+  const printBulkThermal = () => {
+    const usersToPrint = (data?.data || []).filter((r: any) => selectedRows.has(r.user_id))
+    if (usersToPrint.length === 0) return
+
+    let html = `<!doctype html><html><head><title>Cetak Massal Struk Thermal</title><style>
+    body{font-family:'Courier New',Courier,monospace;margin:0;padding:0;background:white;color:black;font-size:12px;width:58mm}
+    @page{margin:0}
+    .page-break{page-break-after:always}
+    .center{text-align:center}.bold{font-weight:bold}.line{border-bottom:1px dashed black;margin:5px 0}.table{width:100%}.table td{vertical-align:top;padding:2px 0}.right{text-align:right}.mb-1{margin-bottom:5px}.mb-2{margin-bottom:10px}.mt-2{margin-top:10px}
+    @media print{.no-print{display:none}body{width:58mm}}
+    </style></head><body>
+    <div class="no-print center" style="padding:10px"><button onclick="window.print()" style="padding:8px 16px;background:black;color:white;border-radius:4px;cursor:pointer">Print Thermal (${usersToPrint.length})</button></div>
+    `
+
+    usersToPrint.forEach((row: any, i: number) => {
+      const invoiceNo = `INV-${year}${String(month).padStart(2, '0')}-${row.user_id || row.id || row.username}`
+      const amount = fmt(parseFloat(row.harga || row.paid_amount || 0))
+      const statusText = row.status === 'paid' ? 'LUNAS' : 'BELUM BAYAR'
+      
+      html += `
+      <div style="padding:5px;">
+        <div class="center bold mb-1" style="font-size:14px">WIFIKU NET</div>
+        <div class="center mb-2">BUKTI PEMBAYARAN</div>
+        <div class="line"></div>
+        <table class="table">
+          <tr><td>No</td><td class="right">${invoiceNo}</td></tr>
+          <tr><td>Tgl</td><td class="right">${row.paid_at || new Date().toISOString().slice(0, 10)}</td></tr>
+          <tr><td>Plg</td><td class="right">${humanizeName(row.username)}</td></tr>
+          <tr><td>Bln</td><td class="right">${MONTHS_ID[month - 1]} ${year}</td></tr>
+        </table>
+        <div class="line"></div>
+        <table class="table">
+          <tr><td>Internet</td><td class="right">${amount}</td></tr>
+          <tr><td colspan="2"><div class="line"></div></td></tr>
+          <tr><td class="bold">TOTAL</td><td class="right bold">${amount}</td></tr>
+        </table>
+        <div class="center mt-2">
+          STATUS: <span class="bold">${statusText}</span>
+        </div>
+        <div class="center" style="font-size:10px;margin-top:10px">Terima kasih atas pembayaran Anda.</div>
+      </div>
+      ${i < usersToPrint.length - 1 ? '<div class="page-break"></div>' : ''}
+      `
+    })
+
+    html += '</body></html>'
+    const w = window.open('', '_blank')
+    w?.document.write(html)
+    w?.document.close()
+  }
+
+  const printThermal = (row: any, month: number, year: number) => {
+    const invoiceNo = `INV-${year}${String(month).padStart(2, '0')}-${row.user_id || row.id || row.username}`
+    const amount = fmt(parseFloat(row.harga || row.paid_amount || 0))
+    const statusText = row.status === 'paid' ? 'LUNAS' : 'BELUM BAYAR'
+
+    const html = `<!doctype html><html><head><title>Cetak Struk Thermal - ${row.username}</title><style>
+    body{font-family:'Courier New',Courier,monospace;margin:0;padding:0;background:white;color:black;font-size:12px;width:58mm}
+    @page{margin:0}
+    .center{text-align:center}.bold{font-weight:bold}.line{border-bottom:1px dashed black;margin:5px 0}.table{width:100%}.table td{vertical-align:top;padding:2px 0}.right{text-align:right}.mb-1{margin-bottom:5px}.mb-2{margin-bottom:10px}.mt-2{margin-top:10px}
+    @media print{.no-print{display:none}body{width:58mm}}
+    </style></head><body>
+    <div class="no-print center" style="padding:10px"><button onclick="window.print()" style="padding:8px 16px;background:black;color:white;border-radius:4px;cursor:pointer">Print Thermal</button></div>
+    <div style="padding:5px;">
+      <div class="center bold mb-1" style="font-size:14px">WIFIKU NET</div>
+      <div class="center mb-2">BUKTI PEMBAYARAN</div>
+      <div class="line"></div>
+      <table class="table">
+        <tr><td>No</td><td class="right">${invoiceNo}</td></tr>
+        <tr><td>Tgl</td><td class="right">${row.paid_at || new Date().toISOString().slice(0, 10)}</td></tr>
+        <tr><td>Plg</td><td class="right">${humanizeName(row.username)}</td></tr>
+        <tr><td>Bln</td><td class="right">${MONTHS_ID[month - 1]} ${year}</td></tr>
+      </table>
+      <div class="line"></div>
+      <table class="table">
+        <tr><td>Internet</td><td class="right">${amount}</td></tr>
+        <tr><td colspan="2"><div class="line"></div></td></tr>
+        <tr><td class="bold">TOTAL</td><td class="right bold">${amount}</td></tr>
+      </table>
+      <div class="center mt-2">
+        STATUS: <span class="bold">${statusText}</span>
+      </div>
+      <div class="center" style="font-size:10px;margin-top:10px">Terima kasih atas pembayaran Anda.</div>
+    </div>
+    <script>window.onload=()=>window.print();</script>
+    </body></html>`
+
+    const w = window.open('', '_blank')
+    w?.document.write(html)
+    w?.document.close()
+  }
+
+  const printBulkInvoice = () => {
+    const usersToPrint = (data?.data || []).filter((r: any) => selectedRows.has(r.user_id))
+    if (usersToPrint.length === 0) return
+
+    let html = `<!doctype html><html><head><title>Cetak Massal Invoice</title><style>
+    body{font-family:Arial,sans-serif;margin:0;padding:0;background:#f3f4f6}
+    .page-break{page-break-after:always}
+    .paper{max-width:760px;margin:20px auto;background:white;padding:32px;border-radius:16px;box-shadow:0 10px 35px rgba(0,0,0,.08)}
+    .top{display:flex;justify-content:space-between;gap:24px;border-bottom:2px solid #111827;padding-bottom:18px;margin-bottom:24px}
+    h1{margin:0;font-size:28px}.muted{color:#6b7280;font-size:13px}.badge{display:inline-block;padding:8px 12px;border-radius:999px;font-weight:800;font-size:12px}
+    .paid{background:#dcfce7;color:#166534}.unpaid{background:#ffedd5;color:#9a3412}
+    table{width:100%;border-collapse:collapse;margin-top:24px}td,th{padding:12px;border-bottom:1px solid #e5e7eb;text-align:left}th{font-size:12px;text-transform:uppercase;color:#6b7280}.right{text-align:right}.total{font-size:22px;font-weight:900}.footer{margin-top:32px;font-size:12px;color:#6b7280;text-align:center}@media print{body{background:white}.paper{box-shadow:none;margin:0;border-radius:0;padding:20px 0}.no-print{display:none}}
+    </style></head><body>
+    <div class="no-print" style="text-align:center;padding:20px"><button onclick="window.print()" style="padding:10px 20px;background:#111827;color:white;border-radius:8px;font-weight:bold;cursor:pointer">Print Semua (${usersToPrint.length} Invoice)</button></div>
+    `
+
+    usersToPrint.forEach((row: any, i: number) => {
+      const invoiceNo = `INV-${year}${String(month).padStart(2, '0')}-${row.user_id || row.id || row.username}`
+      const amount = fmt(parseFloat(row.harga || row.paid_amount || 0))
+      const statusClass = row.status === 'paid' ? 'paid' : 'unpaid'
+      const statusText = row.status === 'paid' ? 'LUNAS' : 'BELUM BAYAR'
+      
+      html += `
+      <div class="paper">
+        <div class="top">
+          <div>
+            <h1>INVOICE TAGIHAN</h1>
+            <div class="muted">No: ${invoiceNo} &bull; Tgl: ${new Date().toISOString().slice(0, 10)}</div>
+          </div>
+          <div style="text-align:right">
+            <div class="badge ${statusClass}">${statusText}</div>
+            <div style="margin-top:8px;font-weight:bold;font-size:18px">WIFIKU NET</div>
+          </div>
+        </div>
+        
+        <div style="margin-bottom:24px">
+          <div class="muted" style="margin-bottom:4px">Ditagihkan kepada:</div>
+          <div style="font-weight:bold;font-size:16px">Saudara/i ${humanizeName(row.username)}</div>
+          <div class="muted">${row.wa || ''}</div>
+        </div>
+
+        <table>
+          <thead>
+            <tr><th>Deskripsi Layanan</th><th class="right">Jumlah</th></tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>Layanan Internet WiFi<br><span class="muted">Periode: ${MONTHS_ID[month - 1]} ${year}</span></td>
+              <td class="right" style="font-weight:bold">${amount}</td>
+            </tr>
+            <tr><td colspan="2" style="border-bottom:none;padding-top:24px"></td></tr>
+            <tr>
+              <td class="right" style="font-size:14px">TOTAL TAGIHAN</td>
+              <td class="right total">${amount}</td>
+            </tr>
+          </tbody>
+        </table>
+        
+        <div class="footer">
+          Terima kasih telah menggunakan layanan WiFiKu Net.<br>
+          Simpan invoice ini sebagai bukti pembayaran yang sah.
+        </div>
+      </div>
+      ${i < usersToPrint.length - 1 ? '<div class="page-break"></div>' : ''}
+      `
+    })
+
+    html += '</body></html>'
+    const w = window.open('', '_blank')
+    w?.document.write(html)
+    w?.document.close()
+  }
+
+  const printInvoice = (row: any, month: number, year: number) => {
+    const invoiceNo = `INV-${year}${String(month).padStart(2, '0')}-${row.user_id || row.id || row.username}`
+    const amount = fmt(parseFloat(row.harga || row.paid_amount || 0))
+    const statusClass = row.status === 'paid' ? 'paid' : 'unpaid'
+    const statusText = row.status === 'paid' ? 'LUNAS' : 'BELUM BAYAR'
+
+    const html = `<!doctype html><html><head><title>Invoice ${row.username}</title><style>
+    body{font-family:Arial,sans-serif;margin:0;padding:0;background:#f3f4f6}
+    .paper{max-width:760px;margin:40px auto;background:white;padding:48px;border-radius:16px;box-shadow:0 10px 35px rgba(0,0,0,.08)}
+    .top{display:flex;justify-content:space-between;gap:24px;border-bottom:2px solid #111827;padding-bottom:24px;margin-bottom:32px}
+    h1{margin:0;font-size:32px}.muted{color:#6b7280;font-size:14px}.badge{display:inline-block;padding:8px 16px;border-radius:999px;font-weight:800;font-size:12px}
+    .paid{background:#dcfce7;color:#166534}.unpaid{background:#ffedd5;color:#9a3412}
+    table{width:100%;border-collapse:collapse;margin-top:32px}td,th{padding:16px;border-bottom:1px solid #e5e7eb;text-align:left}th{font-size:12px;text-transform:uppercase;color:#6b7280}.right{text-align:right}.total{font-size:24px;font-weight:900}.footer{margin-top:48px;font-size:13px;color:#6b7280;text-align:center}@media print{body{background:white}.paper{box-shadow:none;margin:0;border-radius:0;padding:20px}.no-print{display:none}}
+    </style></head><body>
+    <div class="no-print" style="text-align:center;padding:20px"><button onclick="window.print()" style="padding:10px 20px;background:#111827;color:white;border-radius:8px;font-weight:bold;cursor:pointer">Print Invoice</button></div>
+    <div class="paper">
+      <div class="top">
+        <div>
+          <h1>INVOICE TAGIHAN</h1>
+          <div class="muted">No: ${invoiceNo} &bull; Tgl: ${new Date().toISOString().slice(0, 10)}</div>
+        </div>
+        <div style="text-align:right">
+          <div class="badge ${statusClass}">${statusText}</div>
+          <div style="margin-top:12px;font-weight:bold;font-size:20px">WIFIKU NET</div>
+        </div>
+      </div>
+      
+      <div style="margin-bottom:32px">
+        <div class="muted" style="margin-bottom:4px">Ditagihkan kepada:</div>
+        <div style="font-weight:bold;font-size:18px">Saudara/i ${humanizeName(row.username)}</div>
+        <div class="muted">${row.wa || ''}</div>
+      </div>
+
+      <table>
+        <thead>
+          <tr><th>Deskripsi Layanan</th><th class="right">Jumlah</th></tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>Layanan Internet WiFi<br><span class="muted">Periode: ${MONTHS_ID[month - 1]} ${year}</span></td>
+            <td class="right" style="font-weight:bold">${amount}</td>
+          </tr>
+          <tr><td colspan="2" style="border-bottom:none;padding-top:32px"></td></tr>
+          <tr>
+            <td class="right" style="font-size:16px">TOTAL TAGIHAN</td>
+            <td class="right total">${amount}</td>
+          </tr>
+        </tbody>
+      </table>
+      
+      <div class="footer">
+        Terima kasih telah menggunakan layanan WiFiKu Net.<br>
+        Simpan invoice ini sebagai bukti pembayaran yang sah.
+      </div>
+    </div>
+    <script>window.onload=()=>window.print();</script>
+    </body></html>`
+
+    const w = window.open('', '_blank')
+    w?.document.write(html)
+    w?.document.close()
+  }
+
+  const summary = data?.summary || {
+    paid: 0,
+    unpaid: 0,
+    collected: 0,
+    receivable: 0,
+    target_amount: 0,
+    collection_rate: 0,
+  }
   const totalPages = Math.ceil((data?.total || 0) / perPage)
 
   const exportUrl = `/api/payment_operations.php?action=export&router_id=${activeRouter?.software_id || activeRouter?.id}&month=${month}&year=${year}&search=${search}`
@@ -178,7 +586,9 @@ export function FinanceBilling() {
     <>
       <Header fixed>
         <div className='me-auto flex items-center gap-2'>
-          <div className='p-2 bg-primary/10 rounded-lg'><Receipt className='h-5 w-5 text-primary' /></div>
+          <div className='rounded-lg bg-primary/10 p-2'>
+            <Receipt className='h-5 w-5 text-primary' />
+          </div>
           <h1 className='text-lg font-bold'>Tagihan Bulanan</h1>
         </div>
         <RouterSelector />
@@ -187,153 +597,433 @@ export function FinanceBilling() {
       </Header>
 
       <Main className='space-y-4' fluid>
-        <FinanceSubNav active='/finance/billing' />
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <FinanceSubNav active='/finance/billing' />
+          
+          <div className="flex items-center gap-2">
+            {/* Month */}
+            <Select
+              value={String(month)}
+              onValueChange={(v) => {
+                setMonth(parseInt(v))
+                setPage(1)
+              }}
+            >
+              <SelectTrigger className='h-9 w-32 text-xs font-semibold bg-background border-border rounded-lg shadow-sm focus:ring-0 focus:ring-offset-0 shrink-0'>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {MONTHS_ID.map((m, i) => (
+                  <SelectItem key={i} value={String(i + 1)}>
+                    {m}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+
+            {/* Year */}
+            <Select
+              value={String(year)}
+              onValueChange={(v) => {
+                setYear(parseInt(v))
+                setPage(1)
+              }}
+            >
+              <SelectTrigger className='h-9 w-24 text-xs font-semibold bg-background border-border rounded-lg shadow-sm focus:ring-0 focus:ring-offset-0 shrink-0'>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {[
+                  now.getFullYear(),
+                  now.getFullYear() - 1,
+                  now.getFullYear() - 2,
+                ].map((y) => (
+                  <SelectItem key={y} value={String(y)}>
+                    {y}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+        </div>
 
         {/* Summary Strip */}
-        <div className='grid grid-cols-2 lg:grid-cols-4 gap-3'>
-          <Card className='border-none bg-green-50 dark:bg-green-900/20 shadow-sm'>
-            <CardContent className='py-3 px-4 flex items-center gap-3'>
-              <CheckCircle2 className='h-8 w-8 text-green-500' />
-              <div>
-                <p className='text-[10px] font-black uppercase text-green-700 dark:text-green-400'>Lunas</p>
-                <p className='text-xl font-black text-green-600'>{summary.paid}</p>
+        <div className='grid grid-cols-2 gap-4 lg:grid-cols-4'>
+          <Card className='relative overflow-hidden border-none shadow-lg bg-linear-to-br from-emerald-500 to-green-600 text-white'>
+            <CardHeader className='pb-2'>
+              <CardTitle className='text-[10px] font-black uppercase tracking-widest opacity-80'>Lunas</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className='text-2xl xl:text-3xl font-black mb-1 truncate'>
+                <PrivacyText>{summary.paid}</PrivacyText>
+              </div>
+              <div className='flex items-center gap-1 text-[10px] font-bold opacity-80'>
+                Total pelanggan lunas
               </div>
             </CardContent>
+            <CheckCircle2 className='absolute top-4 right-4 h-12 w-12 opacity-20' />
           </Card>
-          <Card className='border-none bg-orange-50 dark:bg-orange-900/20 shadow-sm'>
-            <CardContent className='py-3 px-4 flex items-center gap-3'>
-              <Clock className='h-8 w-8 text-orange-500' />
-              <div>
-                <p className='text-[10px] font-black uppercase text-orange-700 dark:text-orange-400'>Belum Bayar</p>
-                <p className='text-xl font-black text-orange-600'>{summary.unpaid}</p>
+
+          <Card className='relative overflow-hidden border-none shadow-lg bg-linear-to-br from-orange-500 to-amber-600 text-white'>
+            <CardHeader className='pb-2'>
+              <CardTitle className='text-[10px] font-black uppercase tracking-widest opacity-80'>Belum Bayar</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className='text-2xl xl:text-3xl font-black mb-1 truncate'>
+                <PrivacyText>{summary.unpaid}</PrivacyText>
+              </div>
+              <div className='flex items-center gap-1 text-[10px] font-bold opacity-80'>
+                Menunggu pembayaran
               </div>
             </CardContent>
+            <Clock className='absolute top-4 right-4 h-12 w-12 opacity-20' />
           </Card>
-          <Card className='border-none bg-blue-50 dark:bg-blue-900/20 shadow-sm'>
-            <CardContent className='py-3 px-4 flex items-center gap-3'>
-              <Wallet className='h-8 w-8 text-blue-500' />
-              <div>
-                <p className='text-[10px] font-black uppercase text-blue-700 dark:text-blue-400'>Terkumpul</p>
-                <p className='text-xl font-black text-blue-600'><PrivacyText>{fmt(summary.collected)}</PrivacyText></p>
+
+          <Card className='relative overflow-hidden border-none shadow-lg bg-linear-to-br from-blue-500 to-indigo-600 text-white'>
+            <CardHeader className='pb-2'>
+              <CardTitle className='text-[10px] font-black uppercase tracking-widest opacity-80'>Terkumpul</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className='text-xl xl:text-2xl font-black mb-1 truncate'>
+                <PrivacyText>{fmt(summary.collected)}</PrivacyText>
+              </div>
+              <div className='flex items-center gap-1 text-[10px] font-bold opacity-80'>
+                Total dana masuk
               </div>
             </CardContent>
+            <Wallet className='absolute top-4 right-4 h-12 w-12 opacity-20' />
           </Card>
-          <Card className='border-none bg-red-50 dark:bg-red-900/20 shadow-sm'>
-            <CardContent className='py-3 px-4 flex items-center gap-3'>
-              <Receipt className='h-8 w-8 text-red-500' />
-              <div>
-                <p className='text-[10px] font-black uppercase text-red-700 dark:text-red-400'>Sisa Piutang</p>
-                <p className='text-xl font-black text-red-600'><PrivacyText>{fmt(summary.receivable)}</PrivacyText></p>
-                <p className='text-[10px] font-bold text-muted-foreground'>{summary.collection_rate}% tertagih</p>
+
+          <Card className='relative overflow-hidden border-none shadow-lg bg-linear-to-br from-rose-500 to-pink-600 text-white'>
+            <CardHeader className='pb-2'>
+              <CardTitle className='text-[10px] font-black uppercase tracking-widest opacity-80'>Sisa Piutang</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className='text-xl xl:text-2xl font-black mb-1 truncate'>
+                <PrivacyText>{fmt(summary.receivable)}</PrivacyText>
+              </div>
+              <div className='flex items-center gap-1 text-[10px] font-bold opacity-80'>
+                Collection Rate: <PrivacyText>{summary.collection_rate}</PrivacyText>%
               </div>
             </CardContent>
+            <Receipt className='absolute top-4 right-4 h-12 w-12 opacity-20' />
           </Card>
         </div>
 
         {/* Filters */}
-        <div className='flex flex-wrap gap-2 items-center'>
-          {/* Month */}
-          <Select value={String(month)} onValueChange={v => { setMonth(parseInt(v)); setPage(1) }}>
-            <SelectTrigger className='h-8 w-36 text-xs font-bold'><SelectValue /></SelectTrigger>
-            <SelectContent>
-              {MONTHS_ID.map((m, i) => <SelectItem key={i} value={String(i+1)}>{m}</SelectItem>)}
-            </SelectContent>
-          </Select>
-          {/* Year */}
-          <Select value={String(year)} onValueChange={v => { setYear(parseInt(v)); setPage(1) }}>
-            <SelectTrigger className='h-8 w-24 text-xs font-bold'><SelectValue /></SelectTrigger>
-            <SelectContent>
-              {[now.getFullYear(), now.getFullYear()-1, now.getFullYear()-2].map(y => <SelectItem key={y} value={String(y)}>{y}</SelectItem>)}
-            </SelectContent>
-          </Select>
-          {/* Status */}
-          <Select value={status || 'all'} onValueChange={v => { setStatus(v === 'all' ? '' : v); setPage(1) }}>
-            <SelectTrigger className='h-8 w-32 text-xs font-bold'><SelectValue placeholder='Semua Status' /></SelectTrigger>
-            <SelectContent>
-              <SelectItem value='all'>Semua Status</SelectItem>
-              <SelectItem value='paid'>Lunas</SelectItem>
-              <SelectItem value='unpaid'>Belum Bayar</SelectItem>
-            </SelectContent>
-          </Select>
-          {/* Profile */}
-          <Select value={profile || 'all'} onValueChange={v => { setProfile(v === 'all' ? '' : v); setPage(1) }}>
-            <SelectTrigger className='h-8 w-36 text-xs font-bold'><SelectValue placeholder='Semua Paket' /></SelectTrigger>
-            <SelectContent>
-              <SelectItem value='all'>Semua Paket</SelectItem>
-              {allProfiles.map((p: any) => <SelectItem key={p} value={p}>{p}</SelectItem>)}
-            </SelectContent>
-          </Select>
-          {/* Search */}
-          <div className='relative flex-1 min-w-[180px]'>
-            <Search className='absolute left-2.5 top-2 h-4 w-4 text-muted-foreground' />
-            <Input placeholder='Cari username...' className='pl-8 h-8 text-xs' value={search}
-              onChange={e => { setSearch(e.target.value); setPage(1) }} />
+        <div className='flex flex-col gap-3 bg-card p-3 rounded-xl border border-border/80 shadow-sm sm:flex-row sm:items-center sm:justify-between'>
+          {/* Left Side: Selectors & Search Input */}
+          <div className='flex flex-wrap items-center gap-2 flex-1 min-w-0'>
+            {/* Status */}
+            <Select
+              value={status || 'all'}
+              onValueChange={(v) => {
+                setStatus(v === 'all' ? '' : v)
+                setPage(1)
+              }}
+            >
+              <SelectTrigger className='h-9 w-32 text-xs font-semibold bg-background border-border rounded-lg shadow-sm focus:ring-0 focus:ring-offset-0 shrink-0'>
+                <SelectValue placeholder='Semua Status' />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value='all'>Semua Status</SelectItem>
+                <SelectItem value='paid'>Lunas</SelectItem>
+                <SelectItem value='unpaid'>Belum Bayar</SelectItem>
+              </SelectContent>
+            </Select>
+
+            {/* Profile */}
+            <Select
+              value={profile || 'all'}
+              onValueChange={(v) => {
+                setProfile(v === 'all' ? '' : v)
+                setPage(1)
+              }}
+            >
+              <SelectTrigger className='h-9 w-36 text-xs font-semibold bg-background border-border rounded-lg shadow-sm focus:ring-0 focus:ring-offset-0 shrink-0'>
+                <SelectValue placeholder='Semua Paket' />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value='all'>Semua Paket</SelectItem>
+                {allProfiles.map((p: any) => (
+                  <SelectItem key={p} value={p}>
+                    {p}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+
+            {/* Search */}
+            <div className='relative min-w-[160px] flex-1 max-w-[240px]'>
+              <Search className='absolute top-2.5 left-3 h-4 w-4 text-muted-foreground' />
+              <Input
+                placeholder='Cari username...'
+                className='h-9 pl-9 text-xs rounded-lg border-border bg-background shadow-sm focus-visible:ring-1 focus-visible:ring-primary'
+                value={search}
+                onChange={(e) => {
+                  setSearch(e.target.value)
+                  setPage(1)
+                }}
+              />
+            </div>
           </div>
-          <Button size='sm' variant='ghost' className='h-8 text-xs' onClick={() => { setSearch(''); setStatus(''); setProfile(''); setPage(1) }}>
-            Reset
-          </Button>
-          <Button size='sm' variant='outline' className='h-8 gap-1.5 text-xs ml-auto' onClick={() => window.open(exportUrl)}>
-            <Download className='h-3.5 w-3.5' /> Export CSV
-          </Button>
+
+          {/* Right Side: Action Buttons (Reset, Export) */}
+          <div className='flex items-center justify-end gap-2 border-t pt-3 sm:border-none sm:pt-0 shrink-0 ml-auto sm:ml-0'>
+            <Button
+              size='sm'
+              variant='ghost'
+              className='h-9 text-xs font-semibold text-muted-foreground hover:text-foreground gap-1.5 rounded-lg'
+              onClick={() => {
+                setSearch('')
+                setStatus('')
+                setProfile('')
+                setPage(1)
+              }}
+            >
+              <RefreshCw className='h-3.5 w-3.5' />
+              Reset
+            </Button>
+
+            <Button
+              size='sm'
+              variant='outline'
+              className='h-9 gap-1.5 text-xs font-semibold border-border hover:bg-accent rounded-lg shadow-sm'
+              onClick={() => window.open(exportUrl)}
+            >
+              <Download className='h-3.5 w-3.5' /> Export CSV
+            </Button>
+          </div>
         </div>
 
         {/* Table */}
-        <Card className='border-none shadow-lg overflow-hidden'>
-          <Table>
-            <TableHeader className='bg-muted/30'>
+        <Card className='overflow-hidden border border-border/80 shadow-lg rounded-xl bg-card'>
+          <div className='overflow-x-auto w-full'>
+            <Table>
+            <TableHeader className='bg-slate-50/75 dark:bg-slate-900/60 border-b border-border/60'>
               <TableRow>
-                <TableHead className='text-xs font-black uppercase pl-4'>Username</TableHead>
-                <TableHead className='text-xs font-black uppercase hidden md:table-cell'>Alamat</TableHead>
-                <TableHead className='text-xs font-black uppercase'>Paket</TableHead>
-                <TableHead className='text-xs font-black uppercase text-right'>Tagihan</TableHead>
-                <TableHead className='text-xs font-black uppercase text-center'>Status</TableHead>
-                <TableHead className='text-xs font-black uppercase hidden lg:table-cell'>Tgl Bayar</TableHead>
-                {permissions.canManageFinance && <TableHead className='text-xs font-black uppercase text-right pr-4'>Aksi</TableHead>}
+                {permissions.canManageFinance && (
+                  <TableHead className='w-12 pl-4'>
+                    <Checkbox 
+                      checked={data?.data?.length > 0 && selectedRows.size === data.data.length}
+                      onCheckedChange={toggleSelectAll}
+                    />
+                  </TableHead>
+                )}
+                <TableHead className={cn('text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider', !permissions.canManageFinance && 'pl-4')}>
+                  Username
+                </TableHead>
+                <TableHead className='hidden text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider md:table-cell'>
+                  Alamat
+                </TableHead>
+                <TableHead className='text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider'>
+                  Paket
+                </TableHead>
+                <TableHead className='text-right pr-4 text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider'>
+                  Tagihan
+                </TableHead>
+                <TableHead className='text-center text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider'>
+                  Status
+                </TableHead>
+                <TableHead className='hidden text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider lg:table-cell'>
+                  Tgl Bayar
+                </TableHead>
+                {permissions.canManageFinance && (
+                  <TableHead className='pr-4 text-right text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider'>
+                    Aksi
+                  </TableHead>
+                )}
               </TableRow>
             </TableHeader>
             <TableBody>
               {isLoading ? (
-                <TableRow><TableCell colSpan={permissions.canManageFinance ? 7 : 6} className='text-center py-16 text-muted-foreground animate-pulse'>Memuat data...</TableCell></TableRow>
+                <TableRow>
+                  <TableCell
+                    colSpan={permissions.canManageFinance ? 7 : 6}
+                    className='animate-pulse py-16 text-center text-muted-foreground'
+                  >
+                    Memuat data...
+                  </TableCell>
+                </TableRow>
               ) : (data?.data || []).length === 0 ? (
-                <TableRow><TableCell colSpan={permissions.canManageFinance ? 7 : 6} className='text-center py-16 text-muted-foreground'>Tidak ada data</TableCell></TableRow>
+                <TableRow>
+                  <TableCell
+                    colSpan={permissions.canManageFinance ? 8 : 6}
+                    className='py-16 text-center text-muted-foreground'
+                  >
+                    Tidak ada data
+                  </TableCell>
+                </TableRow>
               ) : (
                 (data?.data || []).map((row: any) => (
-                  <TableRow key={row.id} className={cn('border-b border-border/30', row.status === 'paid' && 'bg-green-50/30 dark:bg-green-900/10')}>
-                    <TableCell className='pl-4 font-bold text-sm'><PrivacyText>{row.username}</PrivacyText></TableCell>
-                    <TableCell className='text-xs text-muted-foreground hidden md:table-cell max-w-[150px] truncate'><PrivacyText>{row.alamat || '-'}</PrivacyText></TableCell>
-                    <TableCell>
-                      <Badge variant='secondary' className='text-[10px] font-bold'>{row.profile}</Badge>
+                  <TableRow
+                    key={row.user_id}
+                    className={cn(
+                      'border-b border-border/30 hover:bg-slate-50/50 dark:hover:bg-slate-900/30 transition-all duration-150',
+                      row.status === 'paid' &&
+                        'bg-emerald-50/10 dark:bg-emerald-950/5 hover:bg-emerald-50/20 dark:hover:bg-emerald-950/10',
+                      selectedRows.has(row.user_id) && 'bg-primary/5 hover:bg-primary/10'
+                    )}
+                  >
+                    {permissions.canManageFinance && (
+                      <TableCell className='pl-4'>
+                        <Checkbox 
+                          checked={selectedRows.has(row.user_id)}
+                          onCheckedChange={() => toggleSelectRow(row.user_id)}
+                        />
+                      </TableCell>
+                    )}
+                    <TableCell
+                      className={cn('cursor-pointer text-sm font-bold text-indigo-600 transition-colors hover:text-indigo-800 hover:underline dark:text-indigo-400 dark:hover:text-indigo-300', !permissions.canManageFinance && 'pl-4')}
+                      onClick={() =>
+                        setHistoryUser({
+                          id: row.user_id,
+                          username: row.username,
+                        })
+                      }
+                    >
+                      <PrivacyText>{row.username}</PrivacyText>
                     </TableCell>
-                    <TableCell className='text-right font-mono text-sm font-bold'>
-                      <PrivacyText>{fmt(parseFloat(row.harga || row.paid_amount || 0))}</PrivacyText>
+                    <TableCell className='hidden max-w-[180px] truncate text-xs text-muted-foreground md:table-cell'>
+                      <PrivacyText>{row.alamat || '-'}</PrivacyText>
+                    </TableCell>
+                    <TableCell>
+                      <Badge
+                        variant='secondary'
+                        className='text-[10px] font-bold bg-muted hover:bg-muted text-muted-foreground border-none rounded-md px-1.5 py-0.5'
+                      >
+                        {row.profile}
+                      </Badge>
+                    </TableCell>
+                    <TableCell className='text-right font-mono text-sm font-bold text-foreground/90 pr-4'>
+                      <PrivacyText>
+                        {fmt(parseFloat(row.harga || row.paid_amount || 0))}
+                      </PrivacyText>
                     </TableCell>
                     <TableCell className='text-center'>
-                      {row.status === 'paid'
-                        ? <Badge className='bg-green-500 hover:bg-green-600 text-[10px] font-black'>Lunas</Badge>
-                        : <Badge variant='outline' className='border-orange-400 text-orange-600 text-[10px] font-black'>Belum</Badge>
-                      }
+                      {row.status === 'paid' ? (
+                        <div className="flex flex-col items-center gap-1">
+                          <Badge className='mx-auto flex w-[84px] items-center justify-center gap-1 border border-emerald-200/80 bg-emerald-50/80 px-2.5 py-1 text-[10px] font-extrabold tracking-wider text-emerald-700 uppercase hover:bg-emerald-50 dark:border-emerald-900/40 dark:bg-emerald-950/30 dark:text-emerald-400 rounded-full shadow-sm shadow-emerald-500/5'>
+                            <CheckCircle2 className='h-3.5 w-3.5 text-emerald-600 dark:text-emerald-400 shrink-0' />
+                            Lunas
+                          </Badge>
+                          {row.method && (
+                            <span className="text-[9px] font-bold text-muted-foreground uppercase tracking-wider">{row.method}</span>
+                          )}
+                        </div>
+                      ) : (
+                        <Badge className='mx-auto flex w-[84px] items-center justify-center gap-1 border border-amber-200/80 bg-amber-50/80 px-2.5 py-1 text-[10px] font-extrabold tracking-wider text-amber-700 uppercase hover:bg-amber-50 dark:border-amber-900/40 dark:bg-amber-950/30 dark:text-amber-400 rounded-full shadow-sm shadow-amber-500/5'>
+                          <Clock className='h-3.5 w-3.5 text-amber-600 dark:text-amber-400 shrink-0' />
+                          Belum
+                        </Badge>
+                      )}
                     </TableCell>
-                    <TableCell className='text-xs text-muted-foreground hidden lg:table-cell'>
+                    <TableCell className='hidden text-xs font-semibold text-muted-foreground/80 lg:table-cell'>
                       {row.paid_at || '-'}
+                      {row.note && <div className="text-[10px] text-muted-foreground/60 italic max-w-[120px] truncate" title={row.note}>{row.note}</div>}
                     </TableCell>
                     {permissions.canManageFinance && (
-                      <TableCell className='text-right pr-4'>
-                        <div className='flex justify-end gap-1'>
-                          <Button size='sm' variant='outline' className='h-7 text-[10px]'
-                            onClick={() => printInvoice(row, month, year)}>
-                            <Printer className='h-3.5 w-3.5 mr-1' /> Invoice
+                      <TableCell className='pr-4 text-right'>
+                        <div className='flex justify-end gap-1.5'>
+                          {/* PRIMARY ACTION: WhatsApp */}
+                          <Button
+                            variant='outline'
+                            size='icon'
+                            className={cn('h-8 w-8 transition-all duration-200 rounded-lg shadow-sm',
+                              row.status === 'paid' 
+                                ? 'border-emerald-100 text-emerald-600 bg-emerald-50/30 hover:bg-emerald-50 dark:border-emerald-900/30 dark:text-emerald-400 dark:bg-emerald-950/10' 
+                                : 'border-amber-100 text-amber-600 bg-amber-50/30 hover:bg-amber-50 dark:border-amber-900/30 dark:text-amber-400 dark:bg-amber-950/10'
+                            )}
+                            onClick={() => handleWA(row)}
+                            title={row.status === 'paid' ? 'Kirim Kwitansi via WA' : 'Kirim Tagihan via WA'}
+                          >
+                            <MessageCircle className='h-4 w-4' />
                           </Button>
+                          
+                          {/* PRIMARY ACTION: Edit or Mark Paid */}
                           {row.status === 'paid' ? (
-                            <Button size='sm' variant='ghost' className='h-7 text-[10px] text-red-500 hover:text-red-600 hover:bg-red-50'
-                              onClick={() => markUnpaid.mutate(row.payment_id)}>
-                              <XCircle className='h-3.5 w-3.5 mr-1' /> Batal
+                            <Button
+                              size='icon'
+                              className='h-8 w-8 bg-blue-500 text-white shadow-sm shadow-blue-500/10 transition-all duration-200 hover:bg-blue-600 hover:shadow-blue-500/25 rounded-lg'
+                              onClick={() => {
+                                setPaidDialog(row)
+                                setPaidAmount(row.paid_amount || row.harga || '')
+                                setPaidDate(row.paid_at || now.toISOString().slice(0, 10))
+                                setPaidMethod(row.method || 'cash')
+                                setPaidNote(row.note || '')
+                              }}
+                              title='Edit Pembayaran'
+                            >
+                              <PenLine className='h-4 w-4' />
                             </Button>
                           ) : (
-                            <Button size='sm' className='h-7 text-[10px] bg-green-500 hover:bg-green-600'
-                              onClick={() => { setPaidDialog(row); setPaidAmount(row.harga || ''); }}>
-                              <CheckCheck className='h-3.5 w-3.5 mr-1' /> Lunas
+                            <Button
+                              size='icon'
+                              className='h-8 w-8 bg-emerald-500 text-white shadow-sm shadow-emerald-500/10 transition-all duration-200 hover:bg-emerald-600 hover:shadow-emerald-500/25 rounded-lg'
+                              onClick={() => {
+                                setPaidDialog(row)
+                                setPaidAmount(row.harga || '')
+                                setPaidDate(now.toISOString().slice(0, 10))
+                                setPaidMethod('cash')
+                                setPaidNote('')
+                              }}
+                              title='Tandai Lunas'
+                            >
+                              <CheckCheck className='h-4 w-4' />
                             </Button>
                           )}
+
+                          {/* SECONDARY ACTIONS: Dropdown */}
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                              <Button
+                                variant='outline'
+                                size='icon'
+                                className='h-8 w-8 border-border/80 text-muted-foreground bg-background transition-all duration-200 hover:text-foreground hover:bg-accent rounded-lg shadow-sm'
+                              >
+                                <MoreHorizontal className='h-4 w-4' />
+                              </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end" className="w-48">
+                              <DropdownMenuItem 
+                                onClick={() => printThermal(row, month, year)}
+                                className="cursor-pointer"
+                              >
+                                <Receipt className="mr-2 h-4 w-4 text-muted-foreground" />
+                                Cetak Struk Thermal
+                              </DropdownMenuItem>
+                              <DropdownMenuItem 
+                                onClick={() => printInvoice(row, month, year)}
+                                className="cursor-pointer"
+                              >
+                                <Printer className="mr-2 h-4 w-4 text-muted-foreground" />
+                                Cetak Invoice PDF
+                              </DropdownMenuItem>
+                              <DropdownMenuSeparator />
+                              <DropdownMenuItem 
+                                onClick={() => setHistoryUser({ id: row.user_id, username: row.username })}
+                                className="cursor-pointer"
+                              >
+                                <History className="mr-2 h-4 w-4 text-muted-foreground" />
+                                Riwayat Pembayaran
+                              </DropdownMenuItem>
+                              
+                              {row.status === 'paid' && (
+                                <>
+                                  <DropdownMenuSeparator />
+                                  <DropdownMenuItem 
+                                    onClick={() => {
+                                      if (confirm(`Yakin membatalkan pelunasan tagihan ${row.username}?`)) markUnpaid.mutate(row.payment_id)
+                                    }}
+                                    className="cursor-pointer text-rose-600 focus:bg-rose-50 focus:text-rose-600 dark:focus:bg-rose-950/50"
+                                  >
+                                    <XCircle className="mr-2 h-4 w-4" />
+                                    Batalkan Pembayaran
+                                  </DropdownMenuItem>
+                                </>
+                              )}
+                            </DropdownMenuContent>
+                          </DropdownMenu>
                         </div>
                       </TableCell>
                     )}
@@ -342,45 +1032,231 @@ export function FinanceBilling() {
               )}
             </TableBody>
           </Table>
+          </div>
 
           {/* Pagination */}
-          {totalPages > 1 && (
-            <div className='px-4 py-3 flex items-center justify-between border-t bg-muted/10'>
-              <p className='text-xs text-muted-foreground'>Halaman {page} dari {totalPages}</p>
-              <div className='flex gap-1'>
-                <Button size='icon' variant='outline' className='h-7 w-7' onClick={() => setPage(p => Math.max(1, p-1))} disabled={page === 1}>
-                  <ChevronLeft className='h-3.5 w-3.5' />
-                </Button>
-                <Button size='icon' variant='outline' className='h-7 w-7' onClick={() => setPage(p => Math.min(totalPages, p+1))} disabled={page === totalPages}>
-                  <ChevronRight className='h-3.5 w-3.5' />
-                </Button>
+          {(data?.total || 0) > 0 && (
+            <div className='flex items-center justify-between border-t bg-card px-4 py-3.5 text-card-foreground select-none'>
+              {/* Left Side: Rows per page Select */}
+              <div className='flex items-center gap-2'>
+                <Select
+                  value={String(perPage)}
+                  onValueChange={(val) => {
+                    setPerPage(Number(val))
+                    setPage(1)
+                  }}
+                >
+                  <SelectTrigger className='h-8 w-[72px] gap-1 rounded-md border border-border bg-background px-2 text-xs font-semibold shadow-sm focus:ring-0 focus:ring-offset-0'>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value='10'>10</SelectItem>
+                    <SelectItem value='20'>20</SelectItem>
+                    <SelectItem value='50'>50</SelectItem>
+                    <SelectItem value='100'>100</SelectItem>
+                  </SelectContent>
+                </Select>
+                <span className='text-xs font-semibold text-muted-foreground'>
+                  Rows per page
+                </span>
+              </div>
+
+              {/* Right Side: Page indicator & Page Buttons */}
+              <div className='ml-auto flex items-center gap-6'>
+                <span className='text-xs font-semibold text-foreground/80'>
+                  Page {page} of {totalPages || 1}
+                </span>
+                <div className='flex items-center gap-1.5'>
+                  {/* First Page button */}
+                  <Button
+                    variant='outline'
+                    size='icon'
+                    className='h-8 w-8 rounded-md border-border/80 text-muted-foreground/80 shadow-sm transition-all duration-200 hover:bg-accent hover:text-foreground'
+                    onClick={() => setPage(1)}
+                    disabled={page === 1}
+                  >
+                    <ChevronsLeft className='h-4 w-4' />
+                  </Button>
+
+                  {/* Previous Page button */}
+                  <Button
+                    variant='outline'
+                    size='icon'
+                    className='h-8 w-8 rounded-md border-border/80 text-muted-foreground/80 shadow-sm transition-all duration-200 hover:bg-accent hover:text-foreground'
+                    onClick={() => setPage((p) => Math.max(1, p - 1))}
+                    disabled={page === 1}
+                  >
+                    <ChevronLeft className='h-4 w-4' />
+                  </Button>
+
+                  {/* Page Numbers */}
+                  {(() => {
+                    const pages = []
+                    if (totalPages <= 5) {
+                      for (let i = 1; i <= totalPages; i++) {
+                        pages.push(i)
+                      }
+                    } else {
+                      if (page <= 3) {
+                        for (let i = 1; i <= 4; i++) {
+                          pages.push(i)
+                        }
+                        pages.push('...')
+                        pages.push(totalPages)
+                      } else if (page >= totalPages - 2) {
+                        pages.push(1)
+                        pages.push('...')
+                        for (let i = totalPages - 3; i <= totalPages; i++) {
+                          pages.push(i)
+                        }
+                      } else {
+                        pages.push(1)
+                        pages.push('...')
+                        pages.push(page - 1)
+                        pages.push(page)
+                        pages.push(page + 1)
+                        pages.push('...')
+                        pages.push(totalPages)
+                      }
+                    }
+                    return pages.map((item, idx) => {
+                      if (item === '...') {
+                        return (
+                          <span
+                            key={`ellipsis-${idx}`}
+                            className='px-1.5 text-xs font-semibold text-muted-foreground/60'
+                          >
+                            ...
+                          </span>
+                        )
+                      }
+                      const isCurrent = item === page
+                      return (
+                        <Button
+                          key={`page-${item}`}
+                          variant={isCurrent ? 'default' : 'outline'}
+                          className={cn(
+                            'h-8 w-8 rounded-md p-0 text-xs font-bold shadow-sm transition-all duration-200',
+                            isCurrent
+                              ? 'pointer-events-none bg-slate-950 text-white hover:bg-slate-900 dark:bg-slate-50 dark:text-slate-950'
+                              : 'border-border/80 text-foreground/80 hover:bg-accent hover:text-foreground'
+                          )}
+                          onClick={() => setPage(Number(item))}
+                        >
+                          {item}
+                        </Button>
+                      )
+                    })
+                  })()}
+
+                  {/* Next Page button */}
+                  <Button
+                    variant='outline'
+                    size='icon'
+                    className='h-8 w-8 rounded-md border-border/80 text-muted-foreground/80 shadow-sm transition-all duration-200 hover:bg-accent hover:text-foreground'
+                    onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+                    disabled={page === totalPages || totalPages === 0}
+                  >
+                    <ChevronRight className='h-4 w-4' />
+                  </Button>
+
+                  {/* Last Page button */}
+                  <Button
+                    variant='outline'
+                    size='icon'
+                    className='h-8 w-8 rounded-md border-border/80 text-muted-foreground/80 shadow-sm transition-all duration-200 hover:bg-accent hover:text-foreground'
+                    onClick={() => setPage(totalPages)}
+                    disabled={page === totalPages || totalPages === 0}
+                  >
+                    <ChevronsRight className='h-4 w-4' />
+                  </Button>
+                </div>
               </div>
             </div>
           )}
         </Card>
-
       </Main>
 
-      {/* Mark Paid Dialog */}
-      <Dialog open={!!paidDialog} onOpenChange={() => setPaidDialog(null)}>
+      {/* Floating Action Bar for Bulk Actions */}
+      {selectedRows.size > 0 && permissions.canManageFinance && (
+        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 animate-in slide-in-from-bottom-10 fade-in duration-300">
+          <Card className="bg-slate-900/95 dark:bg-slate-50/95 text-slate-50 dark:text-slate-900 shadow-2xl border-0 backdrop-blur-md px-4 py-3 flex items-center gap-4 rounded-2xl">
+            <div className="flex items-center gap-2 pr-4 border-r border-slate-700/50 dark:border-slate-300/50 font-semibold text-sm">
+              <span className="flex h-6 w-6 items-center justify-center rounded-full bg-primary text-[11px] font-bold text-primary-foreground">
+                {selectedRows.size}
+              </span>
+              terpilih
+            </div>
+            <div className="flex gap-2">
+              <Button 
+                variant="ghost" 
+                size="sm" 
+                className="text-slate-300 hover:text-white hover:bg-white/10 dark:text-slate-600 dark:hover:text-slate-900 dark:hover:bg-black/5"
+                onClick={() => setSelectedRows(new Set())}
+              >
+                Batal
+              </Button>
+              <Button 
+                variant="outline" 
+                size="sm" 
+                className="bg-transparent border-slate-600 text-slate-300 hover:text-white hover:bg-slate-800 dark:border-slate-300/50 dark:text-slate-600 dark:hover:text-slate-900 dark:hover:bg-slate-200"
+                onClick={printBulkThermal}
+              >
+                Cetak Thermal
+              </Button>
+              <Button 
+                variant="outline" 
+                size="sm" 
+                className="bg-transparent border-slate-600 text-slate-300 hover:text-white hover:bg-slate-800 dark:border-slate-300/50 dark:text-slate-600 dark:hover:text-slate-900 dark:hover:bg-slate-200"
+                onClick={printBulkInvoice}
+              >
+                Cetak Invoice
+              </Button>
+              <Button 
+                size="sm" 
+                className="bg-emerald-500 hover:bg-emerald-600 text-white shadow-lg shadow-emerald-500/20"
+                onClick={() => {
+                  setPaidDate(now.toISOString().slice(0, 10))
+                  setPaidMethod('cash')
+                  setPaidNote('')
+                  setBulkPaidDialog(true)
+                }}
+              >
+                Tandai Lunas
+              </Button>
+            </div>
+          </Card>
+        </div>
+      )}
+
+      {/* Bulk Mark Paid Dialog */}
+      <Dialog open={bulkPaidDialog} onOpenChange={setBulkPaidDialog}>
         <DialogContent className='max-w-sm'>
           <DialogHeader>
-            <DialogTitle className='text-base font-black'>Tandai Lunas — {paidDialog?.username}</DialogTitle>
+            <DialogTitle className='text-base font-black'>
+              Pelunasan Massal ({selectedRows.size} Pelanggan)
+            </DialogTitle>
           </DialogHeader>
           <div className='space-y-3 py-2'>
             <div>
-              <label className='text-xs font-bold uppercase tracking-wide text-muted-foreground'>Nominal (Rp)</label>
-              <Input type={privacyMode ? 'password' : 'number'} value={paidAmount} onChange={e => setPaidAmount(e.target.value)}
-                className='mt-1 font-mono' placeholder='0' />
+              <label className='text-xs font-bold tracking-wide text-muted-foreground uppercase'>
+                Tanggal Bayar
+              </label>
+              <Input
+                type='date'
+                value={paidDate}
+                onChange={(e) => setPaidDate(e.target.value)}
+                className='mt-1'
+              />
             </div>
             <div>
-              <label className='text-xs font-bold uppercase tracking-wide text-muted-foreground'>Tanggal Bayar</label>
-              <Input type='date' value={paidDate} onChange={e => setPaidDate(e.target.value)} className='mt-1' />
-            </div>
-            <div>
-              <label className='text-xs font-bold uppercase tracking-wide text-muted-foreground'>Metode</label>
+              <label className='text-xs font-bold tracking-wide text-muted-foreground uppercase'>
+                Metode
+              </label>
               <Select value={paidMethod} onValueChange={setPaidMethod}>
-                <SelectTrigger className='mt-1'><SelectValue /></SelectTrigger>
+                <SelectTrigger className='mt-1'>
+                  <SelectValue />
+                </SelectTrigger>
                 <SelectContent>
                   <SelectItem value='cash'>Tunai</SelectItem>
                   <SelectItem value='transfer'>Transfer Bank</SelectItem>
@@ -389,13 +1265,288 @@ export function FinanceBilling() {
                 </SelectContent>
               </Select>
             </div>
+            <div>
+              <label className='text-xs font-bold tracking-wide text-muted-foreground uppercase'>
+                Catatan (Opsional)
+              </label>
+              <Input
+                value={paidNote}
+                onChange={(e) => setPaidNote(e.target.value)}
+                className='mt-1'
+                placeholder='Catatan pembayaran massal...'
+              />
+            </div>
           </div>
           <DialogFooter>
-            <Button variant='outline' onClick={() => setPaidDialog(null)}>Batal</Button>
-            <Button className='bg-green-500 hover:bg-green-600' onClick={() => markPaid.mutate(paidDialog)} disabled={markPaid.isPending}>
-              <CheckCheck className='h-4 w-4 mr-1' /> Konfirmasi Lunas
+            <Button variant='outline' onClick={() => setBulkPaidDialog(false)}>
+              Batal
+            </Button>
+            <Button
+              className='bg-emerald-500 hover:bg-emerald-600 text-white'
+              onClick={() => bulkMarkPaid.mutate()}
+              disabled={bulkMarkPaid.isPending}
+            >
+              <CheckCheck className='mr-1 h-4 w-4' /> Proses ({selectedRows.size}) Lunas
             </Button>
           </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Mark Paid Dialog */}
+      <Dialog open={!!paidDialog} onOpenChange={() => setPaidDialog(null)}>
+        <DialogContent className='max-w-sm'>
+          <DialogHeader>
+            <DialogTitle className='text-base font-black'>
+              Tandai Lunas — {paidDialog?.username}
+            </DialogTitle>
+          </DialogHeader>
+          <div className='space-y-3 py-2'>
+            <div>
+              <label className='text-xs font-bold tracking-wide text-muted-foreground uppercase'>
+                Nominal (Rp)
+              </label>
+              <Input
+                type={privacyMode ? 'password' : 'number'}
+                value={paidAmount}
+                onChange={(e) => setPaidAmount(e.target.value)}
+                className='mt-1 font-mono'
+                placeholder='0'
+              />
+            </div>
+            <div>
+              <label className='text-xs font-bold tracking-wide text-muted-foreground uppercase'>
+                Tanggal Bayar
+              </label>
+              <Input
+                type='date'
+                value={paidDate}
+                onChange={(e) => setPaidDate(e.target.value)}
+                className='mt-1'
+              />
+            </div>
+            <div>
+              <label className='text-xs font-bold tracking-wide text-muted-foreground uppercase'>
+                Metode
+              </label>
+              <Select value={paidMethod} onValueChange={setPaidMethod}>
+                <SelectTrigger className='mt-1'>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value='cash'>Tunai</SelectItem>
+                  <SelectItem value='transfer'>Transfer Bank</SelectItem>
+                  <SelectItem value='qris'>QRIS</SelectItem>
+                  <SelectItem value='e-wallet'>E-Wallet</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <label className='text-xs font-bold tracking-wide text-muted-foreground uppercase'>
+                Catatan (Opsional)
+              </label>
+              <Input
+                value={paidNote}
+                onChange={(e) => setPaidNote(e.target.value)}
+                className='mt-1'
+                placeholder='Catatan tambahan...'
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant='outline' onClick={() => setPaidDialog(null)}>
+              Batal
+            </Button>
+            <Button
+              className='bg-green-500 hover:bg-green-600'
+              onClick={() => markPaid.mutate(paidDialog)}
+              disabled={markPaid.isPending}
+            >
+              <CheckCheck className='mr-1 h-4 w-4' /> Simpan Pembayaran
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Payment History Dialog */}
+      <Dialog open={!!historyUser} onOpenChange={() => setHistoryUser(null)}>
+        <DialogContent className='max-w-md gap-0 overflow-hidden p-0'>
+          <DialogHeader className='flex flex-row items-center justify-between gap-4 border-b p-4'>
+            <DialogTitle className='flex items-center gap-2 text-base font-black'>
+              <History className='h-4 w-4 text-primary' />
+              Riwayat Pembayaran
+            </DialogTitle>
+          </DialogHeader>
+
+          <ScrollArea className='max-h-[60vh]'>
+            <div className='space-y-4 p-4'>
+              {/* Identity Header */}
+              <div className='flex items-center justify-between border-b border-border/50 pb-2'>
+                <div>
+                  <p className='text-xs text-muted-foreground'>
+                    Username Pelanggan
+                  </p>
+                  <p className='text-lg font-black tracking-tight'>
+                    <PrivacyText>{historyUser?.username}</PrivacyText>
+                  </p>
+                </div>
+              </div>
+
+              {/* History list */}
+              {isHistoryLoading ? (
+                <div className='space-y-3 py-2'>
+                  {[1, 2, 3].map((i) => (
+                    <div
+                      key={i}
+                      className='animate-pulse space-y-2 rounded-lg border bg-muted/10 p-3'
+                    >
+                      <div className='flex justify-between'>
+                        <div className='h-4 w-28 rounded bg-muted' />
+                        <div className='h-4 w-16 rounded bg-muted' />
+                      </div>
+                      <div className='h-3.5 w-32 rounded bg-muted' />
+                    </div>
+                  ))}
+                </div>
+              ) : !userHistory || userHistory.length === 0 ? (
+                <div className='flex flex-col items-center justify-center space-y-3 py-12 text-center'>
+                  <div className='rounded-full bg-muted/40 p-3'>
+                    <Receipt className='h-8 w-8 text-muted-foreground/60' />
+                  </div>
+                  <div>
+                    <h4 className='text-sm font-bold text-foreground'>
+                      Belum Ada Riwayat Bayar
+                    </h4>
+                    <p className='mt-1 max-w-[280px] text-xs leading-relaxed text-muted-foreground'>
+                      Pelanggan ini belum memiliki catatan riwayat pembayaran di
+                      database.
+                    </p>
+                  </div>
+                </div>
+              ) : (
+                <div className='space-y-3'>
+                  <p className='px-1 text-[10px] font-bold tracking-wider text-muted-foreground uppercase'>
+                    Daftar Transaksi ({userHistory.length})
+                  </p>
+                  <div className='space-y-2.5'>
+                    {userHistory.map((pay: any) => {
+                      const methodLower = (pay.method || 'cash').toLowerCase()
+                      let methodColor =
+                        'bg-emerald-500/10 text-emerald-700 dark:text-emerald-400' // Cash
+                      if (
+                        methodLower.includes('tf') ||
+                        methodLower.includes('transfer') ||
+                        methodLower.includes('bank')
+                      ) {
+                        methodColor =
+                          'bg-purple-500/10 text-purple-700 dark:text-purple-400'
+                      } else if (
+                        methodLower.includes('qris') ||
+                        methodLower.includes('link') ||
+                        methodLower.includes('dana') ||
+                        methodLower.includes('gopay')
+                      ) {
+                        methodColor =
+                          'bg-blue-500/10 text-blue-700 dark:text-blue-400'
+                      }
+
+                      const monthsList = [
+                        'Januari',
+                        'Februari',
+                        'Maret',
+                        'April',
+                        'Mei',
+                        'Juni',
+                        'Juli',
+                        'Agustus',
+                        'September',
+                        'Oktober',
+                        'November',
+                        'Desember',
+                      ]
+                      const monthName =
+                        monthsList[pay.payment_month - 1] ||
+                        `Bulan ${pay.payment_month}`
+
+                      return (
+                        <div
+                          key={pay.id}
+                          className='space-y-2.5 rounded-lg border border-border/60 bg-card p-3 transition-all duration-300 hover:shadow-md'
+                        >
+                          {/* Header row */}
+                          <div className='flex items-center justify-between border-b border-border/40 pb-1'>
+                            <div className='flex items-center gap-1.5'>
+                              <Calendar className='h-3.5 w-3.5 text-indigo-500' />
+                              <span className='text-sm font-black text-foreground'>
+                                {monthName} {pay.payment_year}
+                              </span>
+                            </div>
+                            <Badge className='h-4 bg-emerald-500 px-1.5 text-[9px] font-black hover:bg-emerald-600'>
+                              LUNAS
+                            </Badge>
+                          </div>
+
+                          {/* Amount & Method */}
+                          <div className='flex items-center justify-between text-xs'>
+                            <div>
+                              <p className='text-[9px] font-bold text-muted-foreground'>
+                                NOMINAL
+                              </p>
+                              <p className='font-mono text-sm font-extrabold text-indigo-600 dark:text-indigo-400'>
+                                <PrivacyText>{fmt(pay.amount)}</PrivacyText>
+                              </p>
+                            </div>
+                            <div className='text-right'>
+                              <p className='text-[9px] font-bold text-muted-foreground'>
+                                METODE
+                              </p>
+                              <span
+                                className={`mt-0.5 inline-block rounded px-1.5 py-0.5 text-[10px] font-black tracking-wider uppercase ${methodColor}`}
+                              >
+                                {pay.method || 'CASH'}
+                              </span>
+                            </div>
+                          </div>
+
+                          {/* Date of payment & Note */}
+                          <div className='space-y-1 border-t border-dashed border-border/50 pt-1.5 text-[10px]'>
+                            <div className='flex items-center justify-between text-muted-foreground'>
+                              <span>Tanggal Bayar:</span>
+                              <span className='font-bold text-foreground/80'>
+                                {pay.payment_date}
+                              </span>
+                            </div>
+                            {pay.note && (
+                              <div className='mt-1 flex gap-1.5 rounded border border-border/30 bg-muted/40 p-1.5 leading-relaxed text-foreground/90'>
+                                <FileText className='mt-0.5 h-3 w-3 shrink-0 text-muted-foreground' />
+                                <div>
+                                  <p className='text-[8px] font-black text-muted-foreground uppercase'>
+                                    Catatan:
+                                  </p>
+                                  <p className='text-xs font-semibold italic'>
+                                    {pay.note}
+                                  </p>
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      )
+                    })}
+                  </div>
+                </div>
+              )}
+            </div>
+          </ScrollArea>
+
+          <div className='flex justify-end border-t bg-muted/20 p-3'>
+            <Button
+              size='sm'
+              onClick={() => setHistoryUser(null)}
+              className='h-8 px-4 text-xs'
+            >
+              Tutup
+            </Button>
+          </div>
         </DialogContent>
       </Dialog>
     </>

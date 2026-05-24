@@ -43,14 +43,28 @@ function returnSuccess($message, $data = null) {
     exit();
 }
 
-// Get operation type from query parameter or request method
 $operation = isset($_GET['operation']) ? $_GET['operation'] : '';
+
+function resolveSoftwareId($conn, $router_id) {
+    if (is_numeric($router_id)) {
+        $stmt = $conn->prepare("SELECT software_id FROM mikrotik_routers WHERE id = ?");
+        if ($stmt) {
+            $stmt->bind_param("i", $router_id);
+            $stmt->execute();
+            $res = $stmt->get_result();
+            if ($row = $res->fetch_assoc()) {
+                return !empty($row['software_id']) ? $row['software_id'] : $router_id;
+            }
+        }
+    }
+    return $router_id;
+}
 
 // =====================================================
 // GET: Fetch all profile pricing atau single pricing
 // =====================================================
 if ($_SERVER['REQUEST_METHOD'] === 'GET') {
-    $router_id = requireRouterIdFromGet($conn);
+    $router_id = resolveSoftwareId($conn, requireRouterIdFromGet($conn));
     
     // Jika ada ID, ambil single pricing
     if (isset($_GET['id'])) {
@@ -110,7 +124,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET') {
 // POST: Add new profile pricing
 // =====================================================
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && $operation === 'add') {
-    $router_id = requireRouterIdFromGet($conn);
+    $router_id = resolveSoftwareId($conn, requireRouterIdFromGet($conn));
     
     $rawData = file_get_contents('php://input');
     $data = json_decode($rawData, true);
@@ -162,7 +176,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $operation === 'add') {
 // PUT: Update existing profile pricing
 // =====================================================
 if ($_SERVER['REQUEST_METHOD'] === 'PUT' || ($_SERVER['REQUEST_METHOD'] === 'POST' && $operation === 'update')) {
-    $router_id = requireRouterIdFromGet($conn);
+    $router_id = resolveSoftwareId($conn, requireRouterIdFromGet($conn));
     
     $rawData = file_get_contents('php://input');
     $data = json_decode($rawData, true);

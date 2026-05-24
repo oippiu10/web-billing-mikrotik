@@ -38,7 +38,7 @@ function requireRouterIdFromBody($conn, $data) {
         $router_id = isset($data->router_id) ? trim($data->router_id) : '';
     }
     
-    if ($router_id === '') {
+    if ($router_id === '') {    
         http_response_code(400);
         echo json_encode([
             "success" => false,

@@ -102,8 +102,7 @@ if (!isset($cmdMap[$cmd])) {
     exit;
 }
 
-// ─── Ambil kredensial dari Database ──────────────────────────────────────────
-$stmt = $conn->prepare("SELECT host, port, username, password FROM mikrotik_routers WHERE id = ?");
+$stmt = $conn->prepare("SELECT host, port, username, password, software_id FROM mikrotik_routers WHERE id = ?");
 $stmt->bind_param("i", $router_id);
 $stmt->execute();
 $routerRes = $stmt->get_result();
@@ -117,6 +116,7 @@ $host = $routerData['host'];
 $port = intval($routerData['port']) ?: 8728;
 $user = $routerData['username'];
 $pass = $routerData['password'];
+$software_id = $routerData['software_id'];
 
 // ─── Helper khusus PPP active: deteksi cache yang tertukar/rusak ─────────────
 function is_valid_ppp_active_cache($rows) {
@@ -146,6 +146,37 @@ function is_valid_ppp_active_cache($rows) {
     return true;
 }
 
+function inject_ppp_profile_price(&$data, $conn, $router_id) {
+    if (!is_array($data) || empty($data)) return;
+    $router_id_str = (string)$router_id;
+    $stmtPrice = $conn->prepare("SELECT profile_name, price FROM ppp_profile_pricing WHERE router_id = ? AND is_active = 1");
+    if (!$stmtPrice) return;
+    $stmtPrice->bind_param("s", $router_id_str);
+    $stmtPrice->execute();
+    $resPrice = $stmtPrice->get_result();
+    $priceMap = [];
+    while ($row = $resPrice->fetch_assoc()) {
+        $priceMap[$row['profile_name']] = (float)$row['price'];
+    }
+    $stmtPrice->close();
+    
+    $stmtInsert = $conn->prepare("INSERT INTO ppp_profile_pricing (router_id, profile_name, price, is_active) VALUES (?, ?, 0, 1)");
+    foreach ($data as &$p) {
+        if (!is_array($p)) continue;
+        $pname = $p['name'] ?? '';
+        if ($pname === '') continue;
+        if (!isset($priceMap[$pname])) {
+            if ($stmtInsert) {
+                $stmtInsert->bind_param("ss", $router_id_str, $pname);
+                $stmtInsert->execute();
+            }
+            $priceMap[$pname] = 0;
+        }
+        $p['price'] = $priceMap[$pname] ?? 0;
+    }
+    if ($stmtInsert) $stmtInsert->close();
+}
+
 // ─── Fetch dengan cache ──────────────────────────────────────────────────────
 $cacheKey = "mt_{$router_id}_{$cmd}";
 
@@ -158,7 +189,8 @@ try {
     $isDaemonRecent = false;
     if ($daemonStatus) {
         $lastSync = strtotime($daemonStatus['last_sync'] ?? '2000-01-01');
-        $isDaemonRecent = (time() - $lastSync) < 300; // Aktif dalam 5 menit terakhir
+        $diff = time() - $lastSync;
+        $isDaemonRecent = ($diff >= 0 && $diff < 300); // Aktif dalam 5 menit terakhir dan aman dari selisih zona waktu
     }
 
     // 2. Jika daemon aktif/baru saja aktif, prioritaskan cache (meskipun stale/expired)
@@ -179,6 +211,10 @@ try {
                 // karena ini membuat semua pelanggan dianggap offline.
                 $cache->invalidate($cacheKey);
             } else {
+                if ($cmd === 'ppp_profile') {
+                    $actual_router_id = !empty($software_id) ? $software_id : (string)$router_id;
+                    inject_ppp_profile_price($staleData, $conn, $actual_router_id);
+                }
                 echo json_encode([
                     'success'    => true,
                     'cmd'        => $cmd,
@@ -214,7 +250,7 @@ try {
     }
 
 
-    $result = $cache->getOrFetch($cacheKey, $ttl, function () use ($host, $port, $user, $pass, $cmdMap, $cmd) {
+    $result = $cache->getOrFetch($cacheKey, $ttl, function () use ($host, $port, $user, $pass, $cmdMap, $cmd, $conn, $router_id) {
         $api = new RouterosAPI();
         $api->port = $port ?: 8728;
         $api->timeout = 5;
@@ -333,6 +369,11 @@ try {
         exit;
     }
 
+    if ($cmd === 'ppp_profile') {
+        $actual_router_id = !empty($software_id) ? $software_id : (string)$router_id;
+        inject_ppp_profile_price($result['data'], $conn, $actual_router_id);
+    }
+
     echo json_encode([
         'success' => true,
         'cmd' => $cmd,
@@ -343,7 +384,7 @@ try {
         'ttl_sec' => $ttl,
         'cache_key' => $cacheKey,
         'count' => count($result['data'] ?? []),
-        'data' => $result['data'],
+        'data' => is_array($result['data']) ? array_values($result['data']) : $result['data'],
         'time' => date('Y-m-d H:i:s'),
     ], JSON_UNESCAPED_UNICODE);
 

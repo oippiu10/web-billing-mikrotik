@@ -93,7 +93,7 @@ if ($stmt->execute()) {
     $insertId = $stmt->insert_id;
 
     // Sync ke Mikrotik
-    $stmtRouter = $conn->prepare("SELECT host, port, username, password FROM mikrotik_routers WHERE software_id = ? OR id = ? LIMIT 1");
+    $stmtRouter = $conn->prepare("SELECT id, host, port, username, password FROM mikrotik_routers WHERE software_id = ? OR id = ? LIMIT 1");
     $stmtRouter->bind_param("ss", $routerId, $routerId);
     $stmtRouter->execute();
     $router = $stmtRouter->get_result()->fetch_assoc();
@@ -117,7 +117,9 @@ if ($stmt->execute()) {
             $api->disconnect();
 
             // Invalidate mikrotik cache
-            (new MikrotikCache($conn))->invalidate("mt_{$router['host']}_{$api->port}_ppp_secret");
+            $cache = new MikrotikCache($conn);
+            $cache->invalidate("mt_{$router['id']}_ppp_secret");
+            $cache->invalidate("mt_{$router['host']}_{$api->port}_ppp_secret");
         }
     }
 

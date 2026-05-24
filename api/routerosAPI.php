@@ -137,37 +137,57 @@ class RouterosAPI
 
     private function write($word)
     {
+        if (!$this->socket) return false;
+        
         $len = strlen($word);
+        $res = false;
         if ($len < 0x80) {
-            fwrite($this->socket, chr($len));
+            $res = @fwrite($this->socket, chr($len));
         } elseif ($len < 0x4000) {
             $len |= 0x8000;
-            fwrite($this->socket, chr(($len >> 8) & 0xFF) . chr($len & 0xFF));
+            $res = @fwrite($this->socket, chr(($len >> 8) & 0xFF) . chr($len & 0xFF));
         } else {
-            // Handle larger lengths if needed
-            // For now, assume short words
-            fwrite($this->socket, chr(0)); // Fail safe
-            return;
+            @fwrite($this->socket, chr(0)); // Fail safe
+            $this->connected = false;
+            return false;
         }
-        fwrite($this->socket, $word);
+        
+        if ($res === false) {
+            $this->connected = false;
+            return false;
+        }
+        
+        $res = @fwrite($this->socket, $word);
+        if ($res === false) {
+            $this->connected = false;
+            return false;
+        }
+        return true;
     }
 
     private function read()
     {
         $sentence = [];
+        if (!$this->socket) return $sentence;
+        
         while (true) {
-            $byte = fread($this->socket, 1);
-            if ($byte === false || $byte === '')
+            $byte = @fread($this->socket, 1);
+            if ($byte === false || $byte === '') {
+                $this->connected = false;
                 return $sentence; // Connection closed
+            }
 
             $len = ord($byte);
             if ($len & 0x80) {
                 $len &= 0x7F;
                 $len <<= 8;
-                $byte2 = fread($this->socket, 1);
+                $byte2 = @fread($this->socket, 1);
+                if ($byte2 === false || $byte2 === '') {
+                    $this->connected = false;
+                    return $sentence;
+                }
                 $len |= ord($byte2);
             }
-            // Handle larger lengths if needed
 
             if ($len === 0)
                 return $sentence;
@@ -176,9 +196,11 @@ class RouterosAPI
             if ($len > 0) {
                 $word = "";
                 while (strlen($word) < $len) {
-                    $chunk = fread($this->socket, $len - strlen($word));
-                    if ($chunk === false || $chunk === '')
+                    $chunk = @fread($this->socket, $len - strlen($word));
+                    if ($chunk === false || $chunk === '') {
+                        $this->connected = false;
                         break;
+                    }
                     $word .= $chunk;
                 }
             }

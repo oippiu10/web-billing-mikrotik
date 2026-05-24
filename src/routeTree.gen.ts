@@ -44,7 +44,6 @@ import { Route as AuthenticatedGenieacsIndexRouteImport } from './routes/_authen
 import { Route as AuthenticatedFinanceIndexRouteImport } from './routes/_authenticated/finance/index'
 import { Route as AuthenticatedCustomersIndexRouteImport } from './routes/_authenticated/customers/index'
 import { Route as AuthenticatedChatsIndexRouteImport } from './routes/_authenticated/chats/index'
-import { Route as AuthenticatedBillingIndexRouteImport } from './routes/_authenticated/billing/index'
 import { Route as AuthenticatedAutomationIndexRouteImport } from './routes/_authenticated/automation/index'
 import { Route as AuthenticatedAppsIndexRouteImport } from './routes/_authenticated/apps/index'
 import { Route as AuthenticatedAcsIndexRouteImport } from './routes/_authenticated/acs/index'
@@ -63,8 +62,8 @@ import { Route as AuthenticatedPppoeOfflineRouteImport } from './routes/_authent
 import { Route as AuthenticatedPppoeActiveRouteImport } from './routes/_authenticated/pppoe/active'
 import { Route as AuthenticatedOdpCapacityRouteImport } from './routes/_authenticated/odp/capacity'
 import { Route as AuthenticatedGenieacsSettingsRouteImport } from './routes/_authenticated/genieacs/settings'
-import { Route as AuthenticatedFinanceReportRouteImport } from './routes/_authenticated/finance/report'
 import { Route as AuthenticatedFinanceReceivableRouteImport } from './routes/_authenticated/finance/receivable'
+import { Route as AuthenticatedFinanceExpensesRouteImport } from './routes/_authenticated/finance/expenses'
 import { Route as AuthenticatedFinanceBillingRouteImport } from './routes/_authenticated/finance/billing'
 import { Route as AuthenticatedErrorsErrorRouteImport } from './routes/_authenticated/errors/$error'
 import { Route as AuthenticatedCustomersOverviewRouteImport } from './routes/_authenticated/customers/overview'
@@ -257,12 +256,6 @@ const AuthenticatedChatsIndexRoute = AuthenticatedChatsIndexRouteImport.update({
   path: '/chats/',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
-const AuthenticatedBillingIndexRoute =
-  AuthenticatedBillingIndexRouteImport.update({
-    id: '/billing/',
-    path: '/billing/',
-    getParentRoute: () => AuthenticatedRouteRoute,
-  } as any)
 const AuthenticatedAutomationIndexRoute =
   AuthenticatedAutomationIndexRouteImport.update({
     id: '/automation/',
@@ -367,16 +360,16 @@ const AuthenticatedGenieacsSettingsRoute =
     path: '/genieacs/settings',
     getParentRoute: () => AuthenticatedRouteRoute,
   } as any)
-const AuthenticatedFinanceReportRoute =
-  AuthenticatedFinanceReportRouteImport.update({
-    id: '/finance/report',
-    path: '/finance/report',
-    getParentRoute: () => AuthenticatedRouteRoute,
-  } as any)
 const AuthenticatedFinanceReceivableRoute =
   AuthenticatedFinanceReceivableRouteImport.update({
     id: '/finance/receivable',
     path: '/finance/receivable',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
+const AuthenticatedFinanceExpensesRoute =
+  AuthenticatedFinanceExpensesRouteImport.update({
+    id: '/finance/expenses',
+    path: '/finance/expenses',
     getParentRoute: () => AuthenticatedRouteRoute,
   } as any)
 const AuthenticatedFinanceBillingRoute =
@@ -444,8 +437,8 @@ export interface FileRoutesByFullPath {
   '/customers/overview': typeof AuthenticatedCustomersOverviewRoute
   '/errors/$error': typeof AuthenticatedErrorsErrorRoute
   '/finance/billing': typeof AuthenticatedFinanceBillingRoute
+  '/finance/expenses': typeof AuthenticatedFinanceExpensesRoute
   '/finance/receivable': typeof AuthenticatedFinanceReceivableRoute
-  '/finance/report': typeof AuthenticatedFinanceReportRoute
   '/genieacs/settings': typeof AuthenticatedGenieacsSettingsRoute
   '/odp/capacity': typeof AuthenticatedOdpCapacityRoute
   '/pppoe/active': typeof AuthenticatedPppoeActiveRoute
@@ -464,7 +457,6 @@ export interface FileRoutesByFullPath {
   '/acs/': typeof AuthenticatedAcsIndexRoute
   '/apps/': typeof AuthenticatedAppsIndexRoute
   '/automation/': typeof AuthenticatedAutomationIndexRoute
-  '/billing/': typeof AuthenticatedBillingIndexRoute
   '/chats/': typeof AuthenticatedChatsIndexRoute
   '/customers/': typeof AuthenticatedCustomersIndexRoute
   '/finance/': typeof AuthenticatedFinanceIndexRoute
@@ -505,8 +497,8 @@ export interface FileRoutesByTo {
   '/customers/overview': typeof AuthenticatedCustomersOverviewRoute
   '/errors/$error': typeof AuthenticatedErrorsErrorRoute
   '/finance/billing': typeof AuthenticatedFinanceBillingRoute
+  '/finance/expenses': typeof AuthenticatedFinanceExpensesRoute
   '/finance/receivable': typeof AuthenticatedFinanceReceivableRoute
-  '/finance/report': typeof AuthenticatedFinanceReportRoute
   '/genieacs/settings': typeof AuthenticatedGenieacsSettingsRoute
   '/odp/capacity': typeof AuthenticatedOdpCapacityRoute
   '/pppoe/active': typeof AuthenticatedPppoeActiveRoute
@@ -525,7 +517,6 @@ export interface FileRoutesByTo {
   '/acs': typeof AuthenticatedAcsIndexRoute
   '/apps': typeof AuthenticatedAppsIndexRoute
   '/automation': typeof AuthenticatedAutomationIndexRoute
-  '/billing': typeof AuthenticatedBillingIndexRoute
   '/chats': typeof AuthenticatedChatsIndexRoute
   '/customers': typeof AuthenticatedCustomersIndexRoute
   '/finance': typeof AuthenticatedFinanceIndexRoute
@@ -571,8 +562,8 @@ export interface FileRoutesById {
   '/_authenticated/customers/overview': typeof AuthenticatedCustomersOverviewRoute
   '/_authenticated/errors/$error': typeof AuthenticatedErrorsErrorRoute
   '/_authenticated/finance/billing': typeof AuthenticatedFinanceBillingRoute
+  '/_authenticated/finance/expenses': typeof AuthenticatedFinanceExpensesRoute
   '/_authenticated/finance/receivable': typeof AuthenticatedFinanceReceivableRoute
-  '/_authenticated/finance/report': typeof AuthenticatedFinanceReportRoute
   '/_authenticated/genieacs/settings': typeof AuthenticatedGenieacsSettingsRoute
   '/_authenticated/odp/capacity': typeof AuthenticatedOdpCapacityRoute
   '/_authenticated/pppoe/active': typeof AuthenticatedPppoeActiveRoute
@@ -591,7 +582,6 @@ export interface FileRoutesById {
   '/_authenticated/acs/': typeof AuthenticatedAcsIndexRoute
   '/_authenticated/apps/': typeof AuthenticatedAppsIndexRoute
   '/_authenticated/automation/': typeof AuthenticatedAutomationIndexRoute
-  '/_authenticated/billing/': typeof AuthenticatedBillingIndexRoute
   '/_authenticated/chats/': typeof AuthenticatedChatsIndexRoute
   '/_authenticated/customers/': typeof AuthenticatedCustomersIndexRoute
   '/_authenticated/finance/': typeof AuthenticatedFinanceIndexRoute
@@ -635,8 +625,8 @@ export interface FileRouteTypes {
     | '/customers/overview'
     | '/errors/$error'
     | '/finance/billing'
+    | '/finance/expenses'
     | '/finance/receivable'
-    | '/finance/report'
     | '/genieacs/settings'
     | '/odp/capacity'
     | '/pppoe/active'
@@ -655,7 +645,6 @@ export interface FileRouteTypes {
     | '/acs/'
     | '/apps/'
     | '/automation/'
-    | '/billing/'
     | '/chats/'
     | '/customers/'
     | '/finance/'
@@ -696,8 +685,8 @@ export interface FileRouteTypes {
     | '/customers/overview'
     | '/errors/$error'
     | '/finance/billing'
+    | '/finance/expenses'
     | '/finance/receivable'
-    | '/finance/report'
     | '/genieacs/settings'
     | '/odp/capacity'
     | '/pppoe/active'
@@ -716,7 +705,6 @@ export interface FileRouteTypes {
     | '/acs'
     | '/apps'
     | '/automation'
-    | '/billing'
     | '/chats'
     | '/customers'
     | '/finance'
@@ -761,8 +749,8 @@ export interface FileRouteTypes {
     | '/_authenticated/customers/overview'
     | '/_authenticated/errors/$error'
     | '/_authenticated/finance/billing'
+    | '/_authenticated/finance/expenses'
     | '/_authenticated/finance/receivable'
-    | '/_authenticated/finance/report'
     | '/_authenticated/genieacs/settings'
     | '/_authenticated/odp/capacity'
     | '/_authenticated/pppoe/active'
@@ -781,7 +769,6 @@ export interface FileRouteTypes {
     | '/_authenticated/acs/'
     | '/_authenticated/apps/'
     | '/_authenticated/automation/'
-    | '/_authenticated/billing/'
     | '/_authenticated/chats/'
     | '/_authenticated/customers/'
     | '/_authenticated/finance/'
@@ -1064,13 +1051,6 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedChatsIndexRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
-    '/_authenticated/billing/': {
-      id: '/_authenticated/billing/'
-      path: '/billing'
-      fullPath: '/billing/'
-      preLoaderRoute: typeof AuthenticatedBillingIndexRouteImport
-      parentRoute: typeof AuthenticatedRouteRoute
-    }
     '/_authenticated/automation/': {
       id: '/_authenticated/automation/'
       path: '/automation'
@@ -1197,18 +1177,18 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedGenieacsSettingsRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
-    '/_authenticated/finance/report': {
-      id: '/_authenticated/finance/report'
-      path: '/finance/report'
-      fullPath: '/finance/report'
-      preLoaderRoute: typeof AuthenticatedFinanceReportRouteImport
-      parentRoute: typeof AuthenticatedRouteRoute
-    }
     '/_authenticated/finance/receivable': {
       id: '/_authenticated/finance/receivable'
       path: '/finance/receivable'
       fullPath: '/finance/receivable'
       preLoaderRoute: typeof AuthenticatedFinanceReceivableRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/finance/expenses': {
+      id: '/_authenticated/finance/expenses'
+      path: '/finance/expenses'
+      fullPath: '/finance/expenses'
+      preLoaderRoute: typeof AuthenticatedFinanceExpensesRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
     '/_authenticated/finance/billing': {
@@ -1301,8 +1281,8 @@ interface AuthenticatedRouteRouteChildren {
   AuthenticatedCustomersOverviewRoute: typeof AuthenticatedCustomersOverviewRoute
   AuthenticatedErrorsErrorRoute: typeof AuthenticatedErrorsErrorRoute
   AuthenticatedFinanceBillingRoute: typeof AuthenticatedFinanceBillingRoute
+  AuthenticatedFinanceExpensesRoute: typeof AuthenticatedFinanceExpensesRoute
   AuthenticatedFinanceReceivableRoute: typeof AuthenticatedFinanceReceivableRoute
-  AuthenticatedFinanceReportRoute: typeof AuthenticatedFinanceReportRoute
   AuthenticatedGenieacsSettingsRoute: typeof AuthenticatedGenieacsSettingsRoute
   AuthenticatedOdpCapacityRoute: typeof AuthenticatedOdpCapacityRoute
   AuthenticatedPppoeActiveRoute: typeof AuthenticatedPppoeActiveRoute
@@ -1312,7 +1292,6 @@ interface AuthenticatedRouteRouteChildren {
   AuthenticatedAcsIndexRoute: typeof AuthenticatedAcsIndexRoute
   AuthenticatedAppsIndexRoute: typeof AuthenticatedAppsIndexRoute
   AuthenticatedAutomationIndexRoute: typeof AuthenticatedAutomationIndexRoute
-  AuthenticatedBillingIndexRoute: typeof AuthenticatedBillingIndexRoute
   AuthenticatedChatsIndexRoute: typeof AuthenticatedChatsIndexRoute
   AuthenticatedCustomersIndexRoute: typeof AuthenticatedCustomersIndexRoute
   AuthenticatedFinanceIndexRoute: typeof AuthenticatedFinanceIndexRoute
@@ -1344,8 +1323,8 @@ const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedCustomersOverviewRoute: AuthenticatedCustomersOverviewRoute,
   AuthenticatedErrorsErrorRoute: AuthenticatedErrorsErrorRoute,
   AuthenticatedFinanceBillingRoute: AuthenticatedFinanceBillingRoute,
+  AuthenticatedFinanceExpensesRoute: AuthenticatedFinanceExpensesRoute,
   AuthenticatedFinanceReceivableRoute: AuthenticatedFinanceReceivableRoute,
-  AuthenticatedFinanceReportRoute: AuthenticatedFinanceReportRoute,
   AuthenticatedGenieacsSettingsRoute: AuthenticatedGenieacsSettingsRoute,
   AuthenticatedOdpCapacityRoute: AuthenticatedOdpCapacityRoute,
   AuthenticatedPppoeActiveRoute: AuthenticatedPppoeActiveRoute,
@@ -1355,7 +1334,6 @@ const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedAcsIndexRoute: AuthenticatedAcsIndexRoute,
   AuthenticatedAppsIndexRoute: AuthenticatedAppsIndexRoute,
   AuthenticatedAutomationIndexRoute: AuthenticatedAutomationIndexRoute,
-  AuthenticatedBillingIndexRoute: AuthenticatedBillingIndexRoute,
   AuthenticatedChatsIndexRoute: AuthenticatedChatsIndexRoute,
   AuthenticatedCustomersIndexRoute: AuthenticatedCustomersIndexRoute,
   AuthenticatedFinanceIndexRoute: AuthenticatedFinanceIndexRoute,

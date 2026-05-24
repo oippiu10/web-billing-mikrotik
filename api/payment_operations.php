@@ -132,8 +132,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         
         if ($stmt->execute()) {
             log_admin_activity($conn, 'payment_mark_paid', "Menandai lunas user_id {$user_id} periode {$month}/{$year}", (int)($_SESSION['admin_id'] ?? 0));
-            $openResult = open_isolated_customer($conn, $router_id, $user_id, $username);
-            echo json_encode(['success' => true, 'open_isolate' => $openResult]);
+            // Sesuai permintaan, fitur isolir dinonaktifkan sementara
+            // $openResult = open_isolated_customer($conn, $router_id, $user_id, $username);
+            // echo json_encode(['success' => true, 'open_isolate' => $openResult]);
+            echo json_encode(['success' => true]);
         } else {
             echo json_encode(['success' => false, 'message' => $stmt->error]);
         }
@@ -155,6 +157,67 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $stmt->close();
         } else {
             echo json_encode(['success' => false, 'message' => 'Missing payment ID']);
+        }
+    } elseif ($action === 'bulk_mark_paid') {
+        $users = $data['users'] ?? []; // array of { username, user_id, amount }
+        $month = intval($data['month'] ?? date('n'));
+        $year = intval($data['year'] ?? date('Y'));
+        $date = trim($data['paid_date'] ?? date('Y-m-d'));
+        $method = trim($data['method'] ?? 'cash');
+        $note = trim($data['note'] ?? '');
+        
+        if (empty($users)) {
+            echo json_encode(['success' => false, 'message' => 'Tidak ada pelanggan yang dipilih']);
+            exit;
+        }
+
+        $conn->begin_transaction();
+        try {
+            $checkStmt = $conn->prepare("SELECT id FROM payments WHERE router_id = ? AND user_id = ? AND payment_month = ? AND payment_year = ?");
+            $updStmt = $conn->prepare("UPDATE payments SET amount = ?, payment_date = ?, method = ?, note = ? WHERE id = ?");
+            $insStmt = $conn->prepare("INSERT INTO payments (router_id, user_id, amount, payment_date, payment_month, payment_year, method, note) VALUES (?, ?, ?, ?, ?, ?, ?, ?)");
+            
+            $successCount = 0;
+            foreach ($users as $u) {
+                $uid = intval($u['user_id'] ?? 0);
+                $amt = floatval($u['amount'] ?? 0);
+                
+                if (!$uid && !empty($u['username'])) {
+                    $uStmt = $conn->prepare("SELECT id FROM users WHERE username = ? AND router_id = ?");
+                    $uStmt->bind_param("ss", $u['username'], $router_id);
+                    $uStmt->execute();
+                    $uRes = $uStmt->get_result()->fetch_assoc();
+                    $uid = $uRes['id'] ?? 0;
+                    $uStmt->close();
+                }
+                
+                if (!$uid) continue;
+                
+                $checkStmt->bind_param("siii", $router_id, $uid, $month, $year);
+                $checkStmt->execute();
+                $res = $checkStmt->get_result();
+                
+                if ($res->num_rows > 0) {
+                    $pid = $res->fetch_assoc()['id'];
+                    $updStmt->bind_param("dsssi", $amt, $date, $method, $note, $pid);
+                    $updStmt->execute();
+                } else {
+                    $insStmt->bind_param("sidsiiss", $router_id, $uid, $amt, $date, $month, $year, $method, $note);
+                    $insStmt->execute();
+                }
+                $successCount++;
+            }
+            
+            $checkStmt->close();
+            $updStmt->close();
+            $insStmt->close();
+            
+            $conn->commit();
+            log_admin_activity($conn, 'bulk_payment_mark_paid', "Melunasi massal {$successCount} pelanggan periode {$month}/{$year}", (int)($_SESSION['admin_id'] ?? 0));
+            echo json_encode(['success' => true, 'message' => "Berhasil menandai {$successCount} pelanggan lunas"]);
+        } catch (Exception $e) {
+            $conn->rollback();
+            echo json_encode(['success' => false, 'message' => 'Gagal bulk insert: ' . $e->getMessage()]);
         }
     } else {
         echo json_encode(['success' => false, 'message' => 'Unknown action']);
@@ -193,6 +256,7 @@ function open_isolated_customer(mysqli $conn, string $router_id, int $user_id, s
     $api->disconnect();
 
     $cache = new MikrotikCache($conn);
+    $cache->invalidate("mt_{$router['id']}_ppp_secret");
     $cache->invalidate('mt_' . $router['host'] . '_' . (intval($router['port']) ?: 8728) . '_ppp_secret');
     log_admin_activity($conn, 'auto_open_isolate', 'Auto buka isolir setelah bayar: ' . $username, (int)($_SESSION['admin_id'] ?? 0));
     return ['success' => true, 'message' => $disabled ? 'PPP secret di-enable' : 'PPP secret sudah aktif', 'username' => $username, 'was_disabled' => $disabled];

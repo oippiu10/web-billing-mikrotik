@@ -32,6 +32,7 @@ import { useRouterStore } from '@/stores/router-store'
 import { toast } from 'sonner'
 import { ConfirmDialog } from '@/components/confirm-dialog'
 import { ProfileDialog } from './profile-dialog'
+import { PriceDialog } from './price-dialog'
 import { DetailDialog } from './detail-dialog'
 import { usePermission } from '@/lib/permissions'
 
@@ -42,6 +43,7 @@ interface PPPProfile {
   'remote-address'?: string
   'rate-limit'?: string
   default?: string
+  price?: number
 }
 
 // ── Export Helpers ───────────────────────────────────────────────────────────
@@ -85,6 +87,7 @@ export function PPPoEProfilesTable({ data, isLoading }: Props) {
 
   // Dialog states
   const [isProfileDialogOpen, setIsProfileDialogOpen] = useState(false)
+  const [isPriceDialogOpen, setIsPriceDialogOpen] = useState(false)
   const [editingProfile, setEditingProfile] = useState<PPPProfile | undefined>()
   
   // Confirm states
@@ -175,6 +178,15 @@ export function PPPoEProfilesTable({ data, isLoading }: Props) {
       },
     },
     {
+      accessorKey: 'price',
+      header: ({ column }) => <DataTableColumnHeader column={column} title='Harga' />,
+      cell: ({ row }) => {
+        const price = row.original.price
+        if (!price) return <span className="text-muted-foreground text-sm">-</span>
+        return <span className="font-medium text-sm text-green-600 dark:text-green-500">Rp {price.toLocaleString('id-ID')}</span>
+      },
+    },
+    {
       id: 'actions',
       cell: ({ row }) => {
         const profile = row.original
@@ -201,6 +213,18 @@ export function PPPoEProfilesTable({ data, isLoading }: Props) {
                 View Details
               </DropdownMenuItem>
               {permissions.canManageRouter && <DropdownMenuSeparator />}
+              {permissions.canManageRouter && (
+                <DropdownMenuItem 
+                  onClick={() => {
+                    setEditingProfile(profile)
+                    setIsPriceDialogOpen(true)
+                  }}
+                  className="cursor-pointer text-green-600 dark:text-green-500 focus:text-green-600 dark:focus:text-green-500"
+                >
+                  <Activity className="w-4 h-4 mr-2" />
+                  Atur Harga
+                </DropdownMenuItem>
+              )}
               {permissions.canManageRouter && (
                 <DropdownMenuItem 
                   onClick={() => {
@@ -233,6 +257,7 @@ export function PPPoEProfilesTable({ data, isLoading }: Props) {
     },
   ]
 
+  // eslint-disable-next-line react-compiler/react-compiler
   const table = useReactTable({
     data,
     columns,
@@ -371,6 +396,12 @@ export function PPPoEProfilesTable({ data, isLoading }: Props) {
       <ProfileDialog 
         isOpen={isProfileDialogOpen} 
         onClose={() => setIsProfileDialogOpen(false)} 
+        profile={editingProfile}
+      />
+
+      <PriceDialog 
+        isOpen={isPriceDialogOpen} 
+        onClose={() => setIsPriceDialogOpen(false)} 
         profile={editingProfile}
       />
 

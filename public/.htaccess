@@ -1,0 +1,14 @@
+<IfModule mod_rewrite.c>
+  RewriteEngine On
+  RewriteBase /
+  
+  # Jangan arahkan ulang jika yang diakses adalah folder /api (untuk backend)
+  RewriteCond %{REQUEST_URI} !^/api/
+  
+  # Jangan arahkan ulang jika file/folder nyata memang ada
+  RewriteCond %{REQUEST_FILENAME} !-f
+  RewriteCond %{REQUEST_FILENAME} !-d
+  
+  # Selain itu, serahkan semuanya ke index.html untuk diurus oleh React Router
+  RewriteRule ^.*$ /index.html [L]
+</IfModule>

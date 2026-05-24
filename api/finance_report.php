@@ -69,6 +69,17 @@ try {
                 $stmt->execute();
                 $row = $stmt->get_result()->fetch_assoc();
                 $stmt->close();
+                
+                // Get expense
+                $stmtExp = $conn->prepare("SELECT IFNULL(SUM(amount), 0) as expense FROM expenses WHERE router_id = ? AND MONTH(spent_at) = ? AND YEAR(spent_at) = ?");
+                $stmtExp->bind_param("sii", $router_id, $m, $y);
+                $stmtExp->execute();
+                $expRow = $stmtExp->get_result()->fetch_assoc();
+                $stmtExp->close();
+                
+                $row['expense'] = $expRow['expense'];
+                $row['net_profit'] = floatval($row['revenue']) - floatval($row['expense']);
+                
                 return $row;
             };
 
@@ -276,60 +287,66 @@ try {
             fclose($output);
             exit;
 
-        // ── Laporan Tahunan (Per Bulan) ───────────────────────────────────────
+        // ── Laporan Tahunan ───────────────────────────────────────────────────
         case 'annual_report':
-            $monthNames = ['Jan','Feb','Mar','Apr','Mei','Jun','Jul','Agu','Sep','Okt','Nov','Des'];
-            $monthsFull = ['Januari','Februari','Maret','April','Mei','Juni','Juli','Agustus','September','Oktober','November','Desember'];
-            $data = [];
-
-            // Total pelanggan aktif saat ini sebagai basis
-            $totalStmt = $conn->prepare("SELECT COUNT(*) as cnt FROM users WHERE router_id = ?");
-            $totalStmt->bind_param("s", $router_id);
-            $totalStmt->execute();
-            $totalUsers = (int)($totalStmt->get_result()->fetch_assoc()['cnt'] ?? 0);
-            $totalStmt->close();
+            $monthsMap = [1=>'Jan',2=>'Feb',3=>'Mar',4=>'Apr',5=>'Mei',6=>'Jun',7=>'Jul',8=>'Agu',9=>'Sep',10=>'Okt',11=>'Nov',12=>'Des'];
+            $fullMonthsMap = [1=>'Januari',2=>'Februari',3=>'Maret',4=>'April',5=>'Mei',6=>'Juni',7=>'Juli',8=>'Agustus',9=>'September',10=>'Oktober',11=>'November',12=>'Desember'];
+            $result = [];
+            $ytd_revenue = 0;
+            $ytd_expense = 0;
 
             for ($m = 1; $m <= 12; $m++) {
                 $stmt = $conn->prepare("
                     SELECT
-                        COUNT(DISTINCT p.user_id) as paid_count,
+                        COUNT(DISTINCT u.id) as total_users,
+                        SUM(IF(p.id IS NOT NULL, 1, 0)) as paid_count,
+                        SUM(IF(p.id IS NULL, 1, 0)) as unpaid_count,
                         IFNULL(SUM(p.amount), 0) as revenue
-                    FROM payments p
-                    WHERE p.router_id = ? AND p.payment_month = ? AND p.payment_year = ?
+                    FROM users u
+                    LEFT JOIN payments p ON p.user_id = u.id AND p.payment_month = ? AND p.payment_year = ? AND p.router_id = u.router_id
+                    WHERE u.router_id = ?
                 ");
-                $stmt->bind_param("sii", $router_id, $m, $year);
+                $stmt->bind_param("iis", $m, $year, $router_id);
                 $stmt->execute();
                 $row = $stmt->get_result()->fetch_assoc();
                 $stmt->close();
+                
+                $stmtExp = $conn->prepare("SELECT IFNULL(SUM(amount), 0) as expense FROM expenses WHERE router_id = ? AND MONTH(spent_at) = ? AND YEAR(spent_at) = ?");
+                $stmtExp->bind_param("sii", $router_id, $m, $year);
+                $stmtExp->execute();
+                $expRow = $stmtExp->get_result()->fetch_assoc();
+                $stmtExp->close();
 
-                $paid    = (int)($row['paid_count'] ?? 0);
-                $revenue = (float)($row['revenue'] ?? 0);
+                $total = intval($row['total_users']);
+                $paid = intval($row['paid_count']);
+                $revenue = floatval($row['revenue']);
+                $expense = floatval($expRow['expense']);
+                
+                if ($m <= date('n') || $year < date('Y')) {
+                    $ytd_revenue += $revenue;
+                    $ytd_expense += $expense;
+                }
 
-                $data[] = [
-                    'month'        => $m,
-                    'month_short'  => $monthNames[$m - 1],
-                    'month_name'   => $monthsFull[$m - 1],
-                    'paid'         => $paid,
-                    'unpaid'       => max(0, $totalUsers - $paid),
-                    'total'        => $totalUsers,
-                    'revenue'      => $revenue,
-                    'collection_rate' => $totalUsers > 0 ? round(($paid / $totalUsers) * 100, 1) : 0,
+                $result[] = [
+                    'month' => $m,
+                    'month_short' => $monthsMap[$m],
+                    'month_name' => $fullMonthsMap[$m],
+                    'paid' => $paid,
+                    'unpaid' => intval($row['unpaid_count']),
+                    'collection_rate' => $total > 0 ? round(($paid / $total) * 100, 1) : 0,
+                    'revenue' => $revenue,
+                    'expense' => $expense,
+                    'net_profit' => $revenue - $expense
                 ];
             }
 
-            // YTD (Year to Date - hanya sampai bulan saat ini)
-            $ytd = array_reduce(
-                array_slice($data, 0, intval(date('n'))),
-                fn($carry, $item) => $carry + $item['revenue'],
-                0
-            );
-
             echo json_encode([
-                'success'     => true,
-                'data'        => $data,
-                'year'        => $year,
-                'total_users' => $totalUsers,
-                'ytd_revenue' => $ytd,
+                'success' => true,
+                'data' => $result,
+                'ytd_revenue' => $ytd_revenue,
+                'ytd_expense' => $ytd_expense,
+                'ytd_net_profit' => $ytd_revenue - $ytd_expense,
+                'total_users' => intval($result[0]['total_users'] ?? 0) // rough estimation
             ], JSON_UNESCAPED_UNICODE);
             break;
 
