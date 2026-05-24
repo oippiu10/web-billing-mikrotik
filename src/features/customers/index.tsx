@@ -11,6 +11,13 @@ import { RouterSelector } from '@/components/router-selector'
 import { CustomersTable } from './components/customers-table'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
 import { UserPlus, SearchIcon, RefreshCw, LayoutGrid, Users, Wifi, WifiOff, CheckCircle2, MapPin } from 'lucide-react'
 import { toast } from 'sonner'
 import { CustomerMutateDialog } from './components/customer-mutate-drawer'
@@ -225,16 +232,22 @@ export function Customers() {
                                 onChange={(e) => setSearch(e.target.value)}
                             />
                         </div>
-                        <div className='hidden sm:flex items-center rounded-md border bg-background p-1 shadow-sm'>
-                            <Button size='sm' variant={status === 'all' ? 'secondary' : 'ghost'} className='h-7 px-3 text-xs font-semibold' onClick={() => setStatus('all')}>Semua <span className='ml-1.5 text-muted-foreground'>{data?.total_all ?? data?.total ?? 0}</span></Button>
-                            <Button size='sm' variant={status === 'online' ? 'secondary' : 'ghost'} className='h-7 px-3 text-xs font-semibold text-emerald-600' onClick={() => setStatus('online')}>Online <span className='ml-1.5'>{data?.active ?? '-'}</span></Button>
-                            <Button size='sm' variant={status === 'offline' ? 'secondary' : 'ghost'} className='h-7 px-3 text-xs font-semibold text-red-600' onClick={() => setStatus('offline')}>Offline <span className='ml-1.5'>{data?.total_all !== undefined && data?.active !== undefined ? Math.max(0, data.total_all - data.active) : '-'}</span></Button>
-                        </div>
-                        <div className='hidden sm:flex items-center rounded-md border bg-background p-1 shadow-sm'>
-                            <Button size='sm' variant={tipe === 'all' ? 'secondary' : 'ghost'} className='h-7 px-3 text-xs font-semibold' onClick={() => setTipe('all')}>Semua Tipe</Button>
-                            <Button size='sm' variant={tipe === 'prabayar' ? 'secondary' : 'ghost'} className='h-7 px-3 text-xs font-semibold text-emerald-600' onClick={() => setTipe('prabayar')}>Prabayar <span className='ml-1 text-[10px] bg-emerald-100 text-emerald-700 px-1.5 py-0.5 rounded-full font-bold'>{data?.total_prabayar ?? 0}</span></Button>
-                            <Button size='sm' variant={tipe === 'pascabayar' ? 'secondary' : 'ghost'} className='h-7 px-3 text-xs font-semibold text-blue-600' onClick={() => setTipe('pascabayar')}>Pascabayar <span className='ml-1 text-[10px] bg-blue-100 text-blue-700 px-1.5 py-0.5 rounded-full font-bold'>{data?.total_pascabayar ?? 0}</span></Button>
-                        </div>
+                        <Select
+                          value={tipe || 'all'}
+                          onValueChange={(v) => {
+                            setTipe(v === 'all' ? 'all' : (v as any))
+                            setPage(1)
+                          }}
+                        >
+                          <SelectTrigger className='h-9 w-36 text-xs font-semibold bg-background border-border rounded-lg shadow-sm focus:ring-0 focus:ring-offset-0 shrink-0'>
+                            <SelectValue placeholder='Semua Tipe' />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value='all'>Semua Tipe</SelectItem>
+                            <SelectItem value='prabayar'>Prabayar</SelectItem>
+                            <SelectItem value='pascabayar'>Pascabayar</SelectItem>
+                          </SelectContent>
+                        </Select>
                     </div>
 
                     <div className='flex items-center gap-2'>
