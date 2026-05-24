@@ -843,6 +843,9 @@ export function FinanceBilling() {
                 <TableHead className='text-right pr-4 text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider'>
                   Tagihan
                 </TableHead>
+                <TableHead className='text-right pr-4 text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider'>
+                  Bayar
+                </TableHead>
                 <TableHead className='text-center text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider'>
                   Status
                 </TableHead>
@@ -857,24 +860,24 @@ export function FinanceBilling() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {isLoading ? (
-                <TableRow>
-                  <TableCell
-                    colSpan={permissions.canManageFinance ? 7 : 6}
-                    className='animate-pulse py-16 text-center text-muted-foreground'
-                  >
-                    Memuat data...
-                  </TableCell>
-                </TableRow>
-              ) : (data?.data || []).length === 0 ? (
-                <TableRow>
-                  <TableCell
-                    colSpan={permissions.canManageFinance ? 8 : 6}
-                    className='py-16 text-center text-muted-foreground'
-                  >
-                    Tidak ada data
-                  </TableCell>
-                </TableRow>
+               {isLoading ? (
+                 <TableRow>
+                   <TableCell
+                     colSpan={permissions.canManageFinance ? 9 : 7}
+                     className='animate-pulse py-16 text-center text-muted-foreground'
+                   >
+                     Memuat data...
+                   </TableCell>
+                 </TableRow>
+               ) : (data?.data || []).length === 0 ? (
+                 <TableRow>
+                   <TableCell
+                     colSpan={permissions.canManageFinance ? 9 : 7}
+                     className='py-16 text-center text-muted-foreground'
+                   >
+                     Tidak ada data
+                   </TableCell>
+                 </TableRow>
               ) : (
                 (data?.data || []).map((row: any) => (
                   <TableRow
@@ -929,9 +932,14 @@ export function FinanceBilling() {
                         {row.profile}
                       </Badge>
                     </TableCell>
-                    <TableCell className='text-right font-mono text-sm font-bold text-foreground/90 pr-4'>
+                    <TableCell className='text-right font-mono text-sm font-semibold text-muted-foreground pr-4'>
                       <PrivacyText>
-                        {fmt(parseFloat(row.harga || row.paid_amount || 0))}
+                        {fmt(parseFloat(row.harga || 0))}
+                      </PrivacyText>
+                    </TableCell>
+                    <TableCell className='text-right font-mono text-sm font-bold text-emerald-600 dark:text-emerald-400 pr-4'>
+                      <PrivacyText>
+                        {row.status === 'paid' ? fmt(parseFloat(row.paid_amount || row.harga || 0)) : '-'}
                       </PrivacyText>
                     </TableCell>
                     <TableCell className='text-center'>
