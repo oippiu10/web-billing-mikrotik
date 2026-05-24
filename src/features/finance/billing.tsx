@@ -936,7 +936,20 @@ export function FinanceBilling() {
                         {fmt(parseFloat(row.harga || 0))}
                       </PrivacyText>
                     </TableCell>
-                    <TableCell className='text-right font-mono text-sm font-bold text-emerald-600 dark:text-emerald-400 pr-4'>
+                    <TableCell 
+                      className={cn(
+                        'text-right font-mono text-sm font-bold pr-4 transition-all duration-150',
+                        row.status === 'paid' 
+                          ? 'text-emerald-600 dark:text-emerald-400 cursor-pointer hover:text-emerald-700 dark:hover:text-emerald-300 hover:underline decoration-dashed underline-offset-4' 
+                          : 'text-muted-foreground'
+                      )}
+                      onClick={() => {
+                        if (row.status === 'paid') {
+                          setHistoryUser({ id: row.user_id, username: row.username })
+                        }
+                      }}
+                      title={row.status === 'paid' ? 'Klik untuk melihat rincian riwayat angsuran' : undefined}
+                    >
                       <PrivacyText>
                         {row.status === 'paid' ? fmt(parseFloat(row.paid_amount || row.harga || 0)) : '-'}
                       </PrivacyText>
@@ -1717,15 +1730,34 @@ export function FinanceBilling() {
                               </span>
                             </div>
                             {pay.note && (
-                              <div className='mt-1 flex gap-1.5 rounded border border-border/30 bg-muted/40 p-1.5 leading-relaxed text-foreground/90'>
-                                <FileText className='mt-0.5 h-3 w-3 shrink-0 text-muted-foreground' />
-                                <div>
-                                  <p className='text-[8px] font-black text-muted-foreground uppercase'>
-                                    Catatan:
-                                  </p>
-                                  <p className='text-xs font-semibold italic'>
-                                    {pay.note}
-                                  </p>
+                              <div className='mt-2 space-y-1.5 border-t border-dashed border-border/30 pt-2 select-none'>
+                                <p className='text-[8px] font-black text-muted-foreground uppercase tracking-wider'>
+                                  Rincian Riwayat Setoran / Catatan:
+                                </p>
+                                <div className='space-y-1.5'>
+                                  {parseNote(pay.note).map((item) => (
+                                    <div
+                                      key={item.id}
+                                      className={cn(
+                                        'text-xs font-semibold px-2 py-1.5 rounded flex items-center gap-2 border leading-normal',
+                                        item.isStructured
+                                          ? 'bg-slate-50 dark:bg-slate-900/60 border-border/60 text-foreground font-mono text-[10px]'
+                                          : 'bg-muted/40 border-border/30 text-foreground/80 italic'
+                                      )}
+                                    >
+                                      {item.isStructured ? (
+                                        <div className='flex items-center gap-2 w-full'>
+                                          <div className='h-1.5 w-1.5 rounded-full bg-indigo-500 shrink-0 shadow-xs' />
+                                          <span className='w-full break-all'>{item.content}</span>
+                                        </div>
+                                      ) : (
+                                        <div className='flex items-center gap-2 w-full'>
+                                          <FileText className='h-3.5 w-3.5 shrink-0 text-muted-foreground' />
+                                          <span className='w-full'>{item.content}</span>
+                                        </div>
+                                      )}
+                                    </div>
+                                  ))}
                                 </div>
                               </div>
                             )}
@@ -1753,3 +1785,16 @@ export function FinanceBilling() {
     </>
   )
 }
+
+const parseNote = (noteText: string) => {
+  if (!noteText) return [];
+  const lines = noteText.split('\n').map(l => l.trim()).filter(Boolean);
+  return lines.map((line, idx) => {
+    const isStructured = line.startsWith('[') && line.includes(']');
+    if (isStructured) {
+      const content = line.substring(1, line.length - 1);
+      return { id: idx, content, isStructured: true };
+    }
+    return { id: idx, content: line, isStructured: false };
+  });
+};
