@@ -1585,6 +1585,32 @@ export function FinanceBilling() {
                     className='mt-1'
                     placeholder='Catatan tambahan...'
                   />
+                  {paidNote && paidNote.includes('[Angsuran:') && (
+                    <Button
+                      type='button'
+                      variant='outline'
+                      size='sm'
+                      onClick={() => {
+                        const lines = paidNote.split('\n');
+                        const awalLine = lines.find((l: string) => l.startsWith('[Awal:'));
+                        if (awalLine) {
+                          setPaidNote(awalLine);
+                          const match = awalLine.match(/\[Awal:\s*Rp\s*([\d.]+)/);
+                          if (match) {
+                            const awalAmt = parseFloat(match[1].replace(/\./g, ''));
+                            setPaidAmount(String(awalAmt));
+                          }
+                        } else {
+                          setPaidNote('');
+                          setPaidAmount(String(paidDialog?.harga || 0));
+                        }
+                        toast.success('Log angsuran dibersihkan! Nominal dikembalikan ke pembayaran awal.');
+                      }}
+                      className='mt-1 text-[10px] h-6 px-2 text-rose-500 border-rose-200 hover:bg-rose-50 dark:border-rose-950/30'
+                    >
+                      <RefreshCw className='mr-1 h-3 w-3' /> Reset Log Angsuran
+                    </Button>
+                  )}
                 </div>
               </>
             )}
@@ -1610,6 +1636,16 @@ export function FinanceBilling() {
                   } else {
                     const firstDesc = `[Awal: ${fmt(prevAmount)} tgl ${paidDialog.paid_at || paidDate} (${(paidDialog.method || 'CASH').toUpperCase()})${paidDialog.note ? ' - ' + paidDialog.note : ''}]`;
                     finalNote = `${firstDesc}\n${instDesc}`;
+                  }
+                } else if (paidDialog) {
+                  const match = paidNote.match(/\[Awal:\s*Rp\s*([\d.]+)/);
+                  const awalAmt = match ? parseFloat(match[1].replace(/\./g, '')) : 0;
+                  if (finalAmount === awalAmt && paidNote.includes('[Angsuran:')) {
+                    const lines = paidNote.split('\n');
+                    const awalLine = lines.find((l: string) => l.startsWith('[Awal:'));
+                    if (awalLine) {
+                      finalNote = awalLine;
+                    }
                   }
                 }
                 markPaid.mutate({
