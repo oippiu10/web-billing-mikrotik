@@ -6,6 +6,7 @@ import {
   Search,
   CheckCircle2,
   Clock,
+  AlertCircle,
   ChevronLeft,
   ChevronRight,
   ChevronsLeft,
@@ -944,15 +945,27 @@ export function FinanceBilling() {
                     </TableCell>
                     <TableCell className='text-center'>
                       {row.status === 'paid' ? (
-                        <div className="flex flex-col items-center gap-1">
-                          <Badge className='mx-auto flex w-[84px] items-center justify-center gap-1 border border-emerald-200/80 bg-emerald-50/80 px-2.5 py-1 text-[10px] font-extrabold tracking-wider text-emerald-700 uppercase hover:bg-emerald-50 dark:border-emerald-900/40 dark:bg-emerald-950/30 dark:text-emerald-400 rounded-full shadow-sm shadow-emerald-500/5'>
-                            <CheckCircle2 className='h-3.5 w-3.5 text-emerald-600 dark:text-emerald-400 shrink-0' />
-                            Lunas
-                          </Badge>
-                          {row.method && (
-                            <span className="text-[9px] font-bold text-muted-foreground uppercase tracking-wider">{row.method}</span>
-                          )}
-                        </div>
+                        parseFloat(row.paid_amount || 0) < parseFloat(row.harga || 0) ? (
+                          <div className="flex flex-col items-center gap-1">
+                            <Badge className='mx-auto flex w-[84px] items-center justify-center gap-1 border border-amber-200/80 bg-amber-50/80 px-2.5 py-1 text-[10px] font-extrabold tracking-wider text-amber-700 uppercase hover:bg-amber-50 dark:border-amber-900/40 dark:bg-amber-950/30 dark:text-amber-400 rounded-full shadow-sm shadow-amber-500/5'>
+                              <AlertCircle className='h-3.5 w-3.5 text-amber-600 dark:text-amber-400 shrink-0' />
+                              Kurang
+                            </Badge>
+                            <span className="text-[9px] font-bold text-rose-500 dark:text-rose-400 tracking-wider">
+                              -{fmt(parseFloat(row.harga || 0) - parseFloat(row.paid_amount || 0))}
+                            </span>
+                          </div>
+                        ) : (
+                          <div className="flex flex-col items-center gap-1">
+                            <Badge className='mx-auto flex w-[84px] items-center justify-center gap-1 border border-emerald-200/80 bg-emerald-50/80 px-2.5 py-1 text-[10px] font-extrabold tracking-wider text-emerald-700 uppercase hover:bg-emerald-50 dark:border-emerald-900/40 dark:bg-emerald-950/30 dark:text-emerald-400 rounded-full shadow-sm shadow-emerald-500/5'>
+                              <CheckCircle2 className='h-3.5 w-3.5 text-emerald-600 dark:text-emerald-400 shrink-0' />
+                              Lunas
+                            </Badge>
+                            {row.method && (
+                              <span className="text-[9px] font-bold text-muted-foreground uppercase tracking-wider">{row.method}</span>
+                            )}
+                          </div>
+                        )
                       ) : (
                         <Badge className='mx-auto flex w-[84px] items-center justify-center gap-1 border border-amber-200/80 bg-amber-50/80 px-2.5 py-1 text-[10px] font-extrabold tracking-wider text-amber-700 uppercase hover:bg-amber-50 dark:border-amber-900/40 dark:bg-amber-950/30 dark:text-amber-400 rounded-full shadow-sm shadow-amber-500/5'>
                           <Clock className='h-3.5 w-3.5 text-amber-600 dark:text-amber-400 shrink-0' />
