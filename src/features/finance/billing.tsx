@@ -1362,6 +1362,16 @@ export function FinanceBilling() {
                 className='mt-1 font-mono'
                 placeholder='0'
               />
+              {paidDialog && parseFloat(String(paidDialog.harga || 0)) > 0 && (
+                <div className='flex items-center justify-between text-[10px] font-bold text-muted-foreground bg-slate-100 dark:bg-slate-900 px-2 py-1.5 rounded-md mt-1.5 select-none'>
+                  <span>Paket: <span className='font-mono font-extrabold text-foreground'>{fmt(parseFloat(String(paidDialog.harga || 0)))}</span></span>
+                  {parseFloat(String(paidAmount || 0)) < parseFloat(String(paidDialog.harga || 0)) ? (
+                    <span className='text-rose-500 font-black uppercase tracking-wider scale-95'>Kurang: {fmt(parseFloat(String(paidDialog.harga || 0)) - parseFloat(String(paidAmount || 0)))}</span>
+                  ) : (
+                    <span className='text-emerald-600 font-black uppercase tracking-wider scale-95'>Lunas</span>
+                  )}
+                </div>
+              )}
             </div>
             <div>
               <label className='text-xs font-bold tracking-wide text-muted-foreground uppercase'>
