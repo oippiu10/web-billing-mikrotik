@@ -835,9 +835,6 @@ export function FinanceBilling() {
                 <TableHead className={cn('text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider', !permissions.canManageFinance && 'pl-4')}>
                   Username
                 </TableHead>
-                <TableHead className='hidden text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider md:table-cell'>
-                  Alamat
-                </TableHead>
                 <TableHead className='text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider'>
                   Paket
                 </TableHead>
@@ -864,7 +861,7 @@ export function FinanceBilling() {
                {isLoading ? (
                  <TableRow>
                    <TableCell
-                     colSpan={permissions.canManageFinance ? 9 : 7}
+                     colSpan={permissions.canManageFinance ? 8 : 6}
                      className='animate-pulse py-16 text-center text-muted-foreground'
                    >
                      Memuat data...
@@ -873,7 +870,7 @@ export function FinanceBilling() {
                ) : (data?.data || []).length === 0 ? (
                  <TableRow>
                    <TableCell
-                     colSpan={permissions.canManageFinance ? 9 : 7}
+                     colSpan={permissions.canManageFinance ? 8 : 6}
                      className='py-16 text-center text-muted-foreground'
                    >
                      Tidak ada data
@@ -922,9 +919,7 @@ export function FinanceBilling() {
                         </Badge>
                       </div>
                     </TableCell>
-                    <TableCell className='hidden max-w-[180px] truncate text-xs text-muted-foreground md:table-cell'>
-                      <PrivacyText>{row.alamat || '-'}</PrivacyText>
-                    </TableCell>
+
                     <TableCell>
                       <Badge
                         variant='secondary'
