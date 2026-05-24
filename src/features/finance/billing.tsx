@@ -973,7 +973,11 @@ export function FinanceBilling() {
                               Lunas
                             </Badge>
                             {row.note && row.note.includes('[Angsuran:') ? (
-                              <span className="text-[9px] font-extrabold text-indigo-600 dark:text-indigo-400 uppercase tracking-wider flex items-center gap-0.5 select-none bg-indigo-50/50 dark:bg-indigo-950/20 px-1.5 py-0.5 rounded border border-indigo-100/50 dark:border-indigo-900/20 mt-0.5 scale-95 shadow-2xs">
+                              <span 
+                                onClick={() => setHistoryUser({ id: row.user_id, username: row.username })}
+                                className="text-[9px] font-extrabold text-indigo-600 dark:text-indigo-400 uppercase tracking-wider flex items-center gap-0.5 select-none bg-indigo-50/50 dark:bg-indigo-950/20 hover:bg-indigo-100/60 dark:hover:bg-indigo-950/50 hover:text-indigo-700 dark:hover:text-indigo-300 cursor-pointer px-1.5 py-0.5 rounded border border-indigo-100/50 dark:border-indigo-900/20 mt-0.5 scale-95 shadow-2xs transition-all duration-150"
+                                title="Klik untuk melihat rincian riwayat angsuran"
+                              >
                                 <History className="h-2.5 w-2.5 text-indigo-500 shrink-0" /> Angsuran
                               </span>
                             ) : row.method ? (
