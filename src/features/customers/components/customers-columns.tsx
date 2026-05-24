@@ -127,23 +127,6 @@ export const columns: ColumnDef<Customer>[] = [
     enableSorting: true,
   },
   {
-      accessorKey: 'disabled',
-      header: ({ column }) => (
-        <DataTableColumnHeader column={column} title='Active' />
-      ),
-      cell: ({ row }) => {
-        const disabled = row.getValue('disabled') === 'yes'
-        return (
-          <div className="flex items-center gap-1.5">
-             <Shield className={cn("h-4 w-4", disabled ? "text-destructive" : "text-green-600")} />
-             <span className={cn("text-xs font-medium", disabled ? "text-destructive" : "text-green-600")}>
-                {disabled ? 'Disabled' : 'Enabled'}
-             </span>
-          </div>
-        )
-      }
-  },
-  {
     accessorKey: 'remote-address',
     header: ({ column }) => (
       <DataTableColumnHeader column={column} title='IP Address' />
