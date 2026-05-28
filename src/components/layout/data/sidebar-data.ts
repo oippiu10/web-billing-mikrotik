@@ -28,6 +28,7 @@ import {
   Ticket,
   FileText,
   DatabaseBackup,
+  MessageSquare,
 } from 'lucide-react'
 import { type SidebarData } from '../types'
 
@@ -213,9 +214,20 @@ export const sidebarData: SidebarData = {
 
         {
           title: 'Automation',
-          url: '/automation',
           icon: Bot,
           requiredRoles: ['admin', 'administrator', 'super_admin', 'super admin', 'superadministrator'],
+          items: [
+            {
+              title: 'Automation Center',
+              url: '/automation',
+              icon: Bot,
+            },
+            {
+              title: 'WhatsApp Center',
+              url: '/automation/whatsapp-center',
+              icon: MessageSquare,
+            },
+          ],
         },
         {
           title: 'Helpdesk / Ticketing',

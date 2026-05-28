@@ -120,7 +120,7 @@ export function BatchEditCustomers({
   return (
     <div className="flex flex-col h-full bg-background border rounded-2xl overflow-hidden shadow-2xl animate-in fade-in slide-in-from-bottom-4 duration-500">
       {/* Header Premium */}
-      <div className="flex flex-col border-b bg-gradient-to-r from-muted/50 to-background">
+      <div className="flex flex-col border-b bg-linear-to-r from-muted/50 to-background">
         <div className="flex flex-wrap items-center justify-between px-6 py-4 md:px-8 md:py-6 gap-4">
             <div className="flex items-center gap-3 md:gap-5">
             <Button variant="outline" size="icon" onClick={onClose} className="rounded-xl hover:bg-red-50 hover:text-red-600 hover:border-red-100 transition-all shrink-0">

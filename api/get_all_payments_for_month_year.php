@@ -114,19 +114,21 @@ while ($row = $result->fetch_assoc()) {
 }
 $dataStmt->close();
 
-// 3. Summary (Dynamic based on search and filters)
+// 3. Summary (Static for the whole month, ignoring search/filters)
+$sumWhereSQL = "WHERE u.router_id = ?";
+$sumParams = [$month, $year, $router_id];
+$sumTypes = "iis";
+
 $sumSQL = "SELECT 
              SUM(IF(p.id IS NOT NULL, 1, 0)) as total_paid,
              SUM(IF(p.id IS NULL, 1, 0)) as total_unpaid,
-             SUM(IFNULL(p.amount, 0)) as collected,
+             SUM(CASE WHEN p.method != 'titipan' THEN IFNULL(p.amount, 0) ELSE 0 END) as collected,
              SUM(IF(p.id IS NULL, IFNULL(pr.price, 0), 0)) as receivable,
              SUM(IFNULL(pr.price, 0)) as target_amount
            FROM $tables 
-           $whereSQL";
+           $sumWhereSQL";
 $sumStmt = $conn->prepare($sumSQL);
-if ($types) {
-    $sumStmt->bind_param($types, ...$params);
-}
+$sumStmt->bind_param($sumTypes, ...$sumParams);
 $sumStmt->execute();
 $sumResult = $sumStmt->get_result()->fetch_assoc();
 $paid = (int)($sumResult['total_paid'] ?? 0);

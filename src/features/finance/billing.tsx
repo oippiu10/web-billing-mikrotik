@@ -1,5 +1,15 @@
-import { useState } from 'react'
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
+import { useState, useMemo, useCallback } from 'react'
+import {
+  useReactTable,
+  getCoreRowModel,
+  getSortedRowModel,
+  flexRender,
+  type SortingState
+} from '@tanstack/react-table'
+import { getBillingColumns } from './components/billing-columns'
+
+import { useQuery, useMutation, useQueryClient, keepPreviousData } from '@tanstack/react-query'
+import { useNavigate, useSearch } from '@tanstack/react-router'
 import {
   Receipt,
   Download,
@@ -57,6 +67,7 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { Checkbox } from '@/components/ui/checkbox'
+import { Skeleton } from '@/components/ui/skeleton'
 import {
   Table,
   TableBody,
@@ -72,6 +83,10 @@ import { ProfileDropdown } from '@/components/profile-dropdown'
 import { RouterSelector } from '@/components/router-selector'
 import { ThemeSwitch } from '@/components/theme-switch'
 import { FinanceSubNav } from './components/finance-sub-nav'
+import { useConfirm } from '@/hooks/use-confirm'
+import { PaymentDialog } from './components/payment-dialog'
+import { printBulkThermal, printThermal, printBulkInvoice, printInvoice } from './utils/print-templates'
+import { HistoryDialog } from './components/history-dialog'
 
 const MONTHS_ID = [
   'Januari',
@@ -94,74 +109,55 @@ const fmt = (n: number) =>
     maximumFractionDigits: 0,
   }).format(n)
 
-const escapeHtml = (value: unknown) =>
-  String(value ?? '-')
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-    .replace(/'/g, '&#039;')
 
-const printInvoice = (row: any, month: number, year: number) => {
-  const invoiceNo = `INV-${year}${String(month).padStart(2, '0')}-${row.user_id || row.id || row.username}`
-  const amount = fmt(parseFloat(row.harga || row.paid_amount || 0))
-  const status = row.status === 'paid' ? 'LUNAS' : 'BELUM BAYAR'
-  const html = `<!doctype html>
-<html>
-<head>
-  <title>${escapeHtml(invoiceNo)}</title>
-  <style>
-    body{font-family:Arial,sans-serif;margin:0;padding:32px;color:#111827;background:#f3f4f6}
-    .paper{max-width:760px;margin:auto;background:white;padding:32px;border-radius:16px;box-shadow:0 10px 35px rgba(0,0,0,.08)}
-    .top{display:flex;justify-content:space-between;gap:24px;border-bottom:2px solid #111827;padding-bottom:18px;margin-bottom:24px}
-    h1{margin:0;font-size:28px}.muted{color:#6b7280;font-size:13px}.badge{display:inline-block;padding:8px 12px;border-radius:999px;font-weight:800;font-size:12px;background:${row.status === 'paid' ? '#dcfce7;color:#166534' : '#ffedd5;color:#9a3412'}}
-    table{width:100%;border-collapse:collapse;margin-top:24px}td,th{padding:12px;border-bottom:1px solid #e5e7eb;text-align:left}th{font-size:12px;text-transform:uppercase;color:#6b7280}.right{text-align:right}.total{font-size:22px;font-weight:900}.footer{margin-top:32px;font-size:12px;color:#6b7280;text-align:center}@media print{body{background:white;padding:0}.paper{box-shadow:none;border-radius:0}.no-print{display:none}}
-  </style>
-</head>
-<body>
-  <div class='paper'>
-    <div class='top'>
-      <div><h1>Invoice Tagihan</h1><div class='muted'>Web Billing MikroTik</div></div>
-      <div style='text-align:right'><strong>${escapeHtml(invoiceNo)}</strong><br/><span class='muted'>Periode ${MONTHS_ID[month - 1]} ${year}</span><br/><br/><span class='badge'>${status}</span></div>
-    </div>
-    <table>
-      <tr><th>Pelanggan</th><td>${escapeHtml(row.username)}</td></tr>
-      <tr><th>Alamat</th><td>${escapeHtml(row.alamat)}</td></tr>
-      <tr><th>Paket</th><td>${escapeHtml(row.profile)}</td></tr>
-      <tr><th>Tanggal Bayar</th><td>${escapeHtml(row.paid_at || '-')}</td></tr>
-    </table>
-    <table>
-      <thead><tr><th>Deskripsi</th><th class='right'>Nominal</th></tr></thead>
-      <tbody><tr><td>Tagihan internet ${escapeHtml(MONTHS_ID[month - 1])} ${year}</td><td class='right'>${amount}</td></tr></tbody>
-      <tfoot><tr><td class='total'>Total</td><td class='right total'>${amount}</td></tr></tfoot>
-    </table>
-    <div class='footer'>Terima kasih atas pembayaran Anda. Simpan invoice ini sebagai bukti pembayaran.</div>
-    <p class='no-print' style='text-align:center;margin-top:24px'><button onclick='window.print()' style='padding:10px 18px;border:0;border-radius:10px;background:#111827;color:white;font-weight:700'>Print / Save PDF</button></p>
-  </div>
-</body>
-</html>`
-  const win = window.open('', '_blank', 'width=900,height=700')
-  if (!win) return
-  win.document.write(html)
-  win.document.close()
-  win.focus()
-}
 
 export function FinanceBilling() {
+  const navigate = useNavigate()
   const { activeRouter } = useRouterStore()
   const queryClient = useQueryClient()
   const privacyMode = usePrivacyStore((state) => state.privacyMode)
   const permissions = usePermission()
   const now = new Date()
 
-  const [month, setMonth] = useState(now.getMonth() + 1)
-  const [year, setYear] = useState(now.getFullYear())
-  const [search, setSearch] = useState('')
-  const [status, setStatus] = useState('')
-  const [profile, setProfile] = useState('')
-  const [tipe, setTipe] = useState('')
+  // Custom Confirm Dialog Hook
+  const { confirm: confirmAction, ConfirmDialog } = useConfirm()
+
+  const searchParams = useSearch({ strict: false }) as any
+  
+  const month = searchParams.month || (now.getMonth() + 1)
+  const year = searchParams.year || now.getFullYear()
+  const search = searchParams.search || ''
+  const status = searchParams.status || ''
+  const profile = searchParams.profile || ''
+  const tipe = searchParams.tipe || ''
+
+  const updateSearch = (updates: any) => {
+    navigate({
+      to: '/finance/billing',
+      search: {
+        month,
+        year,
+        search: search || undefined,
+        status: status || undefined,
+        profile: profile || undefined,
+        tipe: tipe || undefined,
+        ...updates
+      },
+      replace: true,
+    })
+  }
+
+  const setMonth = (m: number) => updateSearch({ month: m })
+  const setYear = (y: number) => updateSearch({ year: y })
+  const setSearch = (s: string) => updateSearch({ search: s || undefined })
+  const setStatus = (s: string) => updateSearch({ status: s || undefined })
+  const setProfile = (p: string) => updateSearch({ profile: p || undefined })
+  const setTipe = (t: string) => updateSearch({ tipe: t || undefined })
   const [page, setPage] = useState(1)
-  const [perPage, setPerPage] = useState(20)
+  const [perPage, setPerPage] = useState(() => {
+    const saved = localStorage.getItem('billing-per-page')
+    return saved ? parseInt(saved) : 20
+  })
 
   // Selection states
   const [selectedRows, setSelectedRows] = useState<Set<number>>(new Set())
@@ -169,13 +165,9 @@ export function FinanceBilling() {
   // Paid dialog
   const [paidDialog, setPaidDialog] = useState<any>(null)
   const [bulkPaidDialog, setBulkPaidDialog] = useState<boolean>(false)
-  const [paidAmount, setPaidAmount] = useState('')
   const [paidDate, setPaidDate] = useState(now.toISOString().slice(0, 10))
   const [paidMethod, setPaidMethod] = useState('cash')
   const [paidNote, setPaidNote] = useState('')
-  const [isInstallmentMode, setIsInstallmentMode] = useState(false)
-  const [installmentAmount, setInstallmentAmount] = useState('')
-  const [installmentNote, setInstallmentNote] = useState('')
 
   // History dialog state
   const [historyUser, setHistoryUser] = useState<any>(null)
@@ -221,6 +213,7 @@ export function FinanceBilling() {
       return res.data
     },
     enabled: !!activeRouter,
+    placeholderData: keepPreviousData,
   })
 
   // Profiles dari backend supaya filter tetap lengkap walau halaman/pencarian sedang terbatas
@@ -233,7 +226,7 @@ export function FinanceBilling() {
         router_id: activeRouter?.software_id || activeRouter?.id,
         username: row.username,
         payment_id: row.user_id,
-        amount: row.calculatedAmount !== undefined ? row.calculatedAmount : (parseFloat(paidAmount) || parseFloat(row.harga) || 0),
+        amount: row.calculatedAmount !== undefined ? row.calculatedAmount : (parseFloat(row.harga) || 0),
         paid_date: row.calculatedDate !== undefined ? row.calculatedDate : paidDate,
         method: row.calculatedMethod !== undefined ? row.calculatedMethod : paidMethod,
         note: row.calculatedNote !== undefined ? row.calculatedNote : paidNote,
@@ -310,10 +303,16 @@ export function FinanceBilling() {
     },
   })
 
-  const handleDeleteAngsuran = (pay: any, itemContent: string, itemRawLine: string) => {
-    if (!window.confirm(`Apakah Anda yakin ingin menghapus angsuran ini?\n\n"${itemContent}"\n\nNominal pembayaran akan otomatis dikurangkan kembali.`)) {
-      return;
-    }
+  const handleDeleteAngsuran = async (pay: any, itemContent: string, itemRawLine: string) => {
+    const ok = await confirmAction({
+      title: 'Hapus Angsuran',
+      description: `Apakah Anda yakin ingin menghapus angsuran "${itemContent}"?\n\nNominal pembayaran akan otomatis dikurangkan kembali.`,
+      confirmText: 'Hapus Angsuran',
+      cancelText: 'Batal',
+      variant: 'destructive',
+    })
+
+    if (!ok) return
 
     // 1. Extract amount from the raw line
     const match = itemRawLine.match(/(?:\+?Rp\s*)([\d.]+)/);
@@ -345,28 +344,32 @@ export function FinanceBilling() {
     });
   };
 
-  const toggleSelectAll = () => {
-    if (selectedRows.size === (data?.data || []).length && data?.data?.length > 0) {
-      setSelectedRows(new Set())
-    } else {
-      setSelectedRows(new Set((data?.data || []).map((r: any) => r.user_id)))
-    }
-  }
+  const toggleSelectAll = useCallback(() => {
+    const tableData = data?.data || []
+    setSelectedRows(prev => {
+      if (prev.size === tableData.length && tableData.length > 0) {
+        return new Set()
+      }
+      return new Set(tableData.map((r: any) => r.user_id))
+    })
+  }, [data?.data])
 
-  const toggleSelectRow = (userId: number) => {
-    const newSet = new Set(selectedRows)
-    if (newSet.has(userId)) newSet.delete(userId)
-    else newSet.add(userId)
-    setSelectedRows(newSet)
-  }
+  const toggleSelectRow = useCallback((userId: number) => {
+    setSelectedRows(prev => {
+      const newSet = new Set(prev)
+      if (newSet.has(userId)) newSet.delete(userId)
+      else newSet.add(userId)
+      return newSet
+    })
+  }, [])
 
   const humanizeName = (username: string) => {
     if (!username) return 'Pelanggan'
-    let name = username.includes('@') ? (username.split('@').pop() || username) : username
+    const name = username.includes('@') ? (username.split('@').pop() || username) : username
     return name.charAt(0).toUpperCase() + name.slice(1)
   }
 
-  const handleWA = (row: any) => {
+  const handleWA = useCallback((row: any) => {
     const phone = row.wa?.replace(/^0/, '62') || ''
     if (!phone) {
       toast.error('Nomor WA tidak tersedia untuk pelanggan ini')
@@ -383,236 +386,11 @@ export function FinanceBilling() {
       msg = `Halo Saudara/i *${customerName}*,\nKami informasikan bahwa tagihan internet Anda untuk periode *${bulan} ${year}* sebesar *${amount}* telah terbit.\n\nMohon untuk segera melakukan pembayaran agar layanan internet tetap berjalan lancar.\n\nTerima kasih,\n*Admin Internet*`
     }
     
-    window.open(`https://wa.me/${phone}?text=${encodeURIComponent(msg)}`, '_blank')
-  }
-
-  const printBulkThermal = () => {
-    const usersToPrint = (data?.data || []).filter((r: any) => selectedRows.has(r.user_id))
-    if (usersToPrint.length === 0) return
-
-    let html = `<!doctype html><html><head><title>Cetak Massal Struk Thermal</title><style>
-    body{font-family:'Courier New',Courier,monospace;margin:0;padding:0;background:white;color:black;font-size:12px;width:58mm}
-    @page{margin:0}
-    .page-break{page-break-after:always}
-    .center{text-align:center}.bold{font-weight:bold}.line{border-bottom:1px dashed black;margin:5px 0}.table{width:100%}.table td{vertical-align:top;padding:2px 0}.right{text-align:right}.mb-1{margin-bottom:5px}.mb-2{margin-bottom:10px}.mt-2{margin-top:10px}
-    @media print{.no-print{display:none}body{width:58mm}}
-    </style></head><body>
-    <div class="no-print center" style="padding:10px"><button onclick="window.print()" style="padding:8px 16px;background:black;color:white;border-radius:4px;cursor:pointer">Print Thermal (${usersToPrint.length})</button></div>
-    `
-
-    usersToPrint.forEach((row: any, i: number) => {
-      const invoiceNo = `INV-${year}${String(month).padStart(2, '0')}-${row.user_id || row.id || row.username}`
-      const amount = fmt(parseFloat(row.harga || row.paid_amount || 0))
-      const statusText = row.status === 'paid' ? 'LUNAS' : 'BELUM BAYAR'
-      
-      html += `
-      <div style="padding:5px;">
-        <div class="center bold mb-1" style="font-size:14px">WIFIKU NET</div>
-        <div class="center mb-2">BUKTI PEMBAYARAN</div>
-        <div class="line"></div>
-        <table class="table">
-          <tr><td>No</td><td class="right">${invoiceNo}</td></tr>
-          <tr><td>Tgl</td><td class="right">${row.paid_at || new Date().toISOString().slice(0, 10)}</td></tr>
-          <tr><td>Plg</td><td class="right">${humanizeName(row.username)}</td></tr>
-          <tr><td>Bln</td><td class="right">${MONTHS_ID[month - 1]} ${year}</td></tr>
-        </table>
-        <div class="line"></div>
-        <table class="table">
-          <tr><td>Internet</td><td class="right">${amount}</td></tr>
-          <tr><td colspan="2"><div class="line"></div></td></tr>
-          <tr><td class="bold">TOTAL</td><td class="right bold">${amount}</td></tr>
-        </table>
-        <div class="center mt-2">
-          STATUS: <span class="bold">${statusText}</span>
-        </div>
-        <div class="center" style="font-size:10px;margin-top:10px">Terima kasih atas pembayaran Anda.</div>
-      </div>
-      ${i < usersToPrint.length - 1 ? '<div class="page-break"></div>' : ''}
-      `
+    navigate({
+      to: '/automation/whatsapp-center',
+      search: { phone: phone, text: msg }
     })
-
-    html += '</body></html>'
-    const w = window.open('', '_blank')
-    w?.document.write(html)
-    w?.document.close()
-  }
-
-  const printThermal = (row: any, month: number, year: number) => {
-    const invoiceNo = `INV-${year}${String(month).padStart(2, '0')}-${row.user_id || row.id || row.username}`
-    const amount = fmt(parseFloat(row.harga || row.paid_amount || 0))
-    const statusText = row.status === 'paid' ? 'LUNAS' : 'BELUM BAYAR'
-
-    const html = `<!doctype html><html><head><title>Cetak Struk Thermal - ${row.username}</title><style>
-    body{font-family:'Courier New',Courier,monospace;margin:0;padding:0;background:white;color:black;font-size:12px;width:58mm}
-    @page{margin:0}
-    .center{text-align:center}.bold{font-weight:bold}.line{border-bottom:1px dashed black;margin:5px 0}.table{width:100%}.table td{vertical-align:top;padding:2px 0}.right{text-align:right}.mb-1{margin-bottom:5px}.mb-2{margin-bottom:10px}.mt-2{margin-top:10px}
-    @media print{.no-print{display:none}body{width:58mm}}
-    </style></head><body>
-    <div class="no-print center" style="padding:10px"><button onclick="window.print()" style="padding:8px 16px;background:black;color:white;border-radius:4px;cursor:pointer">Print Thermal</button></div>
-    <div style="padding:5px;">
-      <div class="center bold mb-1" style="font-size:14px">WIFIKU NET</div>
-      <div class="center mb-2">BUKTI PEMBAYARAN</div>
-      <div class="line"></div>
-      <table class="table">
-        <tr><td>No</td><td class="right">${invoiceNo}</td></tr>
-        <tr><td>Tgl</td><td class="right">${row.paid_at || new Date().toISOString().slice(0, 10)}</td></tr>
-        <tr><td>Plg</td><td class="right">${humanizeName(row.username)}</td></tr>
-        <tr><td>Bln</td><td class="right">${MONTHS_ID[month - 1]} ${year}</td></tr>
-      </table>
-      <div class="line"></div>
-      <table class="table">
-        <tr><td>Internet</td><td class="right">${amount}</td></tr>
-        <tr><td colspan="2"><div class="line"></div></td></tr>
-        <tr><td class="bold">TOTAL</td><td class="right bold">${amount}</td></tr>
-      </table>
-      <div class="center mt-2">
-        STATUS: <span class="bold">${statusText}</span>
-      </div>
-      <div class="center" style="font-size:10px;margin-top:10px">Terima kasih atas pembayaran Anda.</div>
-    </div>
-    <script>window.onload=()=>window.print();</script>
-    </body></html>`
-
-    const w = window.open('', '_blank')
-    w?.document.write(html)
-    w?.document.close()
-  }
-
-  const printBulkInvoice = () => {
-    const usersToPrint = (data?.data || []).filter((r: any) => selectedRows.has(r.user_id))
-    if (usersToPrint.length === 0) return
-
-    let html = `<!doctype html><html><head><title>Cetak Massal Invoice</title><style>
-    body{font-family:Arial,sans-serif;margin:0;padding:0;background:#f3f4f6}
-    .page-break{page-break-after:always}
-    .paper{max-width:760px;margin:20px auto;background:white;padding:32px;border-radius:16px;box-shadow:0 10px 35px rgba(0,0,0,.08)}
-    .top{display:flex;justify-content:space-between;gap:24px;border-bottom:2px solid #111827;padding-bottom:18px;margin-bottom:24px}
-    h1{margin:0;font-size:28px}.muted{color:#6b7280;font-size:13px}.badge{display:inline-block;padding:8px 12px;border-radius:999px;font-weight:800;font-size:12px}
-    .paid{background:#dcfce7;color:#166534}.unpaid{background:#ffedd5;color:#9a3412}
-    table{width:100%;border-collapse:collapse;margin-top:24px}td,th{padding:12px;border-bottom:1px solid #e5e7eb;text-align:left}th{font-size:12px;text-transform:uppercase;color:#6b7280}.right{text-align:right}.total{font-size:22px;font-weight:900}.footer{margin-top:32px;font-size:12px;color:#6b7280;text-align:center}@media print{body{background:white}.paper{box-shadow:none;margin:0;border-radius:0;padding:20px 0}.no-print{display:none}}
-    </style></head><body>
-    <div class="no-print" style="text-align:center;padding:20px"><button onclick="window.print()" style="padding:10px 20px;background:#111827;color:white;border-radius:8px;font-weight:bold;cursor:pointer">Print Semua (${usersToPrint.length} Invoice)</button></div>
-    `
-
-    usersToPrint.forEach((row: any, i: number) => {
-      const invoiceNo = `INV-${year}${String(month).padStart(2, '0')}-${row.user_id || row.id || row.username}`
-      const amount = fmt(parseFloat(row.harga || row.paid_amount || 0))
-      const statusClass = row.status === 'paid' ? 'paid' : 'unpaid'
-      const statusText = row.status === 'paid' ? 'LUNAS' : 'BELUM BAYAR'
-      
-      html += `
-      <div class="paper">
-        <div class="top">
-          <div>
-            <h1>INVOICE TAGIHAN</h1>
-            <div class="muted">No: ${invoiceNo} &bull; Tgl: ${new Date().toISOString().slice(0, 10)}</div>
-          </div>
-          <div style="text-align:right">
-            <div class="badge ${statusClass}">${statusText}</div>
-            <div style="margin-top:8px;font-weight:bold;font-size:18px">WIFIKU NET</div>
-          </div>
-        </div>
-        
-        <div style="margin-bottom:24px">
-          <div class="muted" style="margin-bottom:4px">Ditagihkan kepada:</div>
-          <div style="font-weight:bold;font-size:16px">Saudara/i ${humanizeName(row.username)}</div>
-          <div class="muted">${row.wa || ''}</div>
-        </div>
-
-        <table>
-          <thead>
-            <tr><th>Deskripsi Layanan</th><th class="right">Jumlah</th></tr>
-          </thead>
-          <tbody>
-            <tr>
-              <td>Layanan Internet WiFi<br><span class="muted">Periode: ${MONTHS_ID[month - 1]} ${year}</span></td>
-              <td class="right" style="font-weight:bold">${amount}</td>
-            </tr>
-            <tr><td colspan="2" style="border-bottom:none;padding-top:24px"></td></tr>
-            <tr>
-              <td class="right" style="font-size:14px">TOTAL TAGIHAN</td>
-              <td class="right total">${amount}</td>
-            </tr>
-          </tbody>
-        </table>
-        
-        <div class="footer">
-          Terima kasih telah menggunakan layanan WiFiKu Net.<br>
-          Simpan invoice ini sebagai bukti pembayaran yang sah.
-        </div>
-      </div>
-      ${i < usersToPrint.length - 1 ? '<div class="page-break"></div>' : ''}
-      `
-    })
-
-    html += '</body></html>'
-    const w = window.open('', '_blank')
-    w?.document.write(html)
-    w?.document.close()
-  }
-
-  const printInvoice = (row: any, month: number, year: number) => {
-    const invoiceNo = `INV-${year}${String(month).padStart(2, '0')}-${row.user_id || row.id || row.username}`
-    const amount = fmt(parseFloat(row.harga || row.paid_amount || 0))
-    const statusClass = row.status === 'paid' ? 'paid' : 'unpaid'
-    const statusText = row.status === 'paid' ? 'LUNAS' : 'BELUM BAYAR'
-
-    const html = `<!doctype html><html><head><title>Invoice ${row.username}</title><style>
-    body{font-family:Arial,sans-serif;margin:0;padding:0;background:#f3f4f6}
-    .paper{max-width:760px;margin:40px auto;background:white;padding:48px;border-radius:16px;box-shadow:0 10px 35px rgba(0,0,0,.08)}
-    .top{display:flex;justify-content:space-between;gap:24px;border-bottom:2px solid #111827;padding-bottom:24px;margin-bottom:32px}
-    h1{margin:0;font-size:32px}.muted{color:#6b7280;font-size:14px}.badge{display:inline-block;padding:8px 16px;border-radius:999px;font-weight:800;font-size:12px}
-    .paid{background:#dcfce7;color:#166534}.unpaid{background:#ffedd5;color:#9a3412}
-    table{width:100%;border-collapse:collapse;margin-top:32px}td,th{padding:16px;border-bottom:1px solid #e5e7eb;text-align:left}th{font-size:12px;text-transform:uppercase;color:#6b7280}.right{text-align:right}.total{font-size:24px;font-weight:900}.footer{margin-top:48px;font-size:13px;color:#6b7280;text-align:center}@media print{body{background:white}.paper{box-shadow:none;margin:0;border-radius:0;padding:20px}.no-print{display:none}}
-    </style></head><body>
-    <div class="no-print" style="text-align:center;padding:20px"><button onclick="window.print()" style="padding:10px 20px;background:#111827;color:white;border-radius:8px;font-weight:bold;cursor:pointer">Print Invoice</button></div>
-    <div class="paper">
-      <div class="top">
-        <div>
-          <h1>INVOICE TAGIHAN</h1>
-          <div class="muted">No: ${invoiceNo} &bull; Tgl: ${new Date().toISOString().slice(0, 10)}</div>
-        </div>
-        <div style="text-align:right">
-          <div class="badge ${statusClass}">${statusText}</div>
-          <div style="margin-top:12px;font-weight:bold;font-size:20px">WIFIKU NET</div>
-        </div>
-      </div>
-      
-      <div style="margin-bottom:32px">
-        <div class="muted" style="margin-bottom:4px">Ditagihkan kepada:</div>
-        <div style="font-weight:bold;font-size:18px">Saudara/i ${humanizeName(row.username)}</div>
-        <div class="muted">${row.wa || ''}</div>
-      </div>
-
-      <table>
-        <thead>
-          <tr><th>Deskripsi Layanan</th><th class="right">Jumlah</th></tr>
-        </thead>
-        <tbody>
-          <tr>
-            <td>Layanan Internet WiFi<br><span class="muted">Periode: ${MONTHS_ID[month - 1]} ${year}</span></td>
-            <td class="right" style="font-weight:bold">${amount}</td>
-          </tr>
-          <tr><td colspan="2" style="border-bottom:none;padding-top:32px"></td></tr>
-          <tr>
-            <td class="right" style="font-size:16px">TOTAL TAGIHAN</td>
-            <td class="right total">${amount}</td>
-          </tr>
-        </tbody>
-      </table>
-      
-      <div class="footer">
-        Terima kasih telah menggunakan layanan WiFiKu Net.<br>
-        Simpan invoice ini sebagai bukti pembayaran yang sah.
-      </div>
-    </div>
-    <script>window.onload=()=>window.print();</script>
-    </body></html>`
-
-    const w = window.open('', '_blank')
-    w?.document.write(html)
-    w?.document.close()
-  }
+  }, [month, year, navigate])
 
   const summary = data?.summary || {
     paid: 0,
@@ -624,7 +402,41 @@ export function FinanceBilling() {
   }
   const totalPages = Math.ceil((data?.total || 0) / perPage)
 
-  const exportUrl = `/api/payment_operations.php?action=export&router_id=${activeRouter?.software_id || activeRouter?.id}&month=${month}&year=${year}&search=${search}`
+  const exportUrl = `/api/export_excel.php?action=billing&router_id=${activeRouter?.software_id || activeRouter?.id}&month=${month}&year=${year}&search=${encodeURIComponent(search)}`
+
+  const [sorting, setSorting] = useState<SortingState>([])
+
+  const tableData = useMemo(() => data?.data || [], [data?.data])
+  
+  const markUnpaidMutate = markUnpaid.mutate
+  
+  const columns = useMemo(() => getBillingColumns({
+    permissions,
+    selectedRows,
+    toggleSelectRow,
+    toggleSelectAll,
+    setHistoryUser,
+    setPaidDialog,
+    handleWA,
+    confirmAction,
+    markUnpaid: markUnpaidMutate,
+    month,
+    year,
+    dataLength: tableData.length,
+    fmt
+  }), [permissions, selectedRows, toggleSelectRow, toggleSelectAll, setHistoryUser, setPaidDialog, handleWA, confirmAction, markUnpaidMutate, month, year, tableData.length])
+
+  // eslint-disable-next-line react-hooks/incompatible-library
+  const table = useReactTable({
+    data: tableData,
+    columns,
+    state: {
+      sorting,
+    },
+    onSortingChange: setSorting,
+    getCoreRowModel: getCoreRowModel(),
+    getSortedRowModel: getSortedRowModel(),
+  })
 
   return (
     <>
@@ -837,9 +649,14 @@ export function FinanceBilling() {
               variant='ghost'
               className='h-9 text-xs font-semibold text-muted-foreground hover:text-foreground gap-1.5 rounded-lg'
               onClick={() => {
-                setSearch('')
-                setStatus('')
-                setProfile('')
+                navigate({
+                  to: '/finance/billing',
+                  search: {
+                    month: now.getMonth() + 1,
+                    year: now.getFullYear(),
+                  },
+                  replace: true
+                })
                 setPage(1)
               }}
             >
@@ -862,293 +679,65 @@ export function FinanceBilling() {
         <Card className='overflow-hidden border border-border/80 shadow-lg rounded-xl bg-card'>
           <div className='overflow-x-auto w-full'>
             <Table>
-            <TableHeader className='bg-slate-50/75 dark:bg-slate-900/60 border-b border-border/60'>
-              <TableRow>
-                {permissions.canManageFinance && (
-                  <TableHead className='w-12 pl-4'>
-                    <Checkbox 
-                      checked={data?.data?.length > 0 && selectedRows.size === data.data.length}
-                      onCheckedChange={toggleSelectAll}
-                    />
-                  </TableHead>
-                )}
-                <TableHead className={cn('text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider', !permissions.canManageFinance && 'pl-4')}>
-                  Username
-                </TableHead>
-                <TableHead className='text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider'>
-                  Paket
-                </TableHead>
-                <TableHead className='text-right pr-4 text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider'>
-                  Tagihan
-                </TableHead>
-                <TableHead className='text-right pr-4 text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider'>
-                  Bayar
-                </TableHead>
-                <TableHead className='text-center text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider'>
-                  Status
-                </TableHead>
-                <TableHead className='hidden text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider lg:table-cell'>
-                  Tgl Bayar
-                </TableHead>
-                {permissions.canManageFinance && (
-                  <TableHead className='pr-4 text-right text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider'>
-                    Aksi
-                  </TableHead>
-                )}
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-               {isLoading ? (
-                 <TableRow>
-                   <TableCell
-                     colSpan={permissions.canManageFinance ? 8 : 6}
-                     className='animate-pulse py-16 text-center text-muted-foreground'
-                   >
-                     Memuat data...
-                   </TableCell>
-                 </TableRow>
-               ) : (data?.data || []).length === 0 ? (
-                 <TableRow>
-                   <TableCell
-                     colSpan={permissions.canManageFinance ? 8 : 6}
-                     className='py-16 text-center text-muted-foreground'
-                   >
-                     Tidak ada data
-                   </TableCell>
-                 </TableRow>
-              ) : (
-                (data?.data || []).map((row: any) => (
-                  <TableRow
-                    key={row.user_id}
-                    className={cn(
-                      'border-b border-border/30 hover:bg-slate-50/50 dark:hover:bg-slate-900/30 transition-all duration-150',
-                      row.status === 'paid' &&
-                        'bg-emerald-50/10 dark:bg-emerald-950/5 hover:bg-emerald-50/20 dark:hover:bg-emerald-950/10',
-                      selectedRows.has(row.user_id) && 'bg-primary/5 hover:bg-primary/10'
-                    )}
-                  >
-                    {permissions.canManageFinance && (
-                      <TableCell className='pl-4'>
-                        <Checkbox 
-                          checked={selectedRows.has(row.user_id)}
-                          onCheckedChange={() => toggleSelectRow(row.user_id)}
-                        />
-                      </TableCell>
-                    )}
-                    <TableCell
-                      className={cn('cursor-pointer text-sm font-bold text-indigo-600 transition-colors hover:text-indigo-800 hover:underline dark:text-indigo-400 dark:hover:text-indigo-300', !permissions.canManageFinance && 'pl-4')}
-                      onClick={() =>
-                        setHistoryUser({
-                          id: row.user_id,
-                          username: row.username,
-                        })
-                      }
-                    >
-                      <div className="flex items-center gap-2">
-                        <PrivacyText>{row.username}</PrivacyText>
-                        <Badge 
-                          variant='outline' 
-                          className={cn(
-                            'text-[9px] font-black uppercase tracking-wider px-1.5 py-0 rounded border shadow-3xs scale-90 origin-left transition-all',
-                            row.tipe_langganan === 'prabayar'
-                              ? 'border-emerald-500 text-emerald-600 bg-emerald-50' 
-                              : 'border-blue-500 text-blue-600 bg-blue-50'
-                          )}
-                        >
-                          {row.tipe_langganan === 'prabayar' ? 'Pra' : 'Pasca'}
-                        </Badge>
-                      </div>
-                    </TableCell>
-
-                    <TableCell>
-                      <Badge
-                        variant='secondary'
-                        className='text-[10px] font-bold bg-muted hover:bg-muted text-muted-foreground border-none rounded-md px-1.5 py-0.5'
-                      >
-                        {row.profile}
-                      </Badge>
-                    </TableCell>
-                    <TableCell className='text-right font-mono text-sm font-semibold text-muted-foreground pr-4'>
-                      <PrivacyText>
-                        {fmt(parseFloat(row.harga || 0))}
-                      </PrivacyText>
-                    </TableCell>
-                    <TableCell 
-                      className={cn(
-                        'text-right font-mono text-sm font-bold pr-4 transition-all duration-150',
-                        row.status === 'paid' 
-                          ? 'text-emerald-600 dark:text-emerald-400 cursor-pointer hover:text-emerald-700 dark:hover:text-emerald-300 hover:underline decoration-dashed underline-offset-4' 
-                          : 'text-muted-foreground'
-                      )}
-                      onClick={() => {
-                        if (row.status === 'paid') {
-                          setHistoryUser({ id: row.user_id, username: row.username })
-                        }
-                      }}
-                      title={row.status === 'paid' ? 'Klik untuk melihat rincian riwayat angsuran' : undefined}
-                    >
-                      <PrivacyText>
-                        {row.status === 'paid' ? fmt(parseFloat(row.paid_amount || row.harga || 0)) : '-'}
-                      </PrivacyText>
-                    </TableCell>
-                    <TableCell className='text-center'>
-                      {row.status === 'paid' ? (
-                        parseFloat(row.paid_amount || 0) < parseFloat(row.harga || 0) ? (
-                          <div className="flex flex-col items-center gap-1">
-                            <Badge className='mx-auto flex w-[84px] items-center justify-center gap-1 border border-amber-200/80 bg-amber-50/80 px-2.5 py-1 text-[10px] font-extrabold tracking-wider text-amber-700 uppercase hover:bg-amber-50 dark:border-amber-900/40 dark:bg-amber-950/30 dark:text-amber-400 rounded-full shadow-sm shadow-amber-500/5'>
-                              <AlertCircle className='h-3.5 w-3.5 text-amber-600 dark:text-amber-400 shrink-0' />
-                              Kurang
-                            </Badge>
-                            <span className="text-[9px] font-bold text-rose-500 dark:text-rose-400 tracking-wider">
-                              -{fmt(parseFloat(row.harga || 0) - parseFloat(row.paid_amount || 0))}
-                            </span>
-                          </div>
-                        ) : (
-                          <div className="flex flex-col items-center gap-1">
-                            <Badge className='mx-auto flex w-[84px] items-center justify-center gap-1 border border-emerald-200/80 bg-emerald-50/80 px-2.5 py-1 text-[10px] font-extrabold tracking-wider text-emerald-700 uppercase hover:bg-emerald-50 dark:border-emerald-900/40 dark:bg-emerald-950/30 dark:text-emerald-400 rounded-full shadow-sm shadow-emerald-500/5'>
-                              <CheckCircle2 className='h-3.5 w-3.5 text-emerald-600 dark:text-emerald-400 shrink-0' />
-                              Lunas
-                            </Badge>
-                            {row.note && row.note.includes('[Angsuran:') ? (
-                              <span 
-                                onClick={() => setHistoryUser({ id: row.user_id, username: row.username })}
-                                className="text-[9px] font-extrabold text-indigo-600 dark:text-indigo-400 uppercase tracking-wider flex items-center gap-0.5 select-none bg-indigo-50/50 dark:bg-indigo-950/20 hover:bg-indigo-100/60 dark:hover:bg-indigo-950/50 hover:text-indigo-700 dark:hover:text-indigo-300 cursor-pointer px-1.5 py-0.5 rounded border border-indigo-100/50 dark:border-indigo-900/20 mt-0.5 scale-95 shadow-2xs transition-all duration-150"
-                                title="Klik untuk melihat rincian riwayat angsuran"
-                              >
-                                <History className="h-2.5 w-2.5 text-indigo-500 shrink-0" /> Angsuran
-                              </span>
-                            ) : row.method ? (
-                              <span className="text-[9px] font-bold text-muted-foreground uppercase tracking-wider">{row.method}</span>
-                            ) : null}
-                          </div>
-                        )
-                      ) : (
-                        <Badge className='mx-auto flex w-[84px] items-center justify-center gap-1 border border-amber-200/80 bg-amber-50/80 px-2.5 py-1 text-[10px] font-extrabold tracking-wider text-amber-700 uppercase hover:bg-amber-50 dark:border-amber-900/40 dark:bg-amber-950/30 dark:text-amber-400 rounded-full shadow-sm shadow-amber-500/5'>
-                          <Clock className='h-3.5 w-3.5 text-amber-600 dark:text-amber-400 shrink-0' />
-                          Belum
-                        </Badge>
-                      )}
-                    </TableCell>
-                    <TableCell className='hidden text-xs font-semibold text-muted-foreground/80 lg:table-cell'>
-                      {row.paid_at || '-'}
-                      {row.note && <div className="text-[10px] text-muted-foreground/60 italic max-w-[120px] truncate" title={row.note}>{row.note}</div>}
-                    </TableCell>
-                    {permissions.canManageFinance && (
-                      <TableCell className='pr-4 text-right'>
-                        <div className='flex justify-end gap-1.5'>
-                          {/* PRIMARY ACTION: WhatsApp */}
-                          <Button
-                            variant='outline'
-                            size='icon'
-                            className={cn('h-8 w-8 transition-all duration-200 rounded-lg shadow-sm',
-                              row.status === 'paid' 
-                                ? 'border-emerald-100 text-emerald-600 bg-emerald-50/30 hover:bg-emerald-50 dark:border-emerald-900/30 dark:text-emerald-400 dark:bg-emerald-950/10' 
-                                : 'border-amber-100 text-amber-600 bg-amber-50/30 hover:bg-amber-50 dark:border-amber-900/30 dark:text-amber-400 dark:bg-amber-950/10'
+              <TableHeader className='bg-slate-50/75 dark:bg-slate-900/60 border-b border-border/60'>
+                {table.getHeaderGroups().map((headerGroup) => (
+                  <TableRow key={headerGroup.id}>
+                    {headerGroup.headers.map((header) => (
+                      <TableHead key={header.id} colSpan={header.colSpan}>
+                        {header.isPlaceholder
+                          ? null
+                          : flexRender(
+                              header.column.columnDef.header,
+                              header.getContext()
                             )}
-                            onClick={() => handleWA(row)}
-                            title={row.status === 'paid' ? 'Kirim Kwitansi via WA' : 'Kirim Tagihan via WA'}
-                          >
-                            <MessageCircle className='h-4 w-4' />
-                          </Button>
-                          
-                          {/* PRIMARY ACTION: Edit or Mark Paid */}
-                          {row.status === 'paid' ? (
-                            <Button
-                              size='icon'
-                              className='h-8 w-8 bg-blue-500 text-white shadow-sm shadow-blue-500/10 transition-all duration-200 hover:bg-blue-600 hover:shadow-blue-500/25 rounded-lg'
-                              onClick={() => {
-                                setPaidDialog(row)
-                                setPaidAmount(row.paid_amount || row.harga || '')
-                                setPaidDate(row.paid_at || now.toISOString().slice(0, 10))
-                                setPaidMethod(row.method || 'cash')
-                                setPaidNote(row.note || '')
-                                setIsInstallmentMode(false)
-                                setInstallmentAmount('')
-                                setInstallmentNote('')
-                              }}
-                              title='Edit Pembayaran'
-                            >
-                              <PenLine className='h-4 w-4' />
-                            </Button>
-                          ) : (
-                            <Button
-                              size='icon'
-                              className='h-8 w-8 bg-emerald-500 text-white shadow-sm shadow-emerald-500/10 transition-all duration-200 hover:bg-emerald-600 hover:shadow-emerald-500/25 rounded-lg'
-                              onClick={() => {
-                                setPaidDialog(row)
-                                setPaidAmount(row.harga || '')
-                                setPaidDate(now.toISOString().slice(0, 10))
-                                setPaidMethod('cash')
-                                setPaidNote('')
-                                setIsInstallmentMode(false)
-                                setInstallmentAmount('')
-                                setInstallmentNote('')
-                              }}
-                              title='Tandai Lunas'
-                            >
-                              <CheckCheck className='h-4 w-4' />
-                            </Button>
-                          )}
-
-                          {/* SECONDARY ACTIONS: Dropdown */}
-                          <DropdownMenu>
-                            <DropdownMenuTrigger asChild>
-                              <Button
-                                variant='outline'
-                                size='icon'
-                                className='h-8 w-8 border-border/80 text-muted-foreground bg-background transition-all duration-200 hover:text-foreground hover:bg-accent rounded-lg shadow-sm'
-                              >
-                                <MoreHorizontal className='h-4 w-4' />
-                              </Button>
-                            </DropdownMenuTrigger>
-                            <DropdownMenuContent align="end" className="w-48">
-                              <DropdownMenuItem 
-                                onClick={() => printThermal(row, month, year)}
-                                className="cursor-pointer"
-                              >
-                                <Receipt className="mr-2 h-4 w-4 text-muted-foreground" />
-                                Cetak Struk Thermal
-                              </DropdownMenuItem>
-                              <DropdownMenuItem 
-                                onClick={() => printInvoice(row, month, year)}
-                                className="cursor-pointer"
-                              >
-                                <Printer className="mr-2 h-4 w-4 text-muted-foreground" />
-                                Cetak Invoice PDF
-                              </DropdownMenuItem>
-                              <DropdownMenuSeparator />
-                              <DropdownMenuItem 
-                                onClick={() => setHistoryUser({ id: row.user_id, username: row.username })}
-                                className="cursor-pointer"
-                              >
-                                <History className="mr-2 h-4 w-4 text-muted-foreground" />
-                                Riwayat Pembayaran
-                              </DropdownMenuItem>
-                              
-                              {row.status === 'paid' && (
-                                <>
-                                  <DropdownMenuSeparator />
-                                  <DropdownMenuItem 
-                                    onClick={() => {
-                                      if (confirm(`Yakin membatalkan pelunasan tagihan ${row.username}?`)) markUnpaid.mutate(row.payment_id)
-                                    }}
-                                    className="cursor-pointer text-rose-600 focus:bg-rose-50 focus:text-rose-600 dark:focus:bg-rose-950/50"
-                                  >
-                                    <XCircle className="mr-2 h-4 w-4" />
-                                    Batalkan Pembayaran
-                                  </DropdownMenuItem>
-                                </>
-                              )}
-                            </DropdownMenuContent>
-                          </DropdownMenu>
-                        </div>
-                      </TableCell>
-                    )}
+                      </TableHead>
+                    ))}
                   </TableRow>
-                ))
-              )}
-            </TableBody>
-          </Table>
+                ))}
+              </TableHeader>
+              <TableBody>
+                {isLoading ? (
+                  Array.from({ length: 5 }).map((_, idx) => (
+                    <TableRow key={idx}>
+                      <TableCell><Skeleton className="h-4 w-4" /></TableCell>
+                      <TableCell><div className="space-y-2"><Skeleton className="h-4 w-32" /><Skeleton className="h-3 w-24" /></div></TableCell>
+                      <TableCell><Skeleton className="h-6 w-20 rounded-full" /></TableCell>
+                      <TableCell><Skeleton className="h-4 w-24" /></TableCell>
+                      <TableCell><Skeleton className="h-4 w-20" /></TableCell>
+                      <TableCell><Skeleton className="h-4 w-24" /></TableCell>
+                      {permissions.canManageFinance && <TableCell><Skeleton className="h-6 w-24 rounded-full" /></TableCell>}
+                      {permissions.canManageFinance && <TableCell><div className="flex gap-2 justify-center"><Skeleton className="h-8 w-8 rounded-lg" /><Skeleton className="h-8 w-8 rounded-lg" /></div></TableCell>}
+                    </TableRow>
+                  ))
+                ) : table.getRowModel().rows?.length ? (
+                  table.getRowModel().rows.map((row) => (
+                    <TableRow
+                      key={row.id}
+                      className={cn(
+                        'border-b border-border/30 hover:bg-slate-50/50 dark:hover:bg-slate-900/30 transition-all duration-150',
+                        row.original.status === 'paid' && 'bg-emerald-50/10 dark:bg-emerald-950/5 hover:bg-emerald-50/20 dark:hover:bg-emerald-950/10',
+                        selectedRows.has(row.original.user_id) && 'bg-primary/5 hover:bg-primary/10'
+                      )}
+                    >
+                      {row.getVisibleCells().map((cell) => (
+                        <TableCell key={cell.id} className={cn(!permissions.canManageFinance && cell.column.id === 'username' && 'pl-4')}>
+                          {flexRender(cell.column.columnDef.cell, cell.getContext())}
+                        </TableCell>
+                      ))}
+                    </TableRow>
+                  ))
+                ) : (
+                  <TableRow>
+                    <TableCell
+                      colSpan={columns.length}
+                      className='py-16 text-center text-muted-foreground'
+                    >
+                      Tidak ada data
+                    </TableCell>
+                  </TableRow>
+                )}
+              </TableBody>
+            </Table>
           </div>
 
           {/* Pagination */}
@@ -1159,7 +748,9 @@ export function FinanceBilling() {
                 <Select
                   value={String(perPage)}
                   onValueChange={(val) => {
-                    setPerPage(Number(val))
+                    const n = Number(val)
+                    setPerPage(n)
+                    localStorage.setItem('billing-per-page', String(n))
                     setPage(1)
                   }}
                 >
@@ -1317,7 +908,10 @@ export function FinanceBilling() {
                 variant="outline" 
                 size="sm" 
                 className="bg-transparent border-slate-600 text-slate-300 hover:text-white hover:bg-slate-800 dark:border-slate-300/50 dark:text-slate-600 dark:hover:text-slate-900 dark:hover:bg-slate-200"
-                onClick={printBulkThermal}
+                onClick={() => {
+                  const usersToPrint = (data?.data || []).filter((r: any) => selectedRows.has(r.user_id))
+                  printBulkThermal(usersToPrint, month, year)
+                }}
               >
                 Cetak Thermal
               </Button>
@@ -1325,7 +919,10 @@ export function FinanceBilling() {
                 variant="outline" 
                 size="sm" 
                 className="bg-transparent border-slate-600 text-slate-300 hover:text-white hover:bg-slate-800 dark:border-slate-300/50 dark:text-slate-600 dark:hover:text-slate-900 dark:hover:bg-slate-200"
-                onClick={printBulkInvoice}
+                onClick={() => {
+                  const usersToPrint = (data?.data || []).filter((r: any) => selectedRows.has(r.user_id))
+                  printBulkInvoice(usersToPrint, month, year)
+                }}
               >
                 Cetak Invoice
               </Button>
@@ -1409,474 +1006,35 @@ export function FinanceBilling() {
         </DialogContent>
       </Dialog>
 
-      {/* Mark Paid Dialog */}
-      <Dialog open={!!paidDialog} onOpenChange={() => setPaidDialog(null)}>
-        <DialogContent className='max-w-sm'>
-          <DialogHeader>
-            <DialogTitle className='text-base font-black'>
-              {parseFloat(String(paidDialog?.paid_amount || 0)) > 0 ? 'Edit Pembayaran' : 'Tandai Lunas'} — {paidDialog?.username}
-            </DialogTitle>
-          </DialogHeader>
+      <PaymentDialog
+        isOpen={!!paidDialog}
+        onClose={() => setPaidDialog(null)}
+        paidDialog={paidDialog}
+        privacyMode={privacyMode}
+        fmt={fmt}
+        isPending={markPaid.isPending}
+        onSave={(payload) => {
+          markPaid.mutate({
+            ...paidDialog,
+            calculatedAmount: payload.calculatedAmount,
+            calculatedNote: payload.calculatedNote,
+            calculatedMethod: payload.calculatedMethod,
+            calculatedDate: payload.calculatedDate,
+          })
+        }}
+      />
 
-          {paidDialog && parseFloat(String(paidDialog.paid_amount || 0)) > 0 && (
-            <div className='grid grid-cols-2 gap-1 bg-muted p-1 rounded-lg text-xs font-bold mb-1 select-none'>
-              <button
-                type='button'
-                onClick={() => setIsInstallmentMode(false)}
-                className={cn('py-1.5 rounded-md transition-all', !isInstallmentMode ? 'bg-background shadow-xs text-foreground' : 'text-muted-foreground hover:text-foreground')}
-              >
-                Koreksi Total
-              </button>
-              <button
-                type='button'
-                onClick={() => setIsInstallmentMode(true)}
-                className={cn('py-1.5 rounded-md transition-all', isInstallmentMode ? 'bg-background shadow-xs text-foreground' : 'text-muted-foreground hover:text-foreground')}
-              >
-                Tambah Angsuran
-              </button>
-            </div>
-          )}
+      <HistoryDialog
+        isOpen={!!historyUser}
+        onClose={() => setHistoryUser(null)}
+        historyUser={historyUser}
+        isHistoryLoading={isHistoryLoading}
+        userHistory={userHistory}
+        fmt={fmt}
+        handleDeleteAngsuran={handleDeleteAngsuran}
+      />
 
-          <div className='space-y-3 py-2'>
-            {isInstallmentMode ? (
-              <>
-                {/* Installment Summary Panel */}
-                <div className='bg-slate-50 dark:bg-slate-900/60 p-3 rounded-lg border border-border/60 text-xs space-y-1.5 mb-2'>
-                  <div className='flex justify-between'>
-                    <span className='text-muted-foreground'>Total Tagihan Paket:</span>
-                    <span className='font-mono font-extrabold text-foreground'>{fmt(parseFloat(String(paidDialog?.harga || 0)))}</span>
-                  </div>
-                  <div className='flex justify-between text-emerald-600 dark:text-emerald-400'>
-                    <span>Terbayar Sebelumnya:</span>
-                    <span className='font-mono font-extrabold'>{fmt(parseFloat(String(paidDialog?.paid_amount || 0)))}</span>
-                  </div>
-                  <div className='flex justify-between text-rose-500 font-bold border-t border-dashed pt-1.5'>
-                    <span>Sisa Kekurangan:</span>
-                    <span className='font-mono font-extrabold'>
-                      {fmt(Math.max(0, parseFloat(String(paidDialog?.harga || 0)) - parseFloat(String(paidDialog?.paid_amount || 0))))}
-                    </span>
-                  </div>
-                </div>
-
-                {/* Additional Amount input */}
-                <div>
-                  <label className='text-xs font-bold tracking-wide text-muted-foreground uppercase'>
-                    Nominal Tambahan Setor (Rp)
-                  </label>
-                  <Input
-                    type={privacyMode ? 'password' : 'number'}
-                    value={installmentAmount}
-                    onChange={(e) => setInstallmentAmount(e.target.value)}
-                    className='mt-1 font-mono'
-                    placeholder='0'
-                  />
-                  {parseFloat(installmentAmount || "0") > 0 && (
-                    <div className='flex items-center justify-between text-[10px] font-bold text-muted-foreground bg-slate-100 dark:bg-slate-900 px-2 py-1.5 rounded-md mt-1.5 select-none'>
-                      <span>Total Setelah Setor:</span>
-                      <span className={cn('font-mono font-extrabold', (parseFloat(String(paidDialog?.paid_amount || 0)) + parseFloat(installmentAmount || "0")) >= parseFloat(String(paidDialog?.harga || 0)) ? 'text-emerald-600' : 'text-amber-600')}>
-                        {fmt(parseFloat(String(paidDialog?.paid_amount || 0)) + parseFloat(installmentAmount || "0"))}
-                      </span>
-                    </div>
-                  )}
-                </div>
-
-                {/* Date of installment (reuses paidDate) */}
-                <div>
-                  <label className='text-xs font-bold tracking-wide text-muted-foreground uppercase'>
-                    Tanggal Setor
-                  </label>
-                  <Input
-                    type='date'
-                    value={paidDate}
-                    onChange={(e) => setPaidDate(e.target.value)}
-                    className='mt-1'
-                  />
-                </div>
-
-                {/* Method of installment (reuses paidMethod) */}
-                <div>
-                  <label className='text-xs font-bold tracking-wide text-muted-foreground uppercase'>
-                    Metode Setor
-                  </label>
-                  <Select value={paidMethod} onValueChange={setPaidMethod}>
-                    <SelectTrigger className='mt-1'>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value='cash'>Tunai</SelectItem>
-                      <SelectItem value='transfer'>Transfer Bank</SelectItem>
-                      <SelectItem value='qris'>QRIS</SelectItem>
-                      <SelectItem value='e-wallet'>E-Wallet</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                {/* Note of installment */}
-                <div>
-                  <label className='text-xs font-bold tracking-wide text-muted-foreground uppercase'>
-                    Catatan Setoran (Opsional)
-                  </label>
-                  <Input
-                    value={installmentNote}
-                    onChange={(e) => setInstallmentNote(e.target.value)}
-                    className='mt-1'
-                    placeholder='Misal: Pelunasan sisa...'
-                  />
-                </div>
-              </>
-            ) : (
-              <>
-                <div>
-                  <label className='text-xs font-bold tracking-wide text-muted-foreground uppercase'>
-                    Nominal (Rp)
-                  </label>
-                  <Input
-                    type={privacyMode ? 'password' : 'number'}
-                    value={paidAmount}
-                    onChange={(e) => setPaidAmount(e.target.value)}
-                    className='mt-1 font-mono'
-                    placeholder='0'
-                  />
-                  {paidDialog && parseFloat(String(paidDialog.harga || 0)) > 0 && (
-                    <div className='flex items-center justify-between text-[10px] font-bold text-muted-foreground bg-slate-100 dark:bg-slate-900 px-2 py-1.5 rounded-md mt-1.5 select-none'>
-                      <span>Paket: <span className='font-mono font-extrabold text-foreground'>{fmt(parseFloat(String(paidDialog.harga || 0)))}</span></span>
-                      {parseFloat(String(paidAmount || 0)) < parseFloat(String(paidDialog.harga || 0)) ? (
-                        <span className='text-rose-500 font-black uppercase tracking-wider scale-95'>Kurang: {fmt(parseFloat(String(paidDialog.harga || 0)) - parseFloat(String(paidAmount || 0)))}</span>
-                      ) : (
-                        <span className='text-emerald-600 font-black uppercase tracking-wider scale-95'>Lunas</span>
-                      )}
-                    </div>
-                  )}
-                </div>
-                <div>
-                  <label className='text-xs font-bold tracking-wide text-muted-foreground uppercase'>
-                    Tanggal Bayar
-                  </label>
-                  <Input
-                    type='date'
-                    value={paidDate}
-                    onChange={(e) => setPaidDate(e.target.value)}
-                    className='mt-1'
-                  />
-                </div>
-                <div>
-                  <label className='text-xs font-bold tracking-wide text-muted-foreground uppercase'>
-                    Metode
-                  </label>
-                  <Select value={paidMethod} onValueChange={setPaidMethod}>
-                    <SelectTrigger className='mt-1'>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value='cash'>Tunai</SelectItem>
-                      <SelectItem value='transfer'>Transfer Bank</SelectItem>
-                      <SelectItem value='qris'>QRIS</SelectItem>
-                      <SelectItem value='e-wallet'>E-Wallet</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div>
-                  <label className='text-xs font-bold tracking-wide text-muted-foreground uppercase'>
-                    Catatan (Opsional)
-                  </label>
-                  <Input
-                    value={paidNote}
-                    onChange={(e) => setPaidNote(e.target.value)}
-                    className='mt-1'
-                    placeholder='Catatan tambahan...'
-                  />
-                  {paidNote && paidNote.includes('[Angsuran:') && (
-                    <Button
-                      type='button'
-                      variant='outline'
-                      size='sm'
-                      onClick={() => {
-                        const lines = paidNote.split('\n');
-                        const awalLine = lines.find((l: string) => l.startsWith('[Awal:'));
-                        if (awalLine) {
-                          setPaidNote(awalLine);
-                          const match = awalLine.match(/\[Awal:\s*Rp\s*([\d.]+)/);
-                          if (match) {
-                            const awalAmt = parseFloat(match[1].replace(/\./g, ''));
-                            setPaidAmount(String(awalAmt));
-                          }
-                        } else {
-                          setPaidNote('');
-                          setPaidAmount(String(paidDialog?.harga || 0));
-                        }
-                        toast.success('Log angsuran dibersihkan! Nominal dikembalikan ke pembayaran awal.');
-                      }}
-                      className='mt-1 text-[10px] h-6 px-2 text-rose-500 border-rose-200 hover:bg-rose-50 dark:border-rose-950/30'
-                    >
-                      <RefreshCw className='mr-1 h-3 w-3' /> Reset Log Angsuran
-                    </Button>
-                  )}
-                </div>
-              </>
-            )}
-          </div>
-          <DialogFooter>
-            <Button variant='outline' onClick={() => setPaidDialog(null)}>
-              Batal
-            </Button>
-            <Button
-              className='bg-green-500 hover:bg-green-600'
-              onClick={() => {
-                let finalAmount = parseFloat(paidAmount) || parseFloat(paidDialog?.harga || 0) || 0;
-                let finalNote = paidNote;
-                if (isInstallmentMode && paidDialog) {
-                  const prevAmount = parseFloat(String(paidDialog.paid_amount || 0));
-                  const instAmt = parseFloat(installmentAmount || "0");
-                  finalAmount = prevAmount + instAmt;
-
-                  const instDesc = `[Angsuran: +${fmt(instAmt)} tgl ${paidDate} (${paidMethod.toUpperCase()})${installmentNote ? ' - ' + installmentNote : ''}]`;
-                  
-                  if (paidDialog.note && paidDialog.note.includes('[Angsuran:')) {
-                    finalNote = `${paidDialog.note}\n${instDesc}`;
-                  } else {
-                    const firstDesc = `[Awal: ${fmt(prevAmount)} tgl ${paidDialog.paid_at || paidDate} (${(paidDialog.method || 'CASH').toUpperCase()})${paidDialog.note ? ' - ' + paidDialog.note : ''}]`;
-                    finalNote = `${firstDesc}\n${instDesc}`;
-                  }
-                } else if (paidDialog) {
-                  const match = paidNote.match(/\[Awal:\s*Rp\s*([\d.]+)/);
-                  const awalAmt = match ? parseFloat(match[1].replace(/\./g, '')) : 0;
-                  if (finalAmount === awalAmt && paidNote.includes('[Angsuran:')) {
-                    const lines = paidNote.split('\n');
-                    const awalLine = lines.find((l: string) => l.startsWith('[Awal:'));
-                    if (awalLine) {
-                      finalNote = awalLine;
-                    }
-                  }
-                }
-                markPaid.mutate({
-                  ...paidDialog,
-                  calculatedAmount: finalAmount,
-                  calculatedNote: finalNote,
-                });
-              }}
-              disabled={markPaid.isPending}
-            >
-              <CheckCheck className='mr-1 h-4 w-4' /> Simpan Pembayaran
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      {/* Payment History Dialog */}
-      <Dialog open={!!historyUser} onOpenChange={() => setHistoryUser(null)}>
-        <DialogContent className='max-w-md gap-0 overflow-hidden p-0'>
-          <DialogHeader className='flex flex-row items-center justify-between gap-4 border-b p-4'>
-            <DialogTitle className='flex items-center gap-2 text-base font-black'>
-              <History className='h-4 w-4 text-primary' />
-              Riwayat Pembayaran
-            </DialogTitle>
-          </DialogHeader>
-
-          <ScrollArea className='max-h-[60vh]'>
-            <div className='space-y-4 p-4'>
-              {/* Identity Header */}
-              <div className='flex items-center justify-between border-b border-border/50 pb-2'>
-                <div>
-                  <p className='text-xs text-muted-foreground'>
-                    Username Pelanggan
-                  </p>
-                  <p className='text-lg font-black tracking-tight'>
-                    <PrivacyText>{historyUser?.username}</PrivacyText>
-                  </p>
-                </div>
-              </div>
-
-              {/* History list */}
-              {isHistoryLoading ? (
-                <div className='space-y-3 py-2'>
-                  {[1, 2, 3].map((i) => (
-                    <div
-                      key={i}
-                      className='animate-pulse space-y-2 rounded-lg border bg-muted/10 p-3'
-                    >
-                      <div className='flex justify-between'>
-                        <div className='h-4 w-28 rounded bg-muted' />
-                        <div className='h-4 w-16 rounded bg-muted' />
-                      </div>
-                      <div className='h-3.5 w-32 rounded bg-muted' />
-                    </div>
-                  ))}
-                </div>
-              ) : !userHistory || userHistory.length === 0 ? (
-                <div className='flex flex-col items-center justify-center space-y-3 py-12 text-center'>
-                  <div className='rounded-full bg-muted/40 p-3'>
-                    <Receipt className='h-8 w-8 text-muted-foreground/60' />
-                  </div>
-                  <div>
-                    <h4 className='text-sm font-bold text-foreground'>
-                      Belum Ada Riwayat Bayar
-                    </h4>
-                    <p className='mt-1 max-w-[280px] text-xs leading-relaxed text-muted-foreground'>
-                      Pelanggan ini belum memiliki catatan riwayat pembayaran di
-                      database.
-                    </p>
-                  </div>
-                </div>
-              ) : (
-                <div className='space-y-3'>
-                  <p className='px-1 text-[10px] font-bold tracking-wider text-muted-foreground uppercase'>
-                    Daftar Transaksi ({userHistory.length})
-                  </p>
-                  <div className='space-y-2.5'>
-                    {userHistory.map((pay: any) => {
-                      const methodLower = (pay.method || 'cash').toLowerCase()
-                      let methodColor =
-                        'bg-emerald-500/10 text-emerald-700 dark:text-emerald-400' // Cash
-                      if (
-                        methodLower.includes('tf') ||
-                        methodLower.includes('transfer') ||
-                        methodLower.includes('bank')
-                      ) {
-                        methodColor =
-                          'bg-purple-500/10 text-purple-700 dark:text-purple-400'
-                      } else if (
-                        methodLower.includes('qris') ||
-                        methodLower.includes('link') ||
-                        methodLower.includes('dana') ||
-                        methodLower.includes('gopay')
-                      ) {
-                        methodColor =
-                          'bg-blue-500/10 text-blue-700 dark:text-blue-400'
-                      }
-
-                      const monthsList = [
-                        'Januari',
-                        'Februari',
-                        'Maret',
-                        'April',
-                        'Mei',
-                        'Juni',
-                        'Juli',
-                        'Agustus',
-                        'September',
-                        'Oktober',
-                        'November',
-                        'Desember',
-                      ]
-                      const monthName =
-                        monthsList[pay.payment_month - 1] ||
-                        `Bulan ${pay.payment_month}`
-
-                      return (
-                        <div
-                          key={pay.id}
-                          className='space-y-2.5 rounded-lg border border-border/60 bg-card p-3 transition-all duration-300 hover:shadow-md'
-                        >
-                          {/* Header row */}
-                          <div className='flex items-center justify-between border-b border-border/40 pb-1'>
-                            <div className='flex items-center gap-1.5'>
-                              <Calendar className='h-3.5 w-3.5 text-indigo-500' />
-                              <span className='text-sm font-black text-foreground'>
-                                {monthName} {pay.payment_year}
-                              </span>
-                            </div>
-                            <Badge className='h-4 bg-emerald-500 px-1.5 text-[9px] font-black hover:bg-emerald-600'>
-                              LUNAS
-                            </Badge>
-                          </div>
-
-                          {/* Amount & Method */}
-                          <div className='flex items-center justify-between text-xs'>
-                            <div>
-                              <p className='text-[9px] font-bold text-muted-foreground'>
-                                NOMINAL
-                              </p>
-                              <p className='font-mono text-sm font-extrabold text-indigo-600 dark:text-indigo-400'>
-                                <PrivacyText>{fmt(pay.amount)}</PrivacyText>
-                              </p>
-                            </div>
-                            <div className='text-right'>
-                              <p className='text-[9px] font-bold text-muted-foreground'>
-                                METODE
-                              </p>
-                              <span
-                                className={`mt-0.5 inline-block rounded px-1.5 py-0.5 text-[10px] font-black tracking-wider uppercase ${methodColor}`}
-                              >
-                                {pay.method || 'CASH'}
-                              </span>
-                            </div>
-                          </div>
-
-                          {/* Date of payment & Note */}
-                          <div className='space-y-1 border-t border-dashed border-border/50 pt-1.5 text-[10px]'>
-                            <div className='flex items-center justify-between text-muted-foreground'>
-                              <span>Tanggal Bayar:</span>
-                              <span className='font-bold text-foreground/80'>
-                                {pay.payment_date}
-                              </span>
-                            </div>
-                            {pay.note && (
-                              <div className='mt-2 space-y-1.5 border-t border-dashed border-border/30 pt-2 select-none'>
-                                <p className='text-[8px] font-black text-muted-foreground uppercase tracking-wider'>
-                                  Rincian Riwayat Setoran / Catatan:
-                                </p>
-                                <div className='space-y-1.5'>
-                                  {parseNote(pay.note).map((item) => (
-                                    <div
-                                      key={item.id}
-                                      className={cn(
-                                        'text-xs font-semibold px-2 py-1.5 rounded flex items-center gap-2 border leading-normal',
-                                        item.isStructured
-                                          ? 'bg-slate-50 dark:bg-slate-900/60 border-border/60 text-foreground font-mono text-[10px]'
-                                          : 'bg-muted/40 border-border/30 text-foreground/80 italic'
-                                      )}
-                                    >
-                                      {item.isStructured ? (
-                                        <div className='flex items-center justify-between w-full gap-2'>
-                                          <div className='flex items-center gap-2'>
-                                            <div className='h-1.5 w-1.5 rounded-full bg-indigo-500 shrink-0 shadow-xs' />
-                                            <span className='break-all'>{item.content}</span>
-                                          </div>
-                                          {item.content.includes('Angsuran:') && (
-                                            <Button
-                                              type='button'
-                                              variant='ghost'
-                                              size='icon'
-                                              onClick={() => handleDeleteAngsuran(pay, item.content, `[${item.content}]`)}
-                                              className='h-5 w-5 rounded text-rose-500 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/30 shrink-0 transition-colors'
-                                              title='Hapus setoran angsuran ini'
-                                            >
-                                              <Trash2 className='h-3.5 w-3.5' />
-                                            </Button>
-                                          )}
-                                        </div>
-                                      ) : (
-                                        <div className='flex items-center gap-2 w-full'>
-                                          <FileText className='h-3.5 w-3.5 shrink-0 text-muted-foreground' />
-                                          <span className='w-full'>{item.content}</span>
-                                        </div>
-                                      )}
-                                    </div>
-                                  ))}
-                                </div>
-                              </div>
-                            )}
-                          </div>
-                        </div>
-                      )
-                    })}
-                  </div>
-                </div>
-              )}
-            </div>
-          </ScrollArea>
-
-          <div className='flex justify-end border-t bg-muted/20 p-3'>
-            <Button
-              size='sm'
-              onClick={() => setHistoryUser(null)}
-              className='h-8 px-4 text-xs'
-            >
-              Tutup
-            </Button>
-          </div>
-        </DialogContent>
-      </Dialog>
+      <ConfirmDialog />
     </>
   )
 }

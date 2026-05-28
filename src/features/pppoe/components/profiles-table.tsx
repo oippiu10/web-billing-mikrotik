@@ -257,7 +257,6 @@ export function PPPoEProfilesTable({ data, isLoading }: Props) {
     },
   ]
 
-  // eslint-disable-next-line react-compiler/react-compiler
   const table = useReactTable({
     data,
     columns,

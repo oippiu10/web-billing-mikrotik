@@ -14,8 +14,10 @@ import { ScrollArea } from '@/components/ui/scroll-area'
 import { Button } from '@/components/ui/button'
 import { PrivacyText } from '@/components/privacy'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import { useQuery } from '@tanstack/react-query'
+import { useQuery, useMutation } from '@tanstack/react-query'
+import { useNavigate } from '@tanstack/react-router'
 import { api } from '@/lib/api'
+import { toast } from 'sonner'
 
 interface Props {
   isOpen: boolean
@@ -26,20 +28,22 @@ interface Props {
 }
 
 export function CustomerDetailDialog({ isOpen, onClose, customer, onEdit, onDelete }: Props) {
-  if (!customer) return null
-  const locationUrl = customer.lat && customer.lng ? `https://www.google.com/maps?q=${customer.lat},${customer.lng}` : customer.maps
-
+  const navigate = useNavigate()
+  
   // Fetch payment history
   const { data: paymentHistory, isLoading } = useQuery({
-    queryKey: ['customer-payment-history', customer.id],
+    queryKey: ['customer-payment-history', customer?.id],
     queryFn: async () => {
       const res = await api.get('/get_user_payment_history.php', {
-        params: { user_id: customer.id }
+        params: { user_id: customer?.id }
       })
       return res.data.data || []
     },
-    enabled: isOpen && !!customer.id,
+    enabled: isOpen && !!customer?.id,
   })
+
+  if (!customer) return null
+  const locationUrl = customer.lat && customer.lng ? `https://www.google.com/maps?q=${customer.lat},${customer.lng}` : customer.maps
 
   const formatRupiah = (value: number) => {
     return new Intl.NumberFormat('id-ID', {
@@ -148,7 +152,18 @@ export function CustomerDetailDialog({ isOpen, onClose, customer, onEdit, onDele
                                 <Button 
                                     size="sm" 
                                     className="h-7 text-[10px] bg-green-600 hover:bg-green-700 gap-1.5" 
-                                    onClick={() => window.open(`https://wa.me/${customer.wa}`, '_blank')}
+                                    onClick={() => {
+                                      const phone = customer.wa?.replace(/^0/, '62') || ''
+                                      if (!phone) {
+                                        toast.error('Nomor WA tidak valid')
+                                        return
+                                      }
+                                      const msg = `Halo ${customer.username}, `
+                                      navigate({
+                                        to: '/automation/whatsapp-center',
+                                        search: { phone: phone, text: msg }
+                                      })
+                                    }}
                                 >
                                     <Phone className="w-3 h-3" />
                                     WhatsApp

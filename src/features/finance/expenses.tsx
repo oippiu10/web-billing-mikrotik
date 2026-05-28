@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { api } from '@/lib/api'
 import { useRouterStore } from '@/stores/router-store'
@@ -20,10 +20,11 @@ import {
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter
 } from '@/components/ui/dialog'
-import { Wallet, Plus, Trash2, ArrowDownCircle, Search, RefreshCw, Pencil } from 'lucide-react'
+import { Wallet, Plus, Trash2, ArrowDownCircle, Search, RefreshCw, Pencil, ChevronLeft, ChevronRight } from 'lucide-react'
 import { toast } from 'sonner'
 import { FinanceSubNav } from './components/finance-sub-nav'
 import { PrivacyText } from '@/components/privacy'
+import { useConfirm } from '@/hooks/use-confirm'
 
 const MONTHS = [
   { value: 1, label: 'Januari' }, { value: 2, label: 'Februari' },
@@ -56,6 +57,16 @@ export function FinanceExpenses() {
   const [spentAt, setSpentAt] = useState(now.toISOString().slice(0, 10))
   const [note, setNote] = useState('')
 
+  // Pagination state
+  const [page, setPage] = useState(1)
+  const perPage = 15
+  const { confirm: confirmAction, ConfirmDialog } = useConfirm()
+
+  // Reset pagination ke halaman 1 saat filter atau waktu berubah
+  useEffect(() => {
+    setPage(1)
+  }, [search, filterCategory, month, year])
+
   const { data, isLoading } = useQuery({
     queryKey: ['expenses', activeRouter?.id, month, year],
     queryFn: async () => {
@@ -74,7 +85,9 @@ export function FinanceExpenses() {
     const matchSearch = search ? (e.note?.toLowerCase().includes(search.toLowerCase()) || e.category?.toLowerCase().includes(search.toLowerCase())) : true
     return matchCat && matchSearch
   })
-  
+
+  const totalPages = Math.ceil(filteredExpenses.length / perPage)
+  const paginatedExpenses = filteredExpenses.slice((page - 1) * perPage, page * perPage)
   const totalExpense = filteredExpenses.reduce((sum: number, e: any) => sum + parseFloat(e.amount), 0)
 
   const addMutation = useMutation({
@@ -219,6 +232,7 @@ export function FinanceExpenses() {
               onClick={() => {
                 setSearch('')
                 setFilterCategory('')
+                setPage(1)
               }}
             >
               <RefreshCw className='h-3.5 w-3.5' />
@@ -248,9 +262,9 @@ export function FinanceExpenses() {
                   <TableCell colSpan={6} className='text-center py-16 text-muted-foreground'>Belum ada pengeluaran yang sesuai.</TableCell>
                 </TableRow>
               ) : (
-                filteredExpenses.map((row: any, idx: number) => (
+                paginatedExpenses.map((row: any, idx: number) => (
                   <TableRow key={row.id} className='border-b border-border/30 hover:bg-muted/30'>
-                    <TableCell className='text-center text-xs font-bold text-muted-foreground'>{idx + 1}</TableCell>
+                    <TableCell className='text-center text-xs font-bold text-muted-foreground'>{(page - 1) * perPage + idx + 1}</TableCell>
                     <TableCell className='text-sm font-bold'>{row.spent_at}</TableCell>
                     <TableCell>
                       <Badge variant='outline' className='font-bold bg-muted/50'>{row.category}</Badge>
@@ -279,8 +293,15 @@ export function FinanceExpenses() {
                           variant='outline'
                           size='icon'
                           className='h-8 w-8 border-rose-100 text-rose-500 bg-rose-50/30 transition-all duration-200 hover:bg-rose-50 hover:text-rose-600 dark:border-rose-950/20 dark:bg-rose-950/10 dark:hover:bg-rose-950/50 rounded-lg shadow-sm'
-                          onClick={() => {
-                            if (confirm('Hapus pengeluaran ini?')) deleteMutation.mutate(row.id)
+                          onClick={async () => {
+                            const ok = await confirmAction({
+                              title: 'Hapus Pengeluaran',
+                              description: `Apakah Anda yakin ingin menghapus catatan pengeluaran "${row.note || row.category}"?\n\nNominal sebesar ${fmt(parseFloat(row.amount))} akan dihapus dari data pembukuan secara permanen.`,
+                              confirmText: 'Ya, Hapus',
+                              cancelText: 'Batal',
+                              variant: 'destructive',
+                            })
+                            if (ok) deleteMutation.mutate(row.id)
                           }}
                           title='Hapus Pengeluaran'
                         >
@@ -294,6 +315,46 @@ export function FinanceExpenses() {
             </TableBody>
           </Table>
         </Card>
+
+        {/* Pagination */}
+        {totalPages > 1 && (
+          <div className='flex items-center justify-between px-1'>
+            <span className='text-xs text-muted-foreground font-semibold'>
+              Menampilkan {(page - 1) * perPage + 1}–{Math.min(page * perPage, filteredExpenses.length)} dari {filteredExpenses.length} item
+            </span>
+            <div className='flex items-center gap-1.5'>
+              <Button
+                variant='outline'
+                size='icon'
+                className='h-8 w-8 rounded-lg border-border/80 text-muted-foreground shadow-sm hover:bg-accent'
+                onClick={() => setPage(p => Math.max(1, p - 1))}
+                disabled={page === 1}
+              >
+                <ChevronLeft className='h-4 w-4' />
+              </Button>
+              {Array.from({ length: totalPages }, (_, i) => i + 1).map(p => (
+                <Button
+                  key={p}
+                  variant={p === page ? 'default' : 'outline'}
+                  size='icon'
+                  className='h-8 w-8 rounded-lg text-xs font-bold shadow-sm'
+                  onClick={() => setPage(p)}
+                >
+                  {p}
+                </Button>
+              ))}
+              <Button
+                variant='outline'
+                size='icon'
+                className='h-8 w-8 rounded-lg border-border/80 text-muted-foreground shadow-sm hover:bg-accent'
+                onClick={() => setPage(p => Math.min(totalPages, p + 1))}
+                disabled={page === totalPages}
+              >
+                <ChevronRight className='h-4 w-4' />
+              </Button>
+            </div>
+          </div>
+        )}
 
         {/* Add Dialog */}
         <Dialog open={addDialog} onOpenChange={(v) => {
@@ -342,6 +403,7 @@ export function FinanceExpenses() {
           </DialogContent>
         </Dialog>
 
+        <ConfirmDialog />
       </Main>
     </>
   )

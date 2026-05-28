@@ -175,16 +175,16 @@ export function Customers() {
         <CustomersSubNav active='/customers' />
 
         <div className='grid gap-3 md:grid-cols-4'>
-          <div className='rounded-xl bg-gradient-to-br from-blue-600 to-indigo-700 p-4 text-white shadow-sm'>
+          <div className='rounded-xl bg-linear-to-br from-blue-600 to-indigo-700 p-4 text-white shadow-sm'>
             <div className='flex items-center justify-between'><div><p className='text-xs font-bold uppercase text-white/70'>Total</p><p className='text-3xl font-black'>{data?.total_all ?? data?.total ?? 0}</p></div><Users className='h-6 w-6 text-white/80' /></div>
           </div>
-          <div className='rounded-xl bg-gradient-to-br from-emerald-500 to-teal-600 p-4 text-white shadow-sm'>
+          <div className='rounded-xl bg-linear-to-br from-emerald-500 to-teal-600 p-4 text-white shadow-sm'>
             <div className='flex items-center justify-between'><div><p className='text-xs font-bold uppercase text-white/70'>Online</p><p className='text-3xl font-black'>{data?.active ?? '-'}</p></div><Wifi className='h-6 w-6 text-white/80' /></div>
           </div>
-          <div className='rounded-xl bg-gradient-to-br from-orange-500 to-rose-600 p-4 text-white shadow-sm'>
+          <div className='rounded-xl bg-linear-to-br from-orange-500 to-rose-600 p-4 text-white shadow-sm'>
             <div className='flex items-center justify-between'><div><p className='text-xs font-bold uppercase text-white/70'>Offline</p><p className='text-3xl font-black'>{data?.total_all !== undefined && data?.active !== undefined ? Math.max(0, data.total_all - data.active) : '-'}</p></div><WifiOff className='h-6 w-6 text-white/80' /></div>
           </div>
-          <div className='rounded-xl bg-gradient-to-br from-sky-500 to-blue-600 p-4 text-white shadow-sm'>
+          <div className='rounded-xl bg-linear-to-br from-sky-500 to-blue-600 p-4 text-white shadow-sm'>
             <div className='flex items-center justify-between'><div><p className='text-xs font-bold uppercase text-white/70'>Data Lengkap</p><p className='text-3xl font-black'>{data?.total_complete ?? 0}</p></div><CheckCircle2 className='h-6 w-6 text-white/80' /></div>
           </div>
         </div>

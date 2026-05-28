@@ -115,24 +115,27 @@ if ($routerHost !== '') {
         return [];
     };
 
-    // 1. Cek apakah daemon aktif dalam 5 menit terakhir (toleransi stale/expired cache)
+    // 1. Cek apakah daemon aktif dalam 10 menit terakhir (toleransi stale/expired cache)
     $daemonStatus = $cache->getStale("daemon_status_{$routerInternalId}");
     $isDaemonRecent = false;
     if ($daemonStatus) {
         $lastSync = strtotime($daemonStatus['last_sync'] ?? '2000-01-01');
-        $isDaemonRecent = (time() - $lastSync) < 300;
+        $isDaemonRecent = (time() - $lastSync) < 600;
     }
 
     $fetchWithDaemon = function ($key, $ttl, $cmd) use ($cache, $isDaemonRecent, $apiCall) {
+        // SELALU gunakan cache stale jika tersedia untuk menghindari direct connect & log flood ke MikroTik
+        $stale = $cache->getStale($key);
+        if ($stale !== null) {
+            return ['data' => $stale, 'from_cache' => true, 'stale' => true];
+        }
+
         if ($isDaemonRecent) {
-            // Daemon aktif — selalu pakai cache (stale sekalipun), JANGAN konek langsung
-            $stale = $cache->getStale($key);
-            if ($stale !== null) {
-                return ['data' => $stale, 'from_cache' => true, 'stale' => true];
-            }
-            // Cache belum ada (daemon baru start) → return kosong, jangan konek
+            // Cache belum ada sama sekali di database & daemon sedang start
             return ['data' => [], 'from_cache' => false, 'via_daemon' => true, 'initializing' => true];
         }
+
+        // Sebagai benteng pertahanan terakhir jika cache benar-benar kosong 100%, baru konek langsung
         return $cache->getOrFetch($key, $ttl, function () use ($apiCall, $cmd) {
             return $apiCall($cmd);
         });

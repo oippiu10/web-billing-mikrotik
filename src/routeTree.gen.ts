@@ -71,6 +71,7 @@ import { Route as AuthenticatedCustomersOnlineRouteImport } from './routes/_auth
 import { Route as AuthenticatedCustomersOfflineRouteImport } from './routes/_authenticated/customers/offline'
 import { Route as AuthenticatedCustomersImportExportRouteImport } from './routes/_authenticated/customers/import-export'
 import { Route as AuthenticatedCustomersByProfileRouteImport } from './routes/_authenticated/customers/by-profile'
+import { Route as AuthenticatedAutomationWhatsappCenterRouteImport } from './routes/_authenticated/automation/whatsapp-center'
 
 const ClerkRouteRoute = ClerkRouteRouteImport.update({
   id: '/clerk',
@@ -414,6 +415,12 @@ const AuthenticatedCustomersByProfileRoute =
     path: '/customers/by-profile',
     getParentRoute: () => AuthenticatedRouteRoute,
   } as any)
+const AuthenticatedAutomationWhatsappCenterRoute =
+  AuthenticatedAutomationWhatsappCenterRouteImport.update({
+    id: '/automation/whatsapp-center',
+    path: '/automation/whatsapp-center',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof AuthenticatedIndexRoute
@@ -430,6 +437,7 @@ export interface FileRoutesByFullPath {
   '/500': typeof errors500Route
   '/503': typeof errors503Route
   '/network-map': typeof AuthenticatedNetworkMapRoute
+  '/automation/whatsapp-center': typeof AuthenticatedAutomationWhatsappCenterRoute
   '/customers/by-profile': typeof AuthenticatedCustomersByProfileRoute
   '/customers/import-export': typeof AuthenticatedCustomersImportExportRoute
   '/customers/offline': typeof AuthenticatedCustomersOfflineRoute
@@ -490,6 +498,7 @@ export interface FileRoutesByTo {
   '/503': typeof errors503Route
   '/network-map': typeof AuthenticatedNetworkMapRoute
   '/': typeof AuthenticatedIndexRoute
+  '/automation/whatsapp-center': typeof AuthenticatedAutomationWhatsappCenterRoute
   '/customers/by-profile': typeof AuthenticatedCustomersByProfileRoute
   '/customers/import-export': typeof AuthenticatedCustomersImportExportRoute
   '/customers/offline': typeof AuthenticatedCustomersOfflineRoute
@@ -555,6 +564,7 @@ export interface FileRoutesById {
   '/(errors)/503': typeof errors503Route
   '/_authenticated/network-map': typeof AuthenticatedNetworkMapRoute
   '/_authenticated/': typeof AuthenticatedIndexRoute
+  '/_authenticated/automation/whatsapp-center': typeof AuthenticatedAutomationWhatsappCenterRoute
   '/_authenticated/customers/by-profile': typeof AuthenticatedCustomersByProfileRoute
   '/_authenticated/customers/import-export': typeof AuthenticatedCustomersImportExportRoute
   '/_authenticated/customers/offline': typeof AuthenticatedCustomersOfflineRoute
@@ -618,6 +628,7 @@ export interface FileRouteTypes {
     | '/500'
     | '/503'
     | '/network-map'
+    | '/automation/whatsapp-center'
     | '/customers/by-profile'
     | '/customers/import-export'
     | '/customers/offline'
@@ -678,6 +689,7 @@ export interface FileRouteTypes {
     | '/503'
     | '/network-map'
     | '/'
+    | '/automation/whatsapp-center'
     | '/customers/by-profile'
     | '/customers/import-export'
     | '/customers/offline'
@@ -742,6 +754,7 @@ export interface FileRouteTypes {
     | '/(errors)/503'
     | '/_authenticated/network-map'
     | '/_authenticated/'
+    | '/_authenticated/automation/whatsapp-center'
     | '/_authenticated/customers/by-profile'
     | '/_authenticated/customers/import-export'
     | '/_authenticated/customers/offline'
@@ -1240,6 +1253,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedCustomersByProfileRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
+    '/_authenticated/automation/whatsapp-center': {
+      id: '/_authenticated/automation/whatsapp-center'
+      path: '/automation/whatsapp-center'
+      fullPath: '/automation/whatsapp-center'
+      preLoaderRoute: typeof AuthenticatedAutomationWhatsappCenterRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
   }
 }
 
@@ -1274,6 +1294,7 @@ interface AuthenticatedRouteRouteChildren {
   AuthenticatedSettingsRouteRoute: typeof AuthenticatedSettingsRouteRouteWithChildren
   AuthenticatedNetworkMapRoute: typeof AuthenticatedNetworkMapRoute
   AuthenticatedIndexRoute: typeof AuthenticatedIndexRoute
+  AuthenticatedAutomationWhatsappCenterRoute: typeof AuthenticatedAutomationWhatsappCenterRoute
   AuthenticatedCustomersByProfileRoute: typeof AuthenticatedCustomersByProfileRoute
   AuthenticatedCustomersImportExportRoute: typeof AuthenticatedCustomersImportExportRoute
   AuthenticatedCustomersOfflineRoute: typeof AuthenticatedCustomersOfflineRoute
@@ -1315,6 +1336,8 @@ const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedSettingsRouteRoute: AuthenticatedSettingsRouteRouteWithChildren,
   AuthenticatedNetworkMapRoute: AuthenticatedNetworkMapRoute,
   AuthenticatedIndexRoute: AuthenticatedIndexRoute,
+  AuthenticatedAutomationWhatsappCenterRoute:
+    AuthenticatedAutomationWhatsappCenterRoute,
   AuthenticatedCustomersByProfileRoute: AuthenticatedCustomersByProfileRoute,
   AuthenticatedCustomersImportExportRoute:
     AuthenticatedCustomersImportExportRoute,

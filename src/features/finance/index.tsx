@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { api } from '@/lib/api'
 import { useRouterStore } from '@/stores/router-store'
@@ -24,13 +24,22 @@ import {
 import {
   TrendingUp, DollarSign, Users, AlertCircle,
   Wallet, ArrowUpRight, ArrowDownRight, CheckCircle2, Clock, CreditCard,
-  BarChart3,
+  BarChart3, MessageSquare, Loader2, Play, Square, Trash2, Settings as SettingsIcon
 } from 'lucide-react'
 import { Link } from '@tanstack/react-router'
 import { FinanceSubNav } from './components/finance-sub-nav'
 import { PrivacyText } from '@/components/privacy'
 import { usePrivacyStore } from '@/stores/privacy-store'
 import { cn } from '@/lib/utils'
+import { toast } from 'sonner'
+import { Input } from '@/components/ui/input'
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from '@/components/ui/dialog'
 
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun', 'Jul', 'Agu', 'Sep', 'Okt', 'Nov', 'Des']
 const COLORS = ['#6366f1', '#22c55e', '#f59e0b', '#ec4899', '#14b8a6', '#8b5cf6', '#f97316', '#06b6d4']
@@ -61,6 +70,147 @@ export function FinanceDashboard() {
   const privacyMode = usePrivacyStore((state) => state.privacyMode)
   const [selMonth, setSelMonth] = useState(now.getMonth() + 1)
   const [selYear, setSelYear]  = useState(now.getFullYear())
+
+  // WA Monitor & Settings States
+  const [isSettingsOpen, setIsSettingsOpen] = useState(false)
+  const [gwType, setGwType] = useState<'fonnte' | 'custom'>('fonnte')
+  const [apiToken, setApiToken] = useState('')
+  const [customUrl, setCustomUrl] = useState('')
+  const [isSavingSettings, setIsSavingSettings] = useState(false)
+  
+  // Background Worker State
+  const [isWorkerRunning, setIsWorkerRunning] = useState(false)
+  const [workerProgress, setWorkerProgress] = useState('')
+
+  // WA Gateway status & Queue Stats
+  const { data: waMonitor, refetch: refetchWa } = useQuery({
+    queryKey: ['finance-wa-monitor', routerId],
+    queryFn: async () => {
+      const res = await api.get('/wa_operations.php', {
+        params: { action: 'get_queue_status', router_id: routerId }
+      })
+      return res.data
+    },
+    enabled: !!routerId,
+    refetchInterval: 10000, // Sync status setiap 10 detik secara live!
+  })
+
+  // Cleanup timeout on unmount
+  useEffect(() => {
+    return () => {
+      if ((window as any)._waWorkerTimeout) {
+        clearTimeout((window as any)._waWorkerTimeout);
+      }
+    }
+  }, [])
+
+  const openGatewaySettings = async () => {
+    try {
+      const res = await api.get('/wa_operations.php?action=get_settings')
+      if (res.data?.success) {
+        setGwType(res.data.settings.gateway_type || 'fonnte')
+        setApiToken(res.data.settings.api_token_masked || '')
+        setCustomUrl(res.data.settings.custom_url || '')
+        setIsSettingsOpen(true)
+      }
+    } catch (err: any) {
+      toast.error('Gagal mengambil setelan WA Gateway')
+    }
+  }
+
+  const saveGatewaySettings = async () => {
+    setIsSavingSettings(true)
+    try {
+      const res = await api.post('/wa_settings', {
+        gateway_type: gwType,
+        api_token: apiToken,
+        custom_url: customUrl
+      })
+      // wait, the actual API path is /wa_operations.php?action=save_settings
+      const resOp = await api.post('/wa_operations.php?action=save_settings', {
+        gateway_type: gwType,
+        api_token: apiToken,
+        custom_url: customUrl
+      })
+      if (resOp.data?.success) {
+        toast.success(resOp.data.message)
+        setIsSettingsOpen(false)
+        refetchWa()
+      } else {
+        toast.error(resOp.data?.message || 'Gagal menyimpan setelan')
+      }
+    } catch (err: any) {
+      toast.error('Gagal menyimpan setelan WA Gateway')
+    } finally {
+      setIsSavingSettings(false)
+    }
+  }
+
+  const clearQueue = async (type: 'failed' | 'all') => {
+    if (!window.confirm(`Apakah Anda yakin ingin menghapus ${type === 'failed' ? 'antrean gagal' : 'seluruh antrean'}?`)) return
+    try {
+      const action = type === 'failed' ? 'clear_failed' : 'clear_all'
+      const res = await api.get(`/wa_operations.php`, {
+        params: { action, router_id: routerId }
+      })
+      if (res.data?.success) {
+        toast.success(res.data.message)
+        refetchWa()
+      } else {
+        toast.error(res.data?.message || 'Gagal membersihkan antrean')
+      }
+    } catch (err) {
+      toast.error('Gagal membersihkan antrean')
+    }
+  }
+
+  const runBackgroundWorker = async () => {
+    if (isWorkerRunning) {
+      if ((window as any)._waWorkerTimeout) {
+        clearTimeout((window as any)._waWorkerTimeout);
+      }
+      setIsWorkerRunning(false);
+      setWorkerProgress('Pengiriman dihentikan.');
+      return;
+    }
+    
+    setIsWorkerRunning(true);
+    setWorkerProgress('Memulai pengiriman pesan...');
+    
+    const runStep = async () => {
+      try {
+        const procRes = await api.get('/wa_operations.php?action=process_queue')
+        refetchWa();
+        if (procRes.data?.completed) {
+          setIsWorkerRunning(false);
+          setWorkerProgress('Semua antrean selesai diproses!');
+          toast.success('Semua antrean pesan selesai diproses!');
+          return;
+        }
+        
+        // Dapatkan data terbaru
+        const statsRes = await api.get('/wa_operations.php', {
+          params: { action: 'get_queue_status', router_id: routerId }
+        })
+        const counts = statsRes.data?.counts || { pending: 0 }
+        
+        if (counts.pending > 0) {
+          setWorkerProgress(`Mengirim pesan... Sisa antrean: ${counts.pending}`);
+          (window as any)._waWorkerTimeout = setTimeout(runStep, 2500);
+        } else {
+          setIsWorkerRunning(false);
+          setWorkerProgress('Semua antrean selesai diproses!');
+          toast.success('Semua antrean pesan selesai diproses!');
+        }
+      } catch (err) {
+        setIsWorkerRunning(false);
+        setWorkerProgress('Pengiriman terhenti karena kesalahan.');
+        toast.error('Terjadi kesalahan pada background worker');
+      }
+    }
+    
+    runStep();
+  }
 
   // KPI
   const { data: kpi } = useQuery({
@@ -93,6 +243,18 @@ export function FinanceDashboard() {
     queryFn: async () => {
       const res = await api.get('/finance_report.php', {
         params: { action: 'profile_revenue', router_id: routerId, month: selMonth, year: selYear }
+      })
+      return res.data.data || []
+    },
+    enabled: !!routerId,
+  })
+
+  // Revenue per ODP
+  const { data: odpRev } = useQuery({
+    queryKey: ['finance-odp', routerId, selMonth, selYear],
+    queryFn: async () => {
+      const res = await api.get('/finance_report.php', {
+        params: { action: 'odp_revenue', router_id: routerId, month: selMonth, year: selYear }
       })
       return res.data.data || []
     },
@@ -238,77 +400,134 @@ export function FinanceDashboard() {
           </CardContent>
         </Card>
 
-        {/* Charts Row */}
-        <div className='grid gap-6 lg:grid-cols-3'>
-          {/* Bar Chart - Tren 12 Bulan */}
-          <Card className='lg:col-span-2 border-none shadow-lg'>
-            <CardHeader className='pb-2'>
-              <CardTitle className='text-sm font-black uppercase tracking-widest flex items-center gap-2'>
-                <TrendingUp className='h-4 w-4 text-primary' /> Tren Pendapatan {selYear}
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <ResponsiveContainer width='100%' height={250}>
-                <BarChart data={annual?.data || []} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
-                  <defs>
-                    <linearGradient id="colorRevenue" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="0%" stopColor="#6366f1" stopOpacity={1}/>
-                      <stop offset="100%" stopColor="#8b5cf6" stopOpacity={0.6}/>
-                    </linearGradient>
-                  </defs>
-                  <CartesianGrid strokeDasharray='4 4' vertical={false} className='stroke-muted' />
-                  <XAxis dataKey='month_short' tick={{ fontSize: 10, fontWeight: 700 }} tickLine={false} axisLine={false} dy={10} />
-                  <YAxis tick={{ fontSize: 10, fontWeight: 600 }} tickFormatter={v => privacyMode ? '•••' : `${(v/1000000).toFixed(0)}jt`} tickLine={false} axisLine={false} />
-                  <Tooltip
-                    cursor={{ fill: 'transparent' }}
-                    formatter={(v: any) => [privacyMode ? '••••••' : fmt(Number(v)), 'Pendapatan']}
-                    labelFormatter={l => `Bulan: ${MONTHS[(l as number) - 1] || l}`}
-                    contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1)', fontSize: 12, fontWeight: 800 }}
-                  />
-                  <Bar dataKey='revenue' fill='url(#colorRevenue)' radius={[6, 6, 0, 0]} maxBarSize={40} />
-                </BarChart>
-              </ResponsiveContainer>
-            </CardContent>
-          </Card>
+        {/* Tren Pendapatan 12 Bulan - Lebar Penuh */}
+        <Card className='border-none shadow-lg w-full'>
+          <CardHeader className='pb-2'>
+            <CardTitle className='text-sm font-black uppercase tracking-widest flex items-center gap-2'>
+              <TrendingUp className='h-4 w-4 text-primary' /> Tren Pendapatan {selYear}
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <ResponsiveContainer width='100%' height={250}>
+              <BarChart data={annual?.data || []} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+                <defs>
+                  <linearGradient id="colorRevenue" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="0%" stopColor="#6366f1" stopOpacity={1}/>
+                    <stop offset="100%" stopColor="#8b5cf6" stopOpacity={0.6}/>
+                  </linearGradient>
+                </defs>
+                <CartesianGrid strokeDasharray='4 4' vertical={false} className='stroke-muted' />
+                <XAxis dataKey='month_short' tick={{ fontSize: 10, fontWeight: 700 }} tickLine={false} axisLine={false} dy={10} />
+                <YAxis tick={{ fontSize: 10, fontWeight: 600 }} tickFormatter={v => privacyMode ? '•••' : `${(v/1000000).toFixed(0)}jt`} tickLine={false} axisLine={false} />
+                <Tooltip
+                  cursor={{ fill: 'transparent' }}
+                  formatter={(v: any) => [privacyMode ? '••••••' : fmt(Number(v)), 'Pendapatan']}
+                  labelFormatter={l => `Bulan: ${MONTHS[(l as number) - 1] || l}`}
+                  contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1)', fontSize: 12, fontWeight: 800 }}
+                />
+                <Bar dataKey='revenue' fill='url(#colorRevenue)' radius={[6, 6, 0, 0]} maxBarSize={40} />
+              </BarChart>
+            </ResponsiveContainer>
+          </CardContent>
+        </Card>
 
+        {/* Grid 2 Kolom: Sebaran Per Paket & Sebaran Per ODP */}
+        <div className='grid gap-6 lg:grid-cols-2'>
           {/* Profile Revenue */}
           <Card className='border-none shadow-lg flex flex-col'>
             <CardHeader className='pb-2'>
               <CardTitle className='text-sm font-black uppercase tracking-widest flex items-center gap-2'>
-                <Users className='h-4 w-4 text-primary' /> Per Paket ({MONTHS[selMonth - 1]})
+                <Users className='h-4 w-4 text-primary' /> Sebaran per Paket ({MONTHS[selMonth - 1]})
               </CardTitle>
             </CardHeader>
             <CardContent className='space-y-5 pt-4 flex-1'>
-              {(profileRev || []).length === 0 && (
-                <div className='flex h-full items-center justify-center text-muted-foreground text-xs'>
-                  Belum ada data
+              {(profileRev || []).length === 0 ? (
+                <div className='flex h-32 items-center justify-center text-muted-foreground text-xs font-bold'>
+                  Belum ada data profile
                 </div>
+              ) : (
+                (profileRev || []).slice(0, 5).map((p: any, i: number) => {
+                  const maxRev = Math.max(...(profileRev || []).map((x: any) => parseFloat(x.revenue || 0)))
+                  const pct = maxRev > 0 ? (parseFloat(p.revenue || 0) / maxRev) * 100 : 0
+                  const colors = ['from-indigo-500 to-blue-500', 'from-emerald-400 to-teal-500', 'from-amber-400 to-orange-500', 'from-rose-400 to-pink-500', 'from-violet-500 to-purple-600']
+                  const gradient = colors[i % colors.length]
+                  
+                  return (
+                    <div key={i} className='group'>
+                      <div className='flex items-end justify-between mb-2'>
+                        <div>
+                          <p className='text-sm font-black leading-none mb-1 text-foreground'>{p.profile}</p>
+                          <p className='text-[10px] font-bold text-muted-foreground tracking-wider uppercase'>
+                            {privacyMode ? '•••' : p.paid_count} Lunas &bull; {privacyMode ? '•••' : p.total_users} Total
+                          </p>
+                        </div>
+                        <div className='text-sm font-black text-right min-w-[70px]'>
+                          <PrivacyText>{fmtShort(parseFloat(p.revenue || 0))}</PrivacyText>
+                        </div>
+                      </div>
+                      <div className='h-2.5 w-full rounded-full bg-muted/60 overflow-hidden shadow-3xs'>
+                        <div className={`h-full rounded-full bg-linear-to-r ${gradient} transition-all duration-1000 ease-out`} style={{ width: `${pct}%` }} />
+                      </div>
+                    </div>
+                  )
+                })
               )}
-              {(profileRev || []).slice(0, 7).map((p: any, i: number) => {
-                const maxRev = Math.max(...(profileRev || []).map((x: any) => parseFloat(x.revenue || 0)))
-                const pct = maxRev > 0 ? (parseFloat(p.revenue || 0) / maxRev) * 100 : 0
-                const colors = ['from-indigo-500 to-blue-500', 'from-emerald-400 to-teal-500', 'from-amber-400 to-orange-500', 'from-rose-400 to-pink-500', 'from-violet-500 to-purple-600', 'from-cyan-400 to-blue-500']
-                const gradient = colors[i % colors.length]
-                
-                return (
-                  <div key={i} className='group'>
-                    <div className='flex items-end justify-between mb-2'>
-                      <div>
-                        <p className='text-sm font-black leading-none mb-1 text-foreground'>{p.profile}</p>
-                        <p className='text-[10px] font-bold text-muted-foreground tracking-wider uppercase'>
-                          {privacyMode ? '***' : p.paid_users} dari {privacyMode ? '***' : p.total_users} Lunas
-                        </p>
+            </CardContent>
+          </Card>
+
+          {/* ODP Revenue & Piutang */}
+          <Card className='border-none shadow-lg flex flex-col'>
+            <CardHeader className='pb-2'>
+              <CardTitle className='text-sm font-black uppercase tracking-widest flex items-center gap-2'>
+                <BarChart3 className='h-4 w-4 text-indigo-500' /> Sebaran per ODP ({MONTHS[selMonth - 1]})
+              </CardTitle>
+            </CardHeader>
+            <CardContent className='space-y-5 pt-4 flex-1'>
+              {(odpRev || []).length === 0 ? (
+                <div className='flex h-32 items-center justify-center text-muted-foreground text-xs font-bold'>
+                  Belum ada data ODP
+                </div>
+              ) : (
+                (odpRev || []).slice(0, 5).map((o: any, i: number) => {
+                  const revenueVal = parseFloat(o.revenue || 0)
+                  const receivableVal = parseFloat(o.receivable || 0)
+                  const totalVal = revenueVal + receivableVal
+                  
+                  // Hitung rasio pembayaran di ODP ini
+                  const paymentRatio = totalVal > 0 ? (revenueVal / totalVal) * 100 : 0
+                  
+                  return (
+                    <div key={i} className='group'>
+                      <div className='flex items-end justify-between mb-2'>
+                        <div>
+                          <p className='text-sm font-black leading-none mb-1 text-foreground'>{o.odp_name}</p>
+                          <p className='text-[10px] font-bold text-muted-foreground tracking-wider uppercase'>
+                            {privacyMode ? '•••' : o.paid_count} Lunas &bull; {privacyMode ? '•••' : o.total_users} Total Plg
+                          </p>
+                        </div>
+                        <div className='text-right text-xs font-semibold'>
+                          <p className='text-emerald-600 font-extrabold'>Lunas: <PrivacyText>{fmtShort(revenueVal)}</PrivacyText></p>
+                          {receivableVal > 0 && (
+                            <p className='text-rose-500 font-bold'>Piutang: <PrivacyText>{fmtShort(receivableVal)}</PrivacyText></p>
+                          )}
+                        </div>
                       </div>
-                      <div className='text-sm font-black text-right min-w-[70px]'>
-                        <PrivacyText>{fmtShort(parseFloat(p.revenue || 0))}</PrivacyText>
+                      <div className='h-2.5 w-full rounded-full bg-slate-100 dark:bg-slate-900 overflow-hidden flex shadow-3xs'>
+                        <div 
+                          className='h-full bg-linear-to-r from-emerald-500 to-teal-500 transition-all duration-1000 ease-out' 
+                          style={{ width: `${paymentRatio}%` }} 
+                          title={`Terkumpul: ${Math.round(paymentRatio)}%`}
+                        />
+                        <div 
+                          className='h-full bg-linear-to-r from-rose-500 to-pink-500 transition-all duration-1000 ease-out' 
+                          style={{ width: `${100 - paymentRatio}%` }}
+                          title={`Tertahan: ${Math.round(100 - paymentRatio)}%`}
+                        />
                       </div>
                     </div>
-                    <div className='h-2.5 w-full rounded-full bg-muted/60 overflow-hidden'>
-                      <div className={`h-full rounded-full bg-linear-to-r ${gradient} transition-all duration-1000 ease-out`} style={{ width: `${pct}%` }} />
-                    </div>
-                  </div>
-                )
-              })}
+                  )
+                })
+              )}
             </CardContent>
           </Card>
         </div>

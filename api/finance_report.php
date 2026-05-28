@@ -58,7 +58,7 @@ try {
                         COUNT(DISTINCT u.id) as total_customers,
                         SUM(IF(p.id IS NOT NULL, 1, 0)) as paid_count,
                         SUM(IF(p.id IS NULL, 1, 0)) as unpaid_count,
-                        IFNULL(SUM(p.amount), 0) as revenue,
+                        IFNULL(SUM(CASE WHEN p.method != 'titipan' THEN p.amount ELSE 0 END), 0) as revenue,
                         IFNULL(SUM(CASE WHEN p.id IS NULL THEN IFNULL(pr.price, 0) ELSE 0 END), 0) as receivable
                     FROM users u
                     LEFT JOIN payments p ON p.user_id = u.id AND p.payment_month = ? AND p.payment_year = ? AND p.router_id = u.router_id
@@ -102,7 +102,7 @@ try {
                     u.profile,
                     COUNT(DISTINCT u.id) as total_users,
                     SUM(IF(p.id IS NOT NULL, 1, 0)) as paid_count,
-                    IFNULL(SUM(p.amount), 0) as revenue,
+                    IFNULL(SUM(CASE WHEN p.method != 'titipan' THEN p.amount ELSE 0 END), 0) as revenue,
                     IFNULL(MAX(pr.price), 0) as price_per_user
                 FROM users u
                 LEFT JOIN payments p ON p.user_id = u.id AND p.payment_month = ? AND p.payment_year = ? AND p.router_id = u.router_id
@@ -110,6 +110,33 @@ try {
                 WHERE u.router_id = ? AND u.profile IS NOT NULL AND u.profile != ''
                 GROUP BY u.profile
                 ORDER BY revenue DESC
+            ");
+            $stmt->bind_param("iis", $month, $year, $router_id);
+            $stmt->execute();
+            $result = $stmt->get_result();
+            $data = [];
+            while ($row = $result->fetch_assoc()) $data[] = $row;
+            $stmt->close();
+
+            echo json_encode(['success' => true, 'data' => $data], JSON_UNESCAPED_UNICODE);
+            break;
+
+        // ── Revenue & Piutang Per ODP ─────────────────────────────────────────
+        case 'odp_revenue':
+            $stmt = $conn->prepare("
+                SELECT
+                    IFNULL(o.name, 'Tanpa ODP') as odp_name,
+                    COUNT(DISTINCT u.id) as total_users,
+                    SUM(IF(p.id IS NOT NULL, 1, 0)) as paid_count,
+                    IFNULL(SUM(CASE WHEN p.method != 'titipan' THEN p.amount ELSE 0 END), 0) as revenue,
+                    IFNULL(SUM(CASE WHEN p.id IS NULL THEN IFNULL(pr.price, 0) ELSE 0 END), 0) as receivable
+                FROM users u
+                LEFT JOIN odp o ON u.odp_id = o.id
+                LEFT JOIN payments p ON p.user_id = u.id AND p.payment_month = ? AND p.payment_year = ? AND p.router_id = u.router_id
+                LEFT JOIN ppp_profile_pricing pr ON pr.profile_name = u.profile AND pr.router_id = u.router_id
+                WHERE u.router_id = ?
+                GROUP BY u.odp_id
+                ORDER BY revenue DESC, receivable DESC
             ");
             $stmt->bind_param("iis", $month, $year, $router_id);
             $stmt->execute();
@@ -301,7 +328,7 @@ try {
                         COUNT(DISTINCT u.id) as total_users,
                         SUM(IF(p.id IS NOT NULL, 1, 0)) as paid_count,
                         SUM(IF(p.id IS NULL, 1, 0)) as unpaid_count,
-                        IFNULL(SUM(p.amount), 0) as revenue
+                        IFNULL(SUM(CASE WHEN p.method != 'titipan' THEN p.amount ELSE 0 END), 0) as revenue
                     FROM users u
                     LEFT JOIN payments p ON p.user_id = u.id AND p.payment_month = ? AND p.payment_year = ? AND p.router_id = u.router_id
                     WHERE u.router_id = ?

@@ -18,6 +18,7 @@ $month = intval($input['month'] ?? date('n'));
 $year = intval($input['year'] ?? date('Y'));
 $grace_days = max(0, intval($input['grace_days'] ?? 7));
 $dry_run = filter_var($input['dry_run'] ?? true, FILTER_VALIDATE_BOOLEAN);
+$send_wa = filter_var($input['send_wa'] ?? false, FILTER_VALIDATE_BOOLEAN);
 
 if ($router_id <= 0 || $month < 1 || $month > 12 || $year < 2020) {
     http_response_code(400);
@@ -50,7 +51,7 @@ $hasHarga = ($conn->query("SHOW COLUMNS FROM users LIKE 'harga'")?->num_rows ?? 
 $hasAmount = ($conn->query("SHOW COLUMNS FROM users LIKE 'amount'")?->num_rows ?? 0) > 0;
 $hargaExpr = $hasHarga ? 'u.harga' : ($hasAmount ? 'u.amount' : '0');
 
-$sql = "SELECT u.id, u.username, u.profile, COALESCE($hargaExpr, 0) AS harga
+$sql = "SELECT u.id, u.username, u.profile, u.wa, COALESCE($hargaExpr, 0) AS harga
         FROM users u
         LEFT JOIN payments p ON (p.user_id = u.id AND p.payment_month = ? AND p.payment_year = ?)
         WHERE p.id IS NULL
@@ -96,11 +97,39 @@ if (!$dry_run && count($candidates) > 0) {
         $secretId = $found[0]['.id'] ?? null;
         if ($secretId) {
             $disabled = ($found[0]['disabled'] ?? 'false') === 'true';
+            $justDisabled = false;
             if (!$disabled) {
                 $r = $api->comm('/ppp/secret/disable', ['.id' => $secretId]);
-                if (!isset($r['!trap'])) $processed++;
+                if (!isset($r['!trap'])) {
+                    $processed++;
+                    $justDisabled = true;
+                }
             }
             $status = $disabled ? 'already_disabled' : 'disabled';
+            
+            // Auto Enqueue WA Isolir jika sukses dinonaktifkan
+            if ($send_wa && $justDisabled && !empty($row['wa'])) {
+                $phone = preg_replace('/[^0-9]/', '', $row['wa']);
+                if (strpos($phone, '0') === 0) {
+                    $phone = '62' . substr($phone, 1);
+                }
+                
+                $bulanNama = [
+                    1 => 'Januari', 2 => 'Februari', 3 => 'Maret', 4 => 'April', 
+                    5 => 'Mei', 6 => 'Juni', 7 => 'Juli', 8 => 'Agustus', 
+                    9 => 'September', 10 => 'Oktober', 11 => 'November', 12 => 'Desember'
+                ][$month] ?? $month;
+                
+                $amountFormatted = "Rp " . number_format($row['harga'], 0, ',', '.');
+                
+                $waText = "Halo Saudara/i *" . ($row['username']) . "*,\n\nKami informasikan bahwa layanan internet Anda (Akun: *" . $row['username'] . "*) ditangguhkan sementara karena belum melakukan pembayaran tagihan internet periode *" . $bulanNama . " " . $year . "* sebesar *" . $amountFormatted . "*.\n\nLayanan internet Anda akan kembali aktif secara otomatis dalam 2 menit setelah pembayaran Anda dikonfirmasi lunas.\n\nJika Anda sudah melakukan pembayaran, mohon hubungi admin untuk konfirmasi. Terima kasih.";
+                
+                $stmtWa = $conn->prepare("INSERT INTO wa_queue (router_id, phone, message, status) VALUES (?, ?, ?, 'pending')");
+                $stmtWa->bind_param("sss", $router_id, $phone, $waText);
+                $stmtWa->execute();
+                $stmtWa->close();
+            }
+            
             $responseRows[] = ['username' => $row['username'], 'secret_id' => $secretId, 'status' => $status];
             insert_automation_log($conn, $router_id, $month, $year, 'isolate', $dry_run, $row['username'], $status, intval($_SESSION['admin_id'] ?? 0), $secretId);
         } else {

@@ -1,5 +1,6 @@
 import { useState, useMemo } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
+import { useNavigate } from '@tanstack/react-router'
 import { api } from '@/lib/api'
 import { useRouterStore } from '@/stores/router-store'
 import { Header } from '@/components/layout/header'
@@ -30,6 +31,9 @@ import { FinanceSubNav } from './components/finance-sub-nav'
 import { PrivacyText } from '@/components/privacy'
 import { usePrivacyStore } from '@/stores/privacy-store'
 import { usePermission } from '@/lib/permissions'
+import { useConfirm } from '@/hooks/use-confirm'
+import { PaymentDialog } from './components/payment-dialog'
+import { BlastWaDialog } from './components/blast-wa-dialog'
 
 const MONTHS_ID = ['Januari','Februari','Maret','April','Mei','Juni','Juli','Agustus','September','Oktober','November','Desember']
 const fmt = (n: number) =>
@@ -43,17 +47,15 @@ const normalizeWhatsapp = (value: unknown) => {
   return raw
 }
 
-const openWhatsappReminder = (row: any, month: number, year: number) => {
+const getWhatsappReminderData = (row: any, month: number, year: number) => {
   const phone = normalizeWhatsapp(row.phone || row.no_hp || row.telepon || row.whatsapp)
   const amount = fmt(parseFloat(row.harga || 0))
   const message = `Halo ${row.username}, kami informasikan tagihan internet periode ${MONTHS_ID[month - 1]} ${year} sebesar ${amount} belum tercatat lunas. Mohon abaikan pesan ini jika sudah melakukan pembayaran. Terima kasih.`
-  const url = phone
-    ? `https://wa.me/${phone}?text=${encodeURIComponent(message)}`
-    : `https://wa.me/?text=${encodeURIComponent(message)}`
-  window.open(url, '_blank')
+  return { phone, message }
 }
 
 export function FinanceReceivable() {
+  const navigate = useNavigate()
   const { activeRouter } = useRouterStore()
   const queryClient = useQueryClient()
   const privacyMode = usePrivacyStore((state) => state.privacyMode)
@@ -64,15 +66,18 @@ export function FinanceReceivable() {
   const [year, setYear]       = useState(now.getFullYear())
   const [search, setSearch]   = useState('')
   const [profile, setProfile] = useState('')
+  const [tipe, setTipe]       = useState('')
   const [page, setPage]       = useState(1)
   const perPage = 20
 
   const [paidDialog, setPaidDialog] = useState<any>(null)
   const [bulkPaidDialog, setBulkPaidDialog] = useState<boolean>(false)
-  const [paidAmount, setPaidAmount] = useState('')
-  const [paidDate, setPaidDate]     = useState(now.toISOString().slice(0, 10))
+  const [isBlastOpen, setIsBlastOpen] = useState<boolean>(false)
+  const [paidDate, setPaidDate] = useState(now.toISOString().slice(0, 10))
   const [paidMethod, setPaidMethod] = useState('cash')
-  const [paidNote, setPaidNote]     = useState('')
+  const [paidNote, setPaidNote] = useState('')
+  
+  const { confirm: confirmAction, ConfirmDialog } = useConfirm()
   
   const [selectedRows, setSelectedRows] = useState<Set<number>>(new Set())
 
@@ -111,28 +116,12 @@ export function FinanceReceivable() {
   })
 
   const markPaid = useMutation({
-    mutationFn: async (row: any) => {
-      const res = await api.post('/payment_operations.php', {
-        action: 'mark_paid',
-        router_id: activeRouter?.software_id || activeRouter?.id,
-        username: row.username,
-        payment_id: row.id,
-        amount: parseFloat(paidAmount) || parseFloat(row.harga) || 0,
-        paid_date: paidDate,
-        method: paidMethod,
-        note: paidNote,
-        month, year,
-      })
-      return res.data
-    },
-    onSuccess: (d) => {
-      if (d.success) {
-        toast.success('Pembayaran dicatat!')
-        queryClient.invalidateQueries({ queryKey: ['receivable'] })
-        queryClient.invalidateQueries({ queryKey: ['billing'] })
-        queryClient.invalidateQueries({ queryKey: ['finance-kpi'] })
-        setPaidDialog(null)
-      } else toast.error(d.message || 'Gagal')
+    onSuccess: () => {
+      toast.success('Pembayaran dicatat!')
+      queryClient.invalidateQueries({ queryKey: ['receivable'] })
+      queryClient.invalidateQueries({ queryKey: ['billing'] })
+      queryClient.invalidateQueries({ queryKey: ['finance-kpi'] })
+      setPaidDialog(null)
     }
   })
 
@@ -196,7 +185,11 @@ export function FinanceReceivable() {
   }
 
   const sortedData = useMemo(() => {
-    const list = [...(data?.data || [])]
+    let list = [...(data?.data || [])]
+    // Filter tipe langganan client-side
+    if (tipe) {
+      list = list.filter((r: any) => (r.tipe_langganan || 'pascabayar') === tipe)
+    }
     if (!sortConfig.key || !sortConfig.direction) return list
     return list.sort((a, b) => {
       let valA = a[sortConfig.key]
@@ -207,11 +200,11 @@ export function FinanceReceivable() {
       if (valA > valB) return sortConfig.direction === 'asc' ? 1 : -1
       return 0
     })
-  }, [data?.data, sortConfig])
+  }, [data?.data, sortConfig, tipe])
 
   const totalPages    = Math.ceil((data?.total || 0) / perPage)
   const totalReceivable = data?.total_receivable || 0
-  const exportUrl = `/api/finance_report.php?action=receivable_export&router_id=${activeRouter?.software_id || activeRouter?.id}&month=${month}&year=${year}&search=${encodeURIComponent(search)}&profile=${encodeURIComponent(profile)}`
+  const exportUrl = `/api/export_excel.php?action=receivable&router_id=${activeRouter?.software_id || activeRouter?.id}&month=${month}&year=${year}&search=${encodeURIComponent(search)}&profile=${encodeURIComponent(profile)}`
 
   const overdueColor = (n: number) => {
     if (n >= 3) return 'text-red-600 bg-red-50 dark:bg-red-900/20'
@@ -305,6 +298,24 @@ export function FinanceReceivable() {
         <div className='flex flex-col gap-3 bg-card p-3 rounded-xl border border-border/80 shadow-sm sm:flex-row sm:items-center sm:justify-between'>
           {/* Left Side: Selectors & Search Input */}
           <div className='flex flex-wrap items-center gap-2 flex-1 min-w-0'>
+            {/* Tipe Langganan */}
+            <Select
+              value={tipe || 'all'}
+              onValueChange={(v) => {
+                setTipe(v === 'all' ? '' : v)
+                setPage(1)
+              }}
+            >
+              <SelectTrigger className='h-9 w-36 text-xs font-semibold bg-background border-border rounded-lg shadow-sm focus:ring-0 focus:ring-offset-0 shrink-0'>
+                <SelectValue placeholder='Semua Tipe' />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value='all'>Semua Tipe</SelectItem>
+                <SelectItem value='prabayar'>Prabayar</SelectItem>
+                <SelectItem value='pascabayar'>Pascabayar</SelectItem>
+              </SelectContent>
+            </Select>
+
             {/* Profile */}
             <Select
               value={profile || 'all'}
@@ -350,6 +361,7 @@ export function FinanceReceivable() {
               onClick={() => {
                 setSearch('')
                 setProfile('')
+                setTipe('')
                 setPage(1)
               }}
             >
@@ -449,7 +461,17 @@ export function FinanceReceivable() {
                             variant='outline'
                             size='icon'
                             className='h-8 w-8 border-amber-100 text-amber-600 bg-amber-50/30 transition-all duration-200 hover:bg-amber-50 hover:text-amber-700 dark:border-amber-900/30 dark:text-amber-400 dark:bg-amber-950/10 dark:hover:bg-amber-950/50 rounded-lg shadow-sm'
-                            onClick={() => openWhatsappReminder(row, month, year)}
+                            onClick={() => {
+                              const waData = getWhatsappReminderData(row, month, year)
+                              if (!waData.phone) {
+                                toast.error('Pelanggan tidak memiliki nomor WhatsApp')
+                                return
+                              }
+                              navigate({
+                                to: '/automation/whatsapp-center',
+                                search: { phone: waData.phone, text: waData.message }
+                              })
+                            }}
                             title='Kirim Pesan Penagihan WA'
                           >
                             <MessageCircle className='h-4 w-4' />
@@ -458,8 +480,15 @@ export function FinanceReceivable() {
                             variant='outline'
                             size='icon'
                             className='h-8 w-8 border-indigo-100 text-indigo-600 bg-indigo-50/30 transition-all duration-200 hover:bg-indigo-50 hover:text-indigo-700 dark:border-indigo-900/30 dark:text-indigo-400 dark:bg-indigo-950/10 dark:hover:bg-indigo-950/50 rounded-lg shadow-sm'
-                            onClick={() => {
-                              if (window.confirm(`Buka isolir PPP secret ${row.username}?`)) openIsolate.mutate(row)
+                            onClick={async () => {
+                              const ok = await confirmAction({
+                                title: 'Buka Isolir Pelanggan',
+                                description: `Apakah Anda yakin ingin membuka isolir layanan Mikrotik untuk pelanggan ${row.username}?`,
+                                confirmText: 'Buka Isolir',
+                                cancelText: 'Batal',
+                                variant: 'default',
+                              })
+                              if (ok) openIsolate.mutate(row)
                             }}
                             disabled={openIsolate.isPending}
                             title='Buka Isolir (Open)'
@@ -471,10 +500,6 @@ export function FinanceReceivable() {
                             className='h-8 w-8 bg-emerald-500 text-white shadow-sm shadow-emerald-500/10 transition-all duration-200 hover:bg-emerald-600 hover:shadow-emerald-500/25 rounded-lg'
                             onClick={() => { 
                               setPaidDialog(row)
-                              setPaidAmount(row.harga || '')
-                              setPaidDate(now.toISOString().slice(0, 10))
-                              setPaidMethod('cash')
-                              setPaidNote('')
                             }}
                             title='Tandai Lunas'
                           >
@@ -528,11 +553,15 @@ export function FinanceReceivable() {
               </Button>
               <Button 
                 size="sm" 
+                className="bg-indigo-500 hover:bg-indigo-600 text-white shadow-lg shadow-indigo-500/20"
+                onClick={() => setIsBlastOpen(true)}
+              >
+                <MessageCircle className="h-4 w-4 mr-1.5" /> Blast WA
+              </Button>
+              <Button 
+                size="sm" 
                 className="bg-emerald-500 hover:bg-emerald-600 text-white shadow-lg shadow-emerald-500/20"
                 onClick={() => {
-                  setPaidDate(now.toISOString().slice(0, 10))
-                  setPaidMethod('cash')
-                  setPaidNote('')
                   setBulkPaidDialog(true)
                 }}
               >
@@ -545,20 +574,20 @@ export function FinanceReceivable() {
 
       {/* Bulk Paid Dialog */}
       <Dialog open={bulkPaidDialog} onOpenChange={setBulkPaidDialog}>
-        <DialogContent className='max-w-sm'>
+        <DialogContent className='max-w-sm rounded-3xl border shadow-2xl'>
           <DialogHeader>
-            <DialogTitle className='text-base font-black'>Pelunasan Massal ({selectedRows.size} Pelanggan)</DialogTitle>
+            <DialogTitle className='text-base font-black tracking-tight'>Pelunasan Massal ({selectedRows.size} Pelanggan)</DialogTitle>
           </DialogHeader>
           <div className='space-y-3 py-2'>
             <div>
-              <label className='text-xs font-bold uppercase tracking-wide text-muted-foreground'>Tanggal Bayar</label>
-              <Input type='date' value={paidDate} onChange={e => setPaidDate(e.target.value)} className='mt-1' />
+              <label className='text-[10px] font-bold uppercase tracking-wider text-muted-foreground'>Tanggal Bayar</label>
+              <Input type='date' value={paidDate} onChange={e => setPaidDate(e.target.value)} className='mt-1 rounded-xl' />
             </div>
             <div>
-              <label className='text-xs font-bold uppercase tracking-wide text-muted-foreground'>Metode</label>
+              <label className='text-[10px] font-bold uppercase tracking-wider text-muted-foreground'>Metode</label>
               <Select value={paidMethod} onValueChange={setPaidMethod}>
-                <SelectTrigger className='mt-1'><SelectValue /></SelectTrigger>
-                <SelectContent>
+                <SelectTrigger className='mt-1 rounded-xl'><SelectValue /></SelectTrigger>
+                <SelectContent className="rounded-2xl">
                   <SelectItem value='cash'>Tunai</SelectItem>
                   <SelectItem value='transfer'>Transfer Bank</SelectItem>
                   <SelectItem value='qris'>QRIS</SelectItem>
@@ -567,59 +596,64 @@ export function FinanceReceivable() {
               </Select>
             </div>
             <div>
-              <label className='text-xs font-bold uppercase tracking-wide text-muted-foreground'>Catatan (Opsional)</label>
-              <Input value={paidNote} onChange={e => setPaidNote(e.target.value)} className='mt-1' placeholder='Catatan massal...' />
+              <label className='text-[10px] font-bold uppercase tracking-wider text-muted-foreground'>Catatan (Opsional)</label>
+              <Input value={paidNote} onChange={e => setPaidNote(e.target.value)} className='mt-1 rounded-xl' placeholder='Catatan massal...' />
             </div>
           </div>
-          <DialogFooter>
-            <Button variant='outline' onClick={() => setBulkPaidDialog(false)}>Batal</Button>
-            <Button className='bg-green-500 hover:bg-green-600' onClick={() => bulkMarkPaid.mutate()} disabled={bulkMarkPaid.isPending}>
-              <CheckCheck className='h-4 w-4 mr-1' /> Proses ({selectedRows.size}) Lunas
+          <DialogFooter className="flex gap-2">
+            <Button variant='outline' onClick={() => setBulkPaidDialog(false)} className="rounded-xl font-bold border-2">Batal</Button>
+            <Button className='bg-green-500 hover:bg-green-600 text-white rounded-xl font-bold px-5' onClick={() => bulkMarkPaid.mutate()} disabled={bulkMarkPaid.isPending}>
+              <CheckCheck className='h-4 w-4 mr-1.5' /> Proses ({selectedRows.size}) Lunas
             </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
 
-      {/* Paid Dialog */}
-      <Dialog open={!!paidDialog} onOpenChange={() => setPaidDialog(null)}>
-        <DialogContent className='max-w-sm'>
-          <DialogHeader>
-            <DialogTitle className='text-base font-black'>Tandai Lunas — {paidDialog?.username}</DialogTitle>
-          </DialogHeader>
-          <div className='space-y-3 py-2'>
-            <div>
-              <label className='text-xs font-bold uppercase tracking-wide text-muted-foreground'>Nominal (Rp)</label>
-              <Input type={privacyMode ? 'password' : 'number'} value={paidAmount} onChange={e => setPaidAmount(e.target.value)} className='mt-1 font-mono' />
-            </div>
-            <div>
-              <label className='text-xs font-bold uppercase tracking-wide text-muted-foreground'>Tanggal Bayar</label>
-              <Input type='date' value={paidDate} onChange={e => setPaidDate(e.target.value)} className='mt-1' />
-            </div>
-            <div>
-              <label className='text-xs font-bold uppercase tracking-wide text-muted-foreground'>Metode</label>
-              <Select value={paidMethod} onValueChange={setPaidMethod}>
-                <SelectTrigger className='mt-1'><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value='cash'>Tunai</SelectItem>
-                  <SelectItem value='transfer'>Transfer Bank</SelectItem>
-                  <SelectItem value='qris'>QRIS</SelectItem>
-                  <SelectItem value='e-wallet'>E-Wallet</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            <div>
-              <label className='text-xs font-bold uppercase tracking-wide text-muted-foreground'>Catatan (Opsional)</label>
-              <Input value={paidNote} onChange={e => setPaidNote(e.target.value)} className='mt-1' placeholder='Catatan tambahan...' />
-            </div>
-          </div>
-          <DialogFooter>
-            <Button variant='outline' onClick={() => setPaidDialog(null)}>Batal</Button>
-            <Button className='bg-green-500 hover:bg-green-600' onClick={() => markPaid.mutate(paidDialog)} disabled={markPaid.isPending}>
-              <CheckCheck className='h-4 w-4 mr-1' /> Konfirmasi Lunas
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      <PaymentDialog
+        isOpen={!!paidDialog}
+        onClose={() => setPaidDialog(null)}
+        paidDialog={paidDialog}
+        privacyMode={privacyMode}
+        fmt={fmt}
+        isPending={markPaid.isPending}
+        onSave={(payload) => {
+          api.post('/payment_operations.php', {
+            action: 'mark_paid',
+            router_id: activeRouter?.software_id || activeRouter?.id,
+            username: paidDialog.username,
+            payment_id: paidDialog.id,
+            amount: payload.calculatedAmount,
+            paid_date: payload.calculatedDate || now.toISOString().slice(0, 10),
+            method: payload.calculatedMethod || 'cash',
+            note: payload.calculatedNote,
+            month, year,
+          }).then((res) => {
+            if (res.data.success) {
+              toast.success('Pembayaran dicatat!')
+              queryClient.invalidateQueries({ queryKey: ['receivable'] })
+              queryClient.invalidateQueries({ queryKey: ['billing'] })
+              queryClient.invalidateQueries({ queryKey: ['finance-kpi'] })
+              setPaidDialog(null)
+            } else {
+              toast.error(res.data.message || 'Gagal')
+            }
+          })
+        }}
+      />
+
+      <BlastWaDialog
+        isOpen={isBlastOpen}
+        onClose={() => {
+          setIsBlastOpen(false)
+          setSelectedRows(new Set())
+        }}
+        selectedCustomers={(data?.data || []).filter((r: any) => selectedRows.has(r.id))}
+        month={month}
+        year={year}
+        fmt={fmt}
+      />
+
+      <ConfirmDialog />
     </>
   )
 }

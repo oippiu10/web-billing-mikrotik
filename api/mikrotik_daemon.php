@@ -171,27 +171,23 @@ while (true) {
 
             // 4. Slow Loop: Secrets, Profiles, Identity & Internet Check (Every 30s)
             if ($loops % 30 == 0) {
-                echo "[" . date('H:i:s') . "] Syncing Secrets/Profiles & Ping for $host via isolated socket...\n";
-                $slowApi = new RouterosAPI();
-                $slowApi->port = $port;
-                $slowApi->timeout = 10;
-                if ($slowApi->connect($host, $user, $pass)) {
-                    $cache->set("mt_{$rid}_ppp_secret", $slowApi->comm('/ppp/secret/print'), 600);
-                    $cache->set("mt_{$rid}_ppp_profile", $slowApi->comm('/ppp/profile/print'), 600);
-
-                    $identity = $slowApi->comm('/system/identity/print');
-                    $routerPrevData[$rid]['identity'] = $identity[0]['name'] ?? 'MikroTik';
-                    $cache->set("mt_{$rid}_identity", $identity ?: [], 3600);
-
-                    // Internet Ping
-                    $ping = $slowApi->comm('/ping', ['address' => '8.8.8.8', 'count' => '1']);
-                    $routerPrevData[$rid]['internet'] = (isset($ping[0]['received']) && $ping[0]['received'] > 0) ? 'OK' : 'Error';
-                    
-                    @$slowApi->disconnect();
-                    echo "[" . date('H:i:s') . "] Syncing Secrets/Profiles & Ping completed successfully.\n";
-                } else {
-                    echo "[" . date('H:i:s') . "] Gagal membuat koneksi terisolasi untuk slow loop $host\n";
+                echo "[" . date('H:i:s') . "] Syncing Secrets/Profiles & Ping for $host via persistent connection...\n";
+                $secrets = $api->comm('/ppp/secret/print');
+                if (is_array($secrets)) {
+                    $cache->set("mt_{$rid}_ppp_secret", $secrets, 600);
                 }
+                $profiles = $api->comm('/ppp/profile/print');
+                if (is_array($profiles)) {
+                    $cache->set("mt_{$rid}_ppp_profile", $profiles, 600);
+                }
+                $identity = $api->comm('/system/identity/print');
+                if (is_array($identity)) {
+                    $routerPrevData[$rid]['identity'] = $identity[0]['name'] ?? 'MikroTik';
+                    $cache->set("mt_{$rid}_identity", $identity, 3600);
+                }
+                $ping = $api->comm('/ping', ['address' => '8.8.8.8', 'count' => '1']);
+                $routerPrevData[$rid]['internet'] = (isset($ping[0]['received']) && $ping[0]['received'] > 0) ? 'OK' : 'Error';
+                echo "[" . date('H:i:s') . "] Syncing Secrets/Profiles & Ping completed successfully.\n";
             }
 
             // 5. Maintenance Loop: Cleanup expired cache entries (Every 1000 loops)
