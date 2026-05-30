@@ -1,4 +1,11 @@
 import { useState, useMemo } from 'react'
+import {
+  useReactTable,
+  getCoreRowModel,
+  getSortedRowModel,
+  flexRender,
+  type SortingState,
+} from '@tanstack/react-table'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useNavigate } from '@tanstack/react-router'
 import { api } from '@/lib/api'
@@ -34,6 +41,9 @@ import { usePermission } from '@/lib/permissions'
 import { useConfirm } from '@/hooks/use-confirm'
 import { PaymentDialog } from './components/payment-dialog'
 import { BlastWaDialog } from './components/blast-wa-dialog'
+import { getReceivableColumns } from './components/receivable-columns'
+import { Skeleton } from '@/components/ui/skeleton'
+import { PaymentCardDialog } from './components/payment-card-dialog'
 
 const MONTHS_ID = ['Januari','Februari','Maret','April','Mei','Juni','Juli','Agustus','September','Oktober','November','Desember']
 const fmt = (n: number) =>
@@ -72,6 +82,7 @@ export function FinanceReceivable() {
 
   const [paidDialog, setPaidDialog] = useState<any>(null)
   const [bulkPaidDialog, setBulkPaidDialog] = useState<boolean>(false)
+  const [paymentCardUser, setPaymentCardUser] = useState<any>(null)
   const [isBlastOpen, setIsBlastOpen] = useState<boolean>(false)
   const [paidDate, setPaidDate] = useState(now.toISOString().slice(0, 10))
   const [paidMethod, setPaidMethod] = useState('cash')
@@ -82,19 +93,20 @@ export function FinanceReceivable() {
   const [selectedRows, setSelectedRows] = useState<Set<number>>(new Set())
 
   const { data, isLoading } = useQuery({
-    queryKey: ['receivable', activeRouter?.id, month, year, search, profile, page],
+    queryKey: ['receivable', activeRouter?.id, month, year, search, profile, tipe, page],
     queryFn: async () => {
       const res = await api.get('/finance_report.php', {
         params: {
           action: 'receivable',
           router_id: activeRouter?.software_id || activeRouter?.id,
-          month, year, search, profile, page, per_page: perPage,
+          month, year, search, profile, tipe, page, per_page: perPage,
         }
       })
       return res.data
     },
     enabled: !!activeRouter,
     refetchInterval: 60000,
+    placeholderData: (prev) => prev,
   })
 
   const allProfiles = data?.profiles || []
@@ -175,42 +187,63 @@ export function FinanceReceivable() {
     setSelectedRows(newSet)
   }
 
-  const [sortConfig, setSortConfig] = useState<{ key: string, direction: 'asc' | 'desc' | null }>({ key: 'username', direction: 'asc' })
-
-  const handleSort = (key: string) => {
-    setSortConfig(prev => ({
-      key,
-      direction: prev.key === key && prev.direction === 'asc' ? 'desc' : 'asc'
-    }))
-  }
-
-  const sortedData = useMemo(() => {
-    let list = [...(data?.data || [])]
-    // Filter tipe langganan client-side
-    if (tipe) {
-      list = list.filter((r: any) => (r.tipe_langganan || 'pascabayar') === tipe)
-    }
-    if (!sortConfig.key || !sortConfig.direction) return list
-    return list.sort((a, b) => {
-      let valA = a[sortConfig.key]
-      let valB = b[sortConfig.key]
-      if (typeof valA === 'string') valA = valA.toLowerCase()
-      if (typeof valB === 'string') valB = valB.toLowerCase()
-      if (valA < valB) return sortConfig.direction === 'asc' ? -1 : 1
-      if (valA > valB) return sortConfig.direction === 'asc' ? 1 : -1
-      return 0
-    })
-  }, [data?.data, sortConfig, tipe])
-
-  const totalPages    = Math.ceil((data?.total || 0) / perPage)
-  const totalReceivable = data?.total_receivable || 0
-  const exportUrl = `/api/export_excel.php?action=receivable&router_id=${activeRouter?.software_id || activeRouter?.id}&month=${month}&year=${year}&search=${encodeURIComponent(search)}&profile=${encodeURIComponent(profile)}`
-
   const overdueColor = (n: number) => {
     if (n >= 3) return 'text-red-600 bg-red-50 dark:bg-red-900/20'
     if (n >= 1) return 'text-orange-600 bg-orange-50 dark:bg-orange-900/20'
     return 'text-yellow-600 bg-yellow-50 dark:bg-yellow-900/20'
   }
+
+  const [sorting, setSorting] = useState<SortingState>([])
+
+  const columns = useMemo(() => getReceivableColumns({
+    permissions,
+    selectedRows,
+    toggleSelectRow,
+    toggleSelectAll,
+    setPaymentCardUser,
+    setPaidDialog,
+    handleWA: (row) => {
+      const waData = getWhatsappReminderData(row, month, year)
+      if (!waData.phone) {
+        toast.error('Pelanggan tidak memiliki nomor WhatsApp')
+        return
+      }
+      navigate({
+        to: '/automation/whatsapp-center',
+        search: { phone: waData.phone, text: waData.message }
+      })
+    },
+    handleOpenIsolate: async (row) => {
+      const ok = await confirmAction({
+        title: 'Buka Isolir Pelanggan',
+        description: `Apakah Anda yakin ingin membuka isolir layanan Mikrotik untuk pelanggan ${row.username}?`,
+        confirmText: 'Buka Isolir',
+        cancelText: 'Batal',
+        variant: 'default',
+      })
+      if (ok) openIsolate.mutate(row)
+    },
+    openIsolatePending: openIsolate.isPending,
+    dataLength: data?.data?.length || 0,
+    fmt,
+    overdueColor
+  }), [permissions, selectedRows, toggleSelectRow, toggleSelectAll, setPaymentCardUser, setPaidDialog, confirmAction, openIsolate.isPending, openIsolate.mutate, data?.data?.length, month, year])
+
+  // eslint-disable-next-line react-hooks/incompatible-library
+  const table = useReactTable({
+    data: data?.data || [],
+    columns,
+    state: {
+      sorting,
+    },
+    onSortingChange: setSorting,
+    getCoreRowModel: getCoreRowModel(),
+    getSortedRowModel: getSortedRowModel(),
+  })
+
+  const totalPages    = Math.ceil((data?.total || 0) / perPage)
+  const totalReceivable = data?.total_receivable || 0
+  const exportUrl = `/api/export_excel.php?action=receivable&router_id=${activeRouter?.software_id || activeRouter?.id}&month=${month}&year=${year}&search=${encodeURIComponent(search)}&profile=${encodeURIComponent(profile)}`
 
   return (
     <>
@@ -385,131 +418,60 @@ export function FinanceReceivable() {
           <div className='overflow-x-auto w-full'>
           <Table>
             <TableHeader className='bg-slate-50/75 dark:bg-slate-900/60 border-b border-border/60'>
-              <TableRow>
-                {permissions.canManageFinance && (
-                  <TableHead className='w-12 pl-4 text-center'>
-                    <Checkbox 
-                      checked={data?.data?.length > 0 && selectedRows.size === data.data.length}
-                      onCheckedChange={toggleSelectAll}
-                    />
-                  </TableHead>
-                )}
-                <TableHead className='w-12 text-center text-xs font-black'>#</TableHead>
-                <TableHead className={cn('pl-4 text-xs font-black uppercase cursor-pointer hover:text-primary', !permissions.canManageFinance && 'pl-4')} onClick={() => handleSort('username')}>
-                  <div className='flex items-center gap-1'>Username <ArrowUpDown className='h-3 w-3' /></div>
-                </TableHead>
-                <TableHead className='text-xs font-black uppercase hidden md:table-cell cursor-pointer hover:text-primary' onClick={() => handleSort('alamat')}>
-                  <div className='flex items-center gap-1'>Alamat <ArrowUpDown className='h-3 w-3' /></div>
-                </TableHead>
-                <TableHead className='text-xs font-black uppercase cursor-pointer hover:text-primary' onClick={() => handleSort('profile')}>
-                  <div className='flex items-center gap-1'>Paket <ArrowUpDown className='h-3 w-3' /></div>
-                </TableHead>
-                <TableHead className='text-xs font-black uppercase text-right cursor-pointer hover:text-primary' onClick={() => handleSort('harga')}>
-                  <div className='flex items-center gap-1 justify-end'>Tagihan <ArrowUpDown className='h-3 w-3' /></div>
-                </TableHead>
-                <TableHead className='text-xs font-black uppercase text-center cursor-pointer hover:text-primary' onClick={() => handleSort('tanggal_tagihan')}>
-                  <div className='flex items-center gap-1 justify-center'>Tgl Tagihan <ArrowUpDown className='h-3 w-3' /></div>
-                </TableHead>
-                <TableHead className='text-xs font-black uppercase text-center cursor-pointer hover:text-primary' onClick={() => handleSort('months_overdue')}>
-                  <div className='flex items-center gap-1 justify-center'>Tunggakan <ArrowUpDown className='h-3 w-3' /></div>
-                </TableHead>
-                {permissions.canManageFinance && <TableHead className='text-xs font-black uppercase text-right pr-4'>Aksi</TableHead>}
-              </TableRow>
+              {table.getHeaderGroups().map((headerGroup) => (
+                <TableRow key={headerGroup.id}>
+                  {headerGroup.headers.map((header) => (
+                    <TableHead key={header.id}>
+                      {header.isPlaceholder
+                        ? null
+                        : flexRender(
+                            header.column.columnDef.header,
+                            header.getContext()
+                          )}
+                    </TableHead>
+                  ))}
+                </TableRow>
+              ))}
             </TableHeader>
             <TableBody>
               {isLoading ? (
-                <TableRow><TableCell colSpan={permissions.canManageFinance ? 9 : 7} className='text-center py-16 text-muted-foreground animate-pulse'>Memuat data...</TableCell></TableRow>
-              ) : sortedData.length === 0 ? (
+                <>
+                  {[...Array(5)].map((_, i) => (
+                    <TableRow key={i}>
+                      {table.getAllColumns().filter(c => c.getIsVisible()).map((col, j) => (
+                        <TableCell key={j} className="py-4">
+                          <Skeleton className="h-4 w-full" />
+                        </TableCell>
+                      ))}
+                    </TableRow>
+                  ))}
+                </>
+              ) : table.getRowModel().rows?.length ? (
+                table.getRowModel().rows.map((row) => (
+                  <TableRow
+                    key={row.id}
+                    data-state={row.getIsSelected() && 'selected'}
+                    className={cn(
+                      'border-b border-border/30 hover:bg-red-50/30 dark:hover:bg-red-900/10',
+                      selectedRows.has(row.original.id) && 'bg-primary/5 hover:bg-primary/10'
+                    )}
+                  >
+                    {row.getVisibleCells().map((cell) => (
+                      <TableCell key={cell.id}>
+                        {flexRender(cell.column.columnDef.cell, cell.getContext())}
+                      </TableCell>
+                    ))}
+                  </TableRow>
+                ))
+              ) : (
                 <TableRow>
-                  <TableCell colSpan={permissions.canManageFinance ? 9 : 7} className='text-center py-16'>
+                  <TableCell colSpan={table.getAllColumns().length} className='text-center py-16'>
                     <div className='flex flex-col items-center gap-2 text-muted-foreground'>
                       <CheckCheck className='h-10 w-10 text-green-400' />
                       <p className='font-bold'>Semua pelanggan sudah lunas!</p>
                     </div>
                   </TableCell>
                 </TableRow>
-              ) : (
-                sortedData.map((row: any, idx: number) => (
-                  <TableRow key={row.id} className={cn('border-b border-border/30 hover:bg-red-50/30 dark:hover:bg-red-900/10', selectedRows.has(row.id) && 'bg-primary/5 hover:bg-primary/10')}>
-                    {permissions.canManageFinance && (
-                      <TableCell className='pl-4 text-center'>
-                        <Checkbox 
-                          checked={selectedRows.has(row.id)}
-                          onCheckedChange={() => toggleSelectRow(row.id)}
-                        />
-                      </TableCell>
-                    )}
-                    <TableCell className='text-center text-xs font-bold text-muted-foreground'>{(page - 1) * perPage + idx + 1}</TableCell>
-                    <TableCell className={cn('font-bold text-sm', !permissions.canManageFinance && 'pl-4')}><PrivacyText>{row.username}</PrivacyText></TableCell>
-                    <TableCell className='text-xs text-muted-foreground hidden md:table-cell max-w-[140px] truncate'><PrivacyText>{row.alamat || '-'}</PrivacyText></TableCell>
-                    <TableCell>
-                      <Badge variant='secondary' className='text-[10px] font-bold'>{row.profile}</Badge>
-                    </TableCell>
-                    <TableCell className='text-right font-mono text-sm font-bold text-red-600'>
-                      <PrivacyText>{fmt(parseFloat(row.harga || 0))}</PrivacyText>
-                    </TableCell>
-                    <TableCell className='text-center text-xs text-muted-foreground'>{row.tanggal_tagihan || '-'}</TableCell>
-                    <TableCell className='text-center'>
-                      <span className={cn('text-[10px] font-black px-2 py-0.5 rounded-full', overdueColor(row.months_overdue))}>
-                        {row.months_overdue >= 1 ? `${row.months_overdue} bulan` : 'Baru'}
-                      </span>
-                    </TableCell>
-                    {permissions.canManageFinance && (
-                      <TableCell className='text-right pr-4'>
-                        <div className='flex justify-end gap-1.5'>
-                          <Button
-                            variant='outline'
-                            size='icon'
-                            className='h-8 w-8 border-amber-100 text-amber-600 bg-amber-50/30 transition-all duration-200 hover:bg-amber-50 hover:text-amber-700 dark:border-amber-900/30 dark:text-amber-400 dark:bg-amber-950/10 dark:hover:bg-amber-950/50 rounded-lg shadow-sm'
-                            onClick={() => {
-                              const waData = getWhatsappReminderData(row, month, year)
-                              if (!waData.phone) {
-                                toast.error('Pelanggan tidak memiliki nomor WhatsApp')
-                                return
-                              }
-                              navigate({
-                                to: '/automation/whatsapp-center',
-                                search: { phone: waData.phone, text: waData.message }
-                              })
-                            }}
-                            title='Kirim Pesan Penagihan WA'
-                          >
-                            <MessageCircle className='h-4 w-4' />
-                          </Button>
-                          <Button
-                            variant='outline'
-                            size='icon'
-                            className='h-8 w-8 border-indigo-100 text-indigo-600 bg-indigo-50/30 transition-all duration-200 hover:bg-indigo-50 hover:text-indigo-700 dark:border-indigo-900/30 dark:text-indigo-400 dark:bg-indigo-950/10 dark:hover:bg-indigo-950/50 rounded-lg shadow-sm'
-                            onClick={async () => {
-                              const ok = await confirmAction({
-                                title: 'Buka Isolir Pelanggan',
-                                description: `Apakah Anda yakin ingin membuka isolir layanan Mikrotik untuk pelanggan ${row.username}?`,
-                                confirmText: 'Buka Isolir',
-                                cancelText: 'Batal',
-                                variant: 'default',
-                              })
-                              if (ok) openIsolate.mutate(row)
-                            }}
-                            disabled={openIsolate.isPending}
-                            title='Buka Isolir (Open)'
-                          >
-                            <ShieldCheck className='h-4 w-4' />
-                          </Button>
-                          <Button
-                            size='icon'
-                            className='h-8 w-8 bg-emerald-500 text-white shadow-sm shadow-emerald-500/10 transition-all duration-200 hover:bg-emerald-600 hover:shadow-emerald-500/25 rounded-lg'
-                            onClick={() => { 
-                              setPaidDialog(row)
-                            }}
-                            title='Tandai Lunas'
-                          >
-                            <CheckCheck className='h-4 w-4' />
-                          </Button>
-                        </div>
-                      </TableCell>
-                    )}
-                  </TableRow>
-                ))
               )}
             </TableBody>
           </Table>
@@ -651,6 +613,12 @@ export function FinanceReceivable() {
         month={month}
         year={year}
         fmt={fmt}
+      />
+      
+      <PaymentCardDialog
+        open={!!paymentCardUser}
+        onOpenChange={(o) => !o && setPaymentCardUser(null)}
+        user={paymentCardUser}
       />
 
       <ConfirmDialog />

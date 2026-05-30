@@ -87,6 +87,7 @@ import { useConfirm } from '@/hooks/use-confirm'
 import { PaymentDialog } from './components/payment-dialog'
 import { printBulkThermal, printThermal, printBulkInvoice, printInvoice } from './utils/print-templates'
 import { HistoryDialog } from './components/history-dialog'
+import { PaymentCardDialog } from './components/payment-card-dialog'
 
 const MONTHS_ID = [
   'Januari',
@@ -122,37 +123,12 @@ export function FinanceBilling() {
   // Custom Confirm Dialog Hook
   const { confirm: confirmAction, ConfirmDialog } = useConfirm()
 
-  const searchParams = useSearch({ strict: false }) as any
-  
-  const month = searchParams.month || (now.getMonth() + 1)
-  const year = searchParams.year || now.getFullYear()
-  const search = searchParams.search || ''
-  const status = searchParams.status || ''
-  const profile = searchParams.profile || ''
-  const tipe = searchParams.tipe || ''
-
-  const updateSearch = (updates: any) => {
-    navigate({
-      to: '/finance/billing',
-      search: {
-        month,
-        year,
-        search: search || undefined,
-        status: status || undefined,
-        profile: profile || undefined,
-        tipe: tipe || undefined,
-        ...updates
-      },
-      replace: true,
-    })
-  }
-
-  const setMonth = (m: number) => updateSearch({ month: m })
-  const setYear = (y: number) => updateSearch({ year: y })
-  const setSearch = (s: string) => updateSearch({ search: s || undefined })
-  const setStatus = (s: string) => updateSearch({ status: s || undefined })
-  const setProfile = (p: string) => updateSearch({ profile: p || undefined })
-  const setTipe = (t: string) => updateSearch({ tipe: t || undefined })
+  const [month, setMonth] = useState(now.getMonth() + 1)
+  const [year, setYear] = useState(now.getFullYear())
+  const [search, setSearch] = useState('')
+  const [status, setStatus] = useState('')
+  const [profile, setProfile] = useState('')
+  const [tipe, setTipe] = useState('')
   const [page, setPage] = useState(1)
   const [perPage, setPerPage] = useState(() => {
     const saved = localStorage.getItem('billing-per-page')
@@ -171,6 +147,9 @@ export function FinanceBilling() {
 
   // History dialog state
   const [historyUser, setHistoryUser] = useState<any>(null)
+  
+  // Payment card dialog state
+  const [paymentCardUser, setPaymentCardUser] = useState<any>(null)
 
   // Fetch payment history for selected user
   const { data: userHistory, isLoading: isHistoryLoading } = useQuery({
@@ -416,6 +395,7 @@ export function FinanceBilling() {
     toggleSelectRow,
     toggleSelectAll,
     setHistoryUser,
+    setPaymentCardUser,
     setPaidDialog,
     handleWA,
     confirmAction,
@@ -424,7 +404,7 @@ export function FinanceBilling() {
     year,
     dataLength: tableData.length,
     fmt
-  }), [permissions, selectedRows, toggleSelectRow, toggleSelectAll, setHistoryUser, setPaidDialog, handleWA, confirmAction, markUnpaidMutate, month, year, tableData.length])
+  }), [permissions, selectedRows, toggleSelectRow, toggleSelectAll, setHistoryUser, setPaymentCardUser, setPaidDialog, handleWA, confirmAction, markUnpaidMutate, month, year, tableData.length])
 
   // eslint-disable-next-line react-hooks/incompatible-library
   const table = useReactTable({
@@ -585,6 +565,7 @@ export function FinanceBilling() {
                 <SelectItem value='all'>Semua Status</SelectItem>
                 <SelectItem value='paid'>Lunas</SelectItem>
                 <SelectItem value='unpaid'>Belum Bayar</SelectItem>
+                <SelectItem value='isolir'>Isolir</SelectItem>
               </SelectContent>
             </Select>
 
@@ -1032,6 +1013,12 @@ export function FinanceBilling() {
         userHistory={userHistory}
         fmt={fmt}
         handleDeleteAngsuran={handleDeleteAngsuran}
+      />
+
+      <PaymentCardDialog
+        open={!!paymentCardUser}
+        onOpenChange={(o) => !o && setPaymentCardUser(null)}
+        user={paymentCardUser}
       />
 
       <ConfirmDialog />

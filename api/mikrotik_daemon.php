@@ -20,7 +20,17 @@ ignore_user_abort(true);
 error_reporting(E_ALL);
 ini_set('display_errors', 1);
 
-echo "Starting Mikrotik Daemon...\n";
+function daemonLog(string $msg) {
+    $formatted = "[" . date('Y-m-d H:i:s') . "] " . $msg;
+    echo $formatted . "\n";
+    $logFile = __DIR__ . '/daemon.log';
+    if (file_exists($logFile) && filesize($logFile) > 5 * 1024 * 1024) { // 5MB limit
+        rename($logFile, $logFile . '.old');
+    }
+    file_put_contents($logFile, $formatted . "\n", FILE_APPEND);
+}
+
+daemonLog("Starting Mikrotik Daemon...");
 $cache = new MikrotikCache($conn);
 
 // Map router connection objects
@@ -34,9 +44,9 @@ while (true) {
     // Catatan: Ambil SEMUA router (bukan hanya is_active=1) agar daemon tetap
     // menjaga cache untuk semua router — mencegah direct connect & flood log
     // ketika user switch router di UI
-    if ($loops % 30 == 0 || empty($routers)) {
+    if ($loops % 3 == 0 || empty($routers)) {
         if (!$conn || $conn->connect_error) {
-            echo "[" . date('H:i:s') . "] DB Connection lost. Reconnecting...\n";
+            daemonLog("DB Connection lost. Reconnecting...");
             require __DIR__ . '/config.php';
             $cache = new MikrotikCache($conn);
         }
@@ -50,7 +60,7 @@ while (true) {
     }
 
     if (empty($routers)) {
-        echo "[" . date('H:i:s') . "] No active routers found. Waiting...\n";
+        daemonLog("No active routers found. Waiting...");
         sleep(5);
         $loops = 0;
         continue;
@@ -66,19 +76,19 @@ while (true) {
         try {
             // Connect if needed
             if (!isset($routerConnections[$rid]) || !$routerConnections[$rid]->connected) {
-                echo "[" . date('H:i:s') . "] Connecting to $host:$port...\n";
+                daemonLog("Connecting to $host:$port...");
                 $api = new RouterosAPI();
                 $api->port = $port;
                 $api->timeout = 5; // Shorter timeout
                 if ($api->connect($host, $user, $pass)) {
                     $routerConnections[$rid] = $api;
-                    echo "[" . date('H:i:s') . "] Connected Successfully to $host\n";
+                    daemonLog("Connected Successfully to $host");
 
                     // Set daemon status active immediately upon connection
                     $cache->set("daemon_status_{$rid}", ['last_sync' => date('Y-m-d H:i:s')], 300);
 
                 } else {
-                    echo "[" . date('H:i:s') . "] Failed to connect to $host\n";
+                    daemonLog("Failed to connect to $host");
                     // Tandai status offline agar API tidak menunggu daemon yang gagal
                     $cache->set("daemon_status_{$rid}", ['last_sync' => '2000-01-01 00:00:00'], 60);
                     continue;
@@ -114,8 +124,8 @@ while (true) {
 
             // 3. Medium Loop: Resources, PPP Active & Summary (Every 2s / 10s)
             // Move summary here for real-time map updates
-            if ($loops % 2 == 0) {
-                echo "[" . date('H:i:s') . "] [RID $rid] Updating Summary & Resources...\n";
+            if ($loops % 3 == 0) {
+                // Remove frequent echoing to avoid large log files for the 2s loop
                 $resource = $api->comm('/system/resource/print');
                 $cache->set("mt_{$rid}_resource", [$resource[0] ?? []], 60);
 
@@ -145,8 +155,14 @@ while (true) {
                 $cache->set("mt_{$rid}_summary", $summary, 10);
             }
 
-            if ($loops % 10 == 0) {
+            if ($loops % 3 == 0) {
                 $active = $api->comm('/ppp/active/print');
+                
+                // --- DEBUG LOG ---
+                $countActive = is_array($active) ? count($active) : 0;
+                daemonLog("DEBUG: Fetched {$countActive} active PPPoE users");
+                // -----------------
+                
                 // Data Merging
                 if (!empty($active) && !empty($interfaces)) {
                     $ifMap = [];
@@ -170,8 +186,8 @@ while (true) {
             }
 
             // 4. Slow Loop: Secrets, Profiles, Identity & Internet Check (Every 30s)
-            if ($loops % 30 == 0) {
-                echo "[" . date('H:i:s') . "] Syncing Secrets/Profiles & Ping for $host via persistent connection...\n";
+            if ($loops % 3 == 0) {
+                daemonLog("Syncing Secrets/Profiles & Ping for $host via persistent connection...");
                 $secrets = $api->comm('/ppp/secret/print');
                 if (is_array($secrets)) {
                     $cache->set("mt_{$rid}_ppp_secret", $secrets, 600);
@@ -187,19 +203,19 @@ while (true) {
                 }
                 $ping = $api->comm('/ping', ['address' => '8.8.8.8', 'count' => '1']);
                 $routerPrevData[$rid]['internet'] = (isset($ping[0]['received']) && $ping[0]['received'] > 0) ? 'OK' : 'Error';
-                echo "[" . date('H:i:s') . "] Syncing Secrets/Profiles & Ping completed successfully.\n";
+                daemonLog("Syncing Secrets/Profiles & Ping completed successfully.");
             }
 
             // 5. Maintenance Loop: Cleanup expired cache entries (Every 1000 loops)
             if ($loops % 1000 == 0) {
                 $cleaned = $cache->cleanup();
                 if ($cleaned > 0) {
-                    echo "[" . date('H:i:s') . "] [Maintenance] Cache Cleanup: $cleaned entries removed.\n";
+                    daemonLog("[Maintenance] Cache Cleanup: $cleaned entries removed.");
                 }
             }
 
         } catch (Exception $e) {
-            echo "[" . date('H:i:s') . "] Error on $host: " . $e->getMessage() . "\n";
+            daemonLog("Error on $host: " . $e->getMessage());
             if (isset($routerConnections[$rid])) {
                 @$routerConnections[$rid]->disconnect();
                 unset($routerConnections[$rid]);

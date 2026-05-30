@@ -14,6 +14,9 @@ import {
   Calendar,
   Trash2,
   FileText,
+  AlertCircle,
+  CheckCircle2,
+  Wallet
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
@@ -164,9 +167,25 @@ export function HistoryDialog({
                               {monthName} {pay.payment_year}
                             </span>
                           </div>
-                          <Badge className='h-4.5 bg-emerald-500 px-2 text-[9px] font-black hover:bg-emerald-600 rounded-lg'>
-                            LUNAS
-                          </Badge>
+                          <div className='flex items-center gap-2'>
+                            {parseFloat(pay.amount || 0) < parseFloat(pay.harga || 0) && (
+                              <Badge className='h-5 flex items-center gap-1 border-amber-200/80 bg-amber-50/80 text-amber-700 px-2 text-[9px] font-black hover:bg-amber-50 dark:border-amber-900/40 dark:bg-amber-950/30 dark:text-amber-400 dark:hover:bg-amber-950/50 rounded-lg shadow-sm'>
+                                <AlertCircle className='h-3 w-3 shrink-0' />
+                                KURANG (-{fmt(parseFloat(pay.harga || 0) - parseFloat(pay.amount || 0))})
+                              </Badge>
+                            )}
+                            {pay.method === 'titipan' ? (
+                              <Badge className='h-5 flex items-center gap-1 border-pink-300 bg-pink-50 text-pink-700 px-2 text-[9px] font-black hover:bg-pink-100 dark:border-pink-500/40 dark:bg-pink-500/10 dark:text-pink-400 dark:hover:bg-pink-500/20 rounded-lg shadow-sm'>
+                                <Wallet className='h-3 w-3 shrink-0' />
+                                TITIPAN
+                              </Badge>
+                            ) : parseFloat(pay.amount || 0) >= parseFloat(pay.harga || 0) ? (
+                              <Badge className='h-5 flex items-center gap-1 border-emerald-500 bg-emerald-500 text-white px-2 text-[9px] font-black hover:bg-emerald-600 dark:border-emerald-600 dark:bg-emerald-600 dark:hover:bg-emerald-700 rounded-lg shadow-sm'>
+                                <CheckCircle2 className='h-3 w-3 shrink-0' />
+                                LUNAS
+                              </Badge>
+                            ) : null}
+                          </div>
                         </div>
 
                         {/* Amount & Method */}

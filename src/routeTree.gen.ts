@@ -8,6 +8,8 @@
 // You should NOT make any changes in this file as it will be overwritten.
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
+import { createFileRoute } from '@tanstack/react-router'
+
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as ClerkRouteRouteImport } from './routes/clerk/route'
 import { Route as AuthenticatedRouteRouteImport } from './routes/_authenticated/route'
@@ -72,6 +74,10 @@ import { Route as AuthenticatedCustomersOfflineRouteImport } from './routes/_aut
 import { Route as AuthenticatedCustomersImportExportRouteImport } from './routes/_authenticated/customers/import-export'
 import { Route as AuthenticatedCustomersByProfileRouteImport } from './routes/_authenticated/customers/by-profile'
 import { Route as AuthenticatedAutomationWhatsappCenterRouteImport } from './routes/_authenticated/automation/whatsapp-center'
+
+const AuthenticatedSystemToolsLogsLazyRouteImport = createFileRoute(
+  '/_authenticated/system-tools/logs',
+)()
 
 const ClerkRouteRoute = ClerkRouteRouteImport.update({
   id: '/clerk',
@@ -273,6 +279,16 @@ const AuthenticatedAcsIndexRoute = AuthenticatedAcsIndexRouteImport.update({
   path: '/acs/',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
+const AuthenticatedSystemToolsLogsLazyRoute =
+  AuthenticatedSystemToolsLogsLazyRouteImport.update({
+    id: '/system-tools/logs',
+    path: '/system-tools/logs',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any).lazy(() =>
+    import('./routes/_authenticated/system-tools/logs.lazy').then(
+      (d) => d.Route,
+    ),
+  )
 const ClerkAuthenticatedUserManagementRoute =
   ClerkAuthenticatedUserManagementRouteImport.update({
     id: '/user-management',
@@ -462,6 +478,7 @@ export interface FileRoutesByFullPath {
   '/clerk/sign-in': typeof ClerkauthSignInRoute
   '/clerk/sign-up': typeof ClerkauthSignUpRoute
   '/clerk/user-management': typeof ClerkAuthenticatedUserManagementRoute
+  '/system-tools/logs': typeof AuthenticatedSystemToolsLogsLazyRoute
   '/acs/': typeof AuthenticatedAcsIndexRoute
   '/apps/': typeof AuthenticatedAppsIndexRoute
   '/automation/': typeof AuthenticatedAutomationIndexRoute
@@ -523,6 +540,7 @@ export interface FileRoutesByTo {
   '/clerk/sign-in': typeof ClerkauthSignInRoute
   '/clerk/sign-up': typeof ClerkauthSignUpRoute
   '/clerk/user-management': typeof ClerkAuthenticatedUserManagementRoute
+  '/system-tools/logs': typeof AuthenticatedSystemToolsLogsLazyRoute
   '/acs': typeof AuthenticatedAcsIndexRoute
   '/apps': typeof AuthenticatedAppsIndexRoute
   '/automation': typeof AuthenticatedAutomationIndexRoute
@@ -589,6 +607,7 @@ export interface FileRoutesById {
   '/clerk/(auth)/sign-in': typeof ClerkauthSignInRoute
   '/clerk/(auth)/sign-up': typeof ClerkauthSignUpRoute
   '/clerk/_authenticated/user-management': typeof ClerkAuthenticatedUserManagementRoute
+  '/_authenticated/system-tools/logs': typeof AuthenticatedSystemToolsLogsLazyRoute
   '/_authenticated/acs/': typeof AuthenticatedAcsIndexRoute
   '/_authenticated/apps/': typeof AuthenticatedAppsIndexRoute
   '/_authenticated/automation/': typeof AuthenticatedAutomationIndexRoute
@@ -653,6 +672,7 @@ export interface FileRouteTypes {
     | '/clerk/sign-in'
     | '/clerk/sign-up'
     | '/clerk/user-management'
+    | '/system-tools/logs'
     | '/acs/'
     | '/apps/'
     | '/automation/'
@@ -714,6 +734,7 @@ export interface FileRouteTypes {
     | '/clerk/sign-in'
     | '/clerk/sign-up'
     | '/clerk/user-management'
+    | '/system-tools/logs'
     | '/acs'
     | '/apps'
     | '/automation'
@@ -779,6 +800,7 @@ export interface FileRouteTypes {
     | '/clerk/(auth)/sign-in'
     | '/clerk/(auth)/sign-up'
     | '/clerk/_authenticated/user-management'
+    | '/_authenticated/system-tools/logs'
     | '/_authenticated/acs/'
     | '/_authenticated/apps/'
     | '/_authenticated/automation/'
@@ -1085,6 +1107,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedAcsIndexRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
+    '/_authenticated/system-tools/logs': {
+      id: '/_authenticated/system-tools/logs'
+      path: '/system-tools/logs'
+      fullPath: '/system-tools/logs'
+      preLoaderRoute: typeof AuthenticatedSystemToolsLogsLazyRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
     '/clerk/_authenticated/user-management': {
       id: '/clerk/_authenticated/user-management'
       path: '/user-management'
@@ -1310,6 +1339,7 @@ interface AuthenticatedRouteRouteChildren {
   AuthenticatedPppoeOfflineRoute: typeof AuthenticatedPppoeOfflineRoute
   AuthenticatedPppoeProfilesRoute: typeof AuthenticatedPppoeProfilesRoute
   AuthenticatedPppoeSecretsRoute: typeof AuthenticatedPppoeSecretsRoute
+  AuthenticatedSystemToolsLogsLazyRoute: typeof AuthenticatedSystemToolsLogsLazyRoute
   AuthenticatedAcsIndexRoute: typeof AuthenticatedAcsIndexRoute
   AuthenticatedAppsIndexRoute: typeof AuthenticatedAppsIndexRoute
   AuthenticatedAutomationIndexRoute: typeof AuthenticatedAutomationIndexRoute
@@ -1354,6 +1384,7 @@ const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedPppoeOfflineRoute: AuthenticatedPppoeOfflineRoute,
   AuthenticatedPppoeProfilesRoute: AuthenticatedPppoeProfilesRoute,
   AuthenticatedPppoeSecretsRoute: AuthenticatedPppoeSecretsRoute,
+  AuthenticatedSystemToolsLogsLazyRoute: AuthenticatedSystemToolsLogsLazyRoute,
   AuthenticatedAcsIndexRoute: AuthenticatedAcsIndexRoute,
   AuthenticatedAppsIndexRoute: AuthenticatedAppsIndexRoute,
   AuthenticatedAutomationIndexRoute: AuthenticatedAutomationIndexRoute,

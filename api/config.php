@@ -31,6 +31,8 @@ ini_set('max_execution_time', 300); // 5 minutes
 error_reporting(E_ALL & ~E_NOTICE & ~E_DEPRECATED);
 ini_set('display_errors', 0); // Don't break JSON output
 ini_set('log_errors', 1);
+ini_set('error_log', __DIR__ . '/error.log'); // Simpan error ke file lokal
+
 
 // ─── Database Configuration ──────────────────────────────────────────────────
 // Use 127.0.0.1 instead of localhost to force TCP connection instead of socket

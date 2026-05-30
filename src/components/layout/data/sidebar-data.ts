@@ -290,9 +290,18 @@ export const sidebarData: SidebarData = {
         },
         {
           title: 'System Tools',
-          url: '/system-tools',
           icon: DatabaseBackup,
           requiredRoles: ['admin', 'administrator', 'super_admin', 'super admin', 'superadministrator'],
+          items: [
+            {
+              title: 'Database Backup',
+              url: '/system-tools',
+            },
+            {
+              title: 'System Logs',
+              url: '/system-tools/logs',
+            },
+          ],
         },
       ],
     },

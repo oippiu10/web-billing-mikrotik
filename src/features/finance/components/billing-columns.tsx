@@ -24,11 +24,14 @@ import {
   Receipt,
   XCircle,
   ArrowUpDown,
+  ArrowUp,
+  ArrowDown,
   Wallet,
   Banknote,
   Landmark,
   QrCode,
   Smartphone,
+  FileText,
 } from 'lucide-react'
 import { printThermal, printInvoice } from '../utils/print-templates'
 
@@ -38,6 +41,7 @@ export interface BillingColumnsContext {
   toggleSelectRow: (id: number) => void
   toggleSelectAll: (checked: boolean) => void
   setHistoryUser: (user: any) => void
+  setPaymentCardUser: (user: any) => void
   setPaidDialog: (row: any) => void
   handleWA: (row: any) => void
   confirmAction: (options: any) => Promise<boolean>
@@ -79,11 +83,18 @@ export const getBillingColumns = (ctx: BillingColumnsContext): ColumnDef<any>[] 
       return (
         <Button
           variant="ghost"
+          size="sm"
           onClick={() => column.toggleSorting(column.getIsSorted() === 'asc')}
-          className="-ml-4 h-8 data-[state=open]:bg-accent text-xs font-bold uppercase tracking-wider"
+          className="-ml-3 h-8 text-xs font-bold uppercase tracking-wider text-muted-foreground hover:text-foreground hover:bg-muted/50 group"
         >
           Username
-          <ArrowUpDown className="ml-2 h-4 w-4" />
+          {column.getIsSorted() === 'desc' ? (
+            <ArrowDown className="ml-2 h-3.5 w-3.5 text-primary" />
+          ) : column.getIsSorted() === 'asc' ? (
+            <ArrowUp className="ml-2 h-3.5 w-3.5 text-primary" />
+          ) : (
+            <ArrowUpDown className="ml-2 h-3.5 w-3.5 opacity-0 group-hover:opacity-40 transition-opacity" />
+          )}
         </Button>
       )
     },
@@ -124,11 +135,18 @@ export const getBillingColumns = (ctx: BillingColumnsContext): ColumnDef<any>[] 
       return (
         <Button
           variant="ghost"
+          size="sm"
           onClick={() => column.toggleSorting(column.getIsSorted() === 'asc')}
-          className="-ml-4 h-8 data-[state=open]:bg-accent text-xs font-bold uppercase tracking-wider"
+          className="-ml-3 h-8 text-xs font-bold uppercase tracking-wider text-muted-foreground hover:text-foreground hover:bg-muted/50 group"
         >
           Paket
-          <ArrowUpDown className="ml-2 h-4 w-4" />
+          {column.getIsSorted() === 'desc' ? (
+            <ArrowDown className="ml-2 h-3.5 w-3.5 text-primary" />
+          ) : column.getIsSorted() === 'asc' ? (
+            <ArrowUp className="ml-2 h-3.5 w-3.5 text-primary" />
+          ) : (
+            <ArrowUpDown className="ml-2 h-3.5 w-3.5 opacity-0 group-hover:opacity-40 transition-opacity" />
+          )}
         </Button>
       )
     },
@@ -149,11 +167,18 @@ export const getBillingColumns = (ctx: BillingColumnsContext): ColumnDef<any>[] 
         <div className="text-right">
           <Button
             variant="ghost"
+            size="sm"
             onClick={() => column.toggleSorting(column.getIsSorted() === 'asc')}
-            className="-mr-4 h-8 data-[state=open]:bg-accent text-xs font-bold uppercase tracking-wider"
+            className="-mr-3 h-8 text-xs font-bold uppercase tracking-wider text-muted-foreground hover:text-foreground hover:bg-muted/50 group flex items-center justify-end w-full"
           >
+            {column.getIsSorted() === 'desc' ? (
+              <ArrowDown className="mr-2 h-3.5 w-3.5 text-primary" />
+            ) : column.getIsSorted() === 'asc' ? (
+              <ArrowUp className="mr-2 h-3.5 w-3.5 text-primary" />
+            ) : (
+              <ArrowUpDown className="mr-2 h-3.5 w-3.5 opacity-0 group-hover:opacity-40 transition-opacity" />
+            )}
             Tagihan
-            <ArrowUpDown className="ml-2 h-4 w-4" />
           </Button>
         </div>
       )
@@ -172,11 +197,18 @@ export const getBillingColumns = (ctx: BillingColumnsContext): ColumnDef<any>[] 
         <div className="text-right">
           <Button
             variant="ghost"
+            size="sm"
             onClick={() => column.toggleSorting(column.getIsSorted() === 'asc')}
-            className="-mr-4 h-8 data-[state=open]:bg-accent text-xs font-bold uppercase tracking-wider"
+            className="-mr-3 h-8 text-xs font-bold uppercase tracking-wider text-muted-foreground hover:text-foreground hover:bg-muted/50 group flex items-center justify-end w-full"
           >
+            {column.getIsSorted() === 'desc' ? (
+              <ArrowDown className="mr-2 h-3.5 w-3.5 text-primary" />
+            ) : column.getIsSorted() === 'asc' ? (
+              <ArrowUp className="mr-2 h-3.5 w-3.5 text-primary" />
+            ) : (
+              <ArrowUpDown className="mr-2 h-3.5 w-3.5 opacity-0 group-hover:opacity-40 transition-opacity" />
+            )}
             Bayar
-            <ArrowUpDown className="ml-2 h-4 w-4" />
           </Button>
         </div>
       )
@@ -214,11 +246,18 @@ export const getBillingColumns = (ctx: BillingColumnsContext): ColumnDef<any>[] 
         <div className="text-center">
           <Button
             variant="ghost"
+            size="sm"
             onClick={() => column.toggleSorting(column.getIsSorted() === 'asc')}
-            className="h-8 data-[state=open]:bg-accent text-xs font-bold uppercase tracking-wider"
+            className="h-8 text-xs font-bold uppercase tracking-wider text-muted-foreground hover:text-foreground hover:bg-muted/50 group"
           >
             Status
-            <ArrowUpDown className="ml-2 h-4 w-4" />
+            {column.getIsSorted() === 'desc' ? (
+              <ArrowDown className="ml-2 h-3.5 w-3.5 text-primary" />
+            ) : column.getIsSorted() === 'asc' ? (
+              <ArrowUp className="ml-2 h-3.5 w-3.5 text-primary" />
+            ) : (
+              <ArrowUpDown className="ml-2 h-3.5 w-3.5 opacity-0 group-hover:opacity-40 transition-opacity" />
+            )}
           </Button>
         </div>
       )
@@ -295,6 +334,14 @@ export const getBillingColumns = (ctx: BillingColumnsContext): ColumnDef<any>[] 
           </div>
         )
       }
+      if (original.status === 'isolir') {
+        return (
+          <Badge className="mx-auto flex w-[84px] items-center justify-center gap-1 border border-slate-200/80 bg-slate-100/80 px-2.5 py-1 text-[10px] font-extrabold tracking-wider text-slate-500 uppercase hover:bg-slate-200 dark:border-slate-800/40 dark:bg-slate-900/30 dark:text-slate-400 rounded-full shadow-sm shadow-slate-500/5">
+            <XCircle className="h-3.5 w-3.5 text-slate-400 shrink-0" />
+            Isolir
+          </Badge>
+        )
+      }
       return (
         <Badge className="mx-auto flex w-[84px] items-center justify-center gap-1 border border-amber-200/80 bg-amber-50/80 px-2.5 py-1 text-[10px] font-extrabold tracking-wider text-amber-700 uppercase hover:bg-amber-50 dark:border-amber-900/40 dark:bg-amber-950/30 dark:text-amber-400 rounded-full shadow-sm shadow-amber-500/5">
           <Clock className="h-3.5 w-3.5 text-amber-600 dark:text-amber-400 shrink-0" />
@@ -310,11 +357,18 @@ export const getBillingColumns = (ctx: BillingColumnsContext): ColumnDef<any>[] 
       return (
         <Button
           variant="ghost"
+          size="sm"
           onClick={() => column.toggleSorting(column.getIsSorted() === 'asc')}
-          className="-ml-4 h-8 data-[state=open]:bg-accent text-xs font-bold uppercase tracking-wider"
+          className="-ml-3 h-8 text-xs font-bold uppercase tracking-wider text-muted-foreground hover:text-foreground hover:bg-muted/50 group"
         >
           Tgl Bayar
-          <ArrowUpDown className="ml-2 h-4 w-4" />
+          {column.getIsSorted() === 'desc' ? (
+            <ArrowDown className="ml-2 h-3.5 w-3.5 text-primary" />
+          ) : column.getIsSorted() === 'asc' ? (
+            <ArrowUp className="ml-2 h-3.5 w-3.5 text-primary" />
+          ) : (
+            <ArrowUpDown className="ml-2 h-3.5 w-3.5 opacity-0 group-hover:opacity-40 transition-opacity" />
+          )}
         </Button>
       )
     },
@@ -354,6 +408,16 @@ export const getBillingColumns = (ctx: BillingColumnsContext): ColumnDef<any>[] 
               title={original.status === 'paid' ? 'Kirim Kwitansi via WA' : 'Kirim Tagihan via WA'}
             >
               <MessageCircle className="h-4 w-4" />
+            </Button>
+            
+            <Button
+              variant="outline"
+              size="icon"
+              className="h-8 w-8 border-blue-100 text-blue-600 bg-blue-50/30 transition-all duration-200 hover:bg-blue-50 hover:text-blue-700 dark:border-blue-900/30 dark:text-blue-400 dark:bg-blue-950/10 dark:hover:bg-blue-950/50 rounded-lg shadow-sm"
+              onClick={() => ctx.setPaymentCardUser(original)}
+              title="Lihat Kartu Pembayaran (1 Tahun)"
+            >
+              <FileText className="h-4 w-4" />
             </Button>
 
             {original.status === 'paid' ? (

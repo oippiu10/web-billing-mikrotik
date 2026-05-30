@@ -1,4 +1,14 @@
 import { useState, useEffect } from 'react'
+import {
+  useReactTable,
+  getCoreRowModel,
+  getPaginationRowModel,
+  getSortedRowModel,
+  getFilteredRowModel,
+  flexRender,
+  SortingState,
+  ColumnFiltersState,
+} from '@tanstack/react-table'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { api } from '@/lib/api'
 import { useRouterStore } from '@/stores/router-store'
@@ -25,6 +35,8 @@ import { toast } from 'sonner'
 import { FinanceSubNav } from './components/finance-sub-nav'
 import { PrivacyText } from '@/components/privacy'
 import { useConfirm } from '@/hooks/use-confirm'
+import { getExpensesColumns } from './components/expenses-columns'
+import { Skeleton } from '@/components/ui/skeleton'
 
 const MONTHS = [
   { value: 1, label: 'Januari' }, { value: 2, label: 'Februari' },
@@ -57,15 +69,18 @@ export function FinanceExpenses() {
   const [spentAt, setSpentAt] = useState(now.toISOString().slice(0, 10))
   const [note, setNote] = useState('')
 
-  // Pagination state
-  const [page, setPage] = useState(1)
-  const perPage = 15
+  // Pagination & Sorting state (Managed by TanStack Table now, but we keep the initial pagination state to pass to useReactTable)
+  const [{ pageIndex, pageSize }, setPagination] = useState({ pageIndex: 0, pageSize: 15 })
+  const [sorting, setSorting] = useState<SortingState>([])
+  const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([])
+  const [globalFilter, setGlobalFilter] = useState('')
+
   const { confirm: confirmAction, ConfirmDialog } = useConfirm()
 
-  // Reset pagination ke halaman 1 saat filter atau waktu berubah
+  // Reset pagination ke halaman 1 saat filter waktu berubah
   useEffect(() => {
-    setPage(1)
-  }, [search, filterCategory, month, year])
+    setPagination(prev => ({ ...prev, pageIndex: 0 }))
+  }, [month, year])
 
   const { data, isLoading } = useQuery({
     queryKey: ['expenses', activeRouter?.id, month, year],
@@ -80,15 +95,7 @@ export function FinanceExpenses() {
 
   const expenses = data?.data || []
   
-  const filteredExpenses = expenses.filter((e: any) => {
-    const matchCat = filterCategory ? e.category === filterCategory : true
-    const matchSearch = search ? (e.note?.toLowerCase().includes(search.toLowerCase()) || e.category?.toLowerCase().includes(search.toLowerCase())) : true
-    return matchCat && matchSearch
-  })
-
-  const totalPages = Math.ceil(filteredExpenses.length / perPage)
-  const paginatedExpenses = filteredExpenses.slice((page - 1) * perPage, page * perPage)
-  const totalExpense = filteredExpenses.reduce((sum: number, e: any) => sum + parseFloat(e.amount), 0)
+  const totalExpense = expenses.reduce((sum: number, e: any) => sum + parseFloat(e.amount), 0)
 
   const addMutation = useMutation({
     mutationFn: async () => {
@@ -139,6 +146,45 @@ export function FinanceExpenses() {
     if (!amount || parseFloat(amount) <= 0) return toast.error('Nominal harus diisi')
     addMutation.mutate()
   }
+
+  const table = useReactTable({
+    data: expenses,
+    columns: getExpensesColumns({
+      setEditDialog: (row) => {
+        setEditId(row.id)
+        setCategory(row.category)
+        setAmount(row.amount)
+        setNote(row.note)
+        setSpentAt(row.spent_at)
+        setAddDialog(true)
+      },
+      handleDelete: async (row) => {
+        const ok = await confirmAction({
+          title: 'Hapus Pengeluaran',
+          description: `Apakah Anda yakin ingin menghapus catatan pengeluaran "${row.note || row.category}"?\n\nNominal sebesar ${fmt(parseFloat(row.amount))} akan dihapus dari data pembukuan secara permanen.`,
+          confirmText: 'Ya, Hapus',
+          cancelText: 'Batal',
+          variant: 'destructive',
+        })
+        if (ok) deleteMutation.mutate(row.id)
+      },
+      fmt
+    }),
+    state: {
+      sorting,
+      columnFilters,
+      globalFilter,
+      pagination: { pageIndex, pageSize },
+    },
+    onSortingChange: setSorting,
+    onColumnFiltersChange: setColumnFilters,
+    onGlobalFilterChange: setGlobalFilter,
+    onPaginationChange: setPagination,
+    getCoreRowModel: getCoreRowModel(),
+    getPaginationRowModel: getPaginationRowModel(),
+    getSortedRowModel: getSortedRowModel(),
+    getFilteredRowModel: getFilteredRowModel(),
+  })
 
   return (
     <>
@@ -232,7 +278,7 @@ export function FinanceExpenses() {
               onClick={() => {
                 setSearch('')
                 setFilterCategory('')
-                setPage(1)
+                table.setPageIndex(0)
               }}
             >
               <RefreshCw className='h-3.5 w-3.5' />
@@ -245,100 +291,83 @@ export function FinanceExpenses() {
         <Card className='overflow-hidden border border-border/80 shadow-lg rounded-xl bg-card'>
           <Table>
             <TableHeader className='bg-slate-50/75 dark:bg-slate-900/60 border-b border-border/60'>
-              <TableRow>
-                <TableHead className='w-12 text-center text-xs font-black'>#</TableHead>
-                <TableHead className='text-xs font-black uppercase'>Tanggal</TableHead>
-                <TableHead className='text-xs font-black uppercase'>Kategori</TableHead>
-                <TableHead className='text-xs font-black uppercase'>Keterangan</TableHead>
-                <TableHead className='text-xs font-black uppercase text-right'>Nominal</TableHead>
-                <TableHead className='w-20 text-center text-xs font-black uppercase'>Aksi</TableHead>
-              </TableRow>
+              {table.getHeaderGroups().map((headerGroup) => (
+                <TableRow key={headerGroup.id}>
+                  {headerGroup.headers.map((header) => (
+                    <TableHead key={header.id} className={header.column.id === 'actions' ? 'w-20' : ''}>
+                      {header.isPlaceholder
+                        ? null
+                        : flexRender(
+                            header.column.columnDef.header,
+                            header.getContext()
+                          )}
+                    </TableHead>
+                  ))}
+                </TableRow>
+              ))}
             </TableHeader>
             <TableBody>
               {isLoading ? (
-                <TableRow><TableCell colSpan={6} className='text-center py-16 animate-pulse text-muted-foreground'>Memuat data...</TableCell></TableRow>
-              ) : filteredExpenses.length === 0 ? (
-                <TableRow>
-                  <TableCell colSpan={6} className='text-center py-16 text-muted-foreground'>Belum ada pengeluaran yang sesuai.</TableCell>
-                </TableRow>
-              ) : (
-                paginatedExpenses.map((row: any, idx: number) => (
-                  <TableRow key={row.id} className='border-b border-border/30 hover:bg-muted/30'>
-                    <TableCell className='text-center text-xs font-bold text-muted-foreground'>{(page - 1) * perPage + idx + 1}</TableCell>
-                    <TableCell className='text-sm font-bold'>{row.spent_at}</TableCell>
-                    <TableCell>
-                      <Badge variant='outline' className='font-bold bg-muted/50'>{row.category}</Badge>
-                    </TableCell>
-                    <TableCell className='text-sm max-w-[250px] truncate'>{row.note || '-'}</TableCell>
-                    <TableCell className='text-right font-black text-rose-600'><PrivacyText>{fmt(parseFloat(row.amount))}</PrivacyText></TableCell>
-                    <TableCell className='text-center'>
-                      <div className='flex justify-center gap-2'>
-                        <Button
-                          variant='outline'
-                          size='icon'
-                          className='h-8 w-8 border-indigo-100 text-indigo-500 bg-indigo-50/30 transition-all duration-200 hover:bg-indigo-50 hover:text-indigo-600 dark:border-indigo-950/20 dark:bg-indigo-950/10 dark:hover:bg-indigo-950/50 rounded-lg shadow-sm'
-                          onClick={() => {
-                            setEditId(row.id)
-                            setCategory(row.category)
-                            setAmount(row.amount)
-                            setNote(row.note)
-                            setSpentAt(row.spent_at)
-                            setAddDialog(true)
-                          }}
-                          title='Ubah Pengeluaran'
-                        >
-                          <Pencil className='h-4 w-4' />
-                        </Button>
-                        <Button
-                          variant='outline'
-                          size='icon'
-                          className='h-8 w-8 border-rose-100 text-rose-500 bg-rose-50/30 transition-all duration-200 hover:bg-rose-50 hover:text-rose-600 dark:border-rose-950/20 dark:bg-rose-950/10 dark:hover:bg-rose-950/50 rounded-lg shadow-sm'
-                          onClick={async () => {
-                            const ok = await confirmAction({
-                              title: 'Hapus Pengeluaran',
-                              description: `Apakah Anda yakin ingin menghapus catatan pengeluaran "${row.note || row.category}"?\n\nNominal sebesar ${fmt(parseFloat(row.amount))} akan dihapus dari data pembukuan secara permanen.`,
-                              confirmText: 'Ya, Hapus',
-                              cancelText: 'Batal',
-                              variant: 'destructive',
-                            })
-                            if (ok) deleteMutation.mutate(row.id)
-                          }}
-                          title='Hapus Pengeluaran'
-                        >
-                          <Trash2 className='h-4 w-4' />
-                        </Button>
-                      </div>
-                    </TableCell>
+                <>
+                  {[...Array(5)].map((_, i) => (
+                    <TableRow key={i}>
+                      {table.getAllColumns().filter(c => c.getIsVisible()).map((col, j) => (
+                        <TableCell key={j} className="py-4">
+                          <Skeleton className="h-4 w-full" />
+                        </TableCell>
+                      ))}
+                    </TableRow>
+                  ))}
+                </>
+              ) : table.getRowModel().rows?.length ? (
+                table.getRowModel().rows.map((row) => (
+                  <TableRow
+                    key={row.id}
+                    data-state={row.getIsSelected() && 'selected'}
+                    className='border-b border-border/30 hover:bg-muted/30'
+                  >
+                    {row.getVisibleCells().map((cell) => (
+                      <TableCell key={cell.id}>
+                        {flexRender(cell.column.columnDef.cell, cell.getContext())}
+                      </TableCell>
+                    ))}
                   </TableRow>
                 ))
+              ) : (
+                <TableRow>
+                  <TableCell colSpan={table.getAllColumns().length} className='text-center py-16 text-muted-foreground'>
+                    Belum ada pengeluaran yang sesuai.
+                  </TableCell>
+                </TableRow>
               )}
             </TableBody>
           </Table>
         </Card>
 
         {/* Pagination */}
-        {totalPages > 1 && (
+        {table.getPageCount() > 1 && (
           <div className='flex items-center justify-between px-1'>
             <span className='text-xs text-muted-foreground font-semibold'>
-              Menampilkan {(page - 1) * perPage + 1}–{Math.min(page * perPage, filteredExpenses.length)} dari {filteredExpenses.length} item
+              Menampilkan {table.getState().pagination.pageIndex * table.getState().pagination.pageSize + 1}–
+              {Math.min((table.getState().pagination.pageIndex + 1) * table.getState().pagination.pageSize, table.getFilteredRowModel().rows.length)} dari {table.getFilteredRowModel().rows.length} item
             </span>
             <div className='flex items-center gap-1.5'>
               <Button
                 variant='outline'
                 size='icon'
                 className='h-8 w-8 rounded-lg border-border/80 text-muted-foreground shadow-sm hover:bg-accent'
-                onClick={() => setPage(p => Math.max(1, p - 1))}
-                disabled={page === 1}
+                onClick={() => table.previousPage()}
+                disabled={!table.getCanPreviousPage()}
               >
                 <ChevronLeft className='h-4 w-4' />
               </Button>
-              {Array.from({ length: totalPages }, (_, i) => i + 1).map(p => (
+              {Array.from({ length: table.getPageCount() }, (_, i) => i + 1).map(p => (
                 <Button
                   key={p}
-                  variant={p === page ? 'default' : 'outline'}
+                  variant={p - 1 === table.getState().pagination.pageIndex ? 'default' : 'outline'}
                   size='icon'
                   className='h-8 w-8 rounded-lg text-xs font-bold shadow-sm'
-                  onClick={() => setPage(p)}
+                  onClick={() => table.setPageIndex(p - 1)}
                 >
                   {p}
                 </Button>
@@ -347,8 +376,8 @@ export function FinanceExpenses() {
                 variant='outline'
                 size='icon'
                 className='h-8 w-8 rounded-lg border-border/80 text-muted-foreground shadow-sm hover:bg-accent'
-                onClick={() => setPage(p => Math.min(totalPages, p + 1))}
-                disabled={page === totalPages}
+                onClick={() => table.nextPage()}
+                disabled={!table.getCanNextPage()}
               >
                 <ChevronRight className='h-4 w-4' />
               </Button>

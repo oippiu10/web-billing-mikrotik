@@ -109,6 +109,24 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             exit;
         }
         
+        // Fetch target amount
+        $target_amount = 0;
+        $invStmt = $conn->prepare("SELECT amount FROM invoices WHERE user_id = ? AND month = ? AND year = ?");
+        $invStmt->bind_param("iii", $user_id, $month, $year);
+        $invStmt->execute();
+        $invRes = $invStmt->get_result();
+        if ($invRes->num_rows > 0) {
+            $target_amount = $invRes->fetch_assoc()['amount'];
+        } else {
+            $profStmt = $conn->prepare("SELECT pr.price FROM users u LEFT JOIN ppp_profile_pricing pr ON pr.profile_name = u.profile AND pr.router_id = u.router_id WHERE u.id = ?");
+            $profStmt->bind_param("i", $user_id);
+            $profStmt->execute();
+            $pRes = $profStmt->get_result()->fetch_assoc();
+            $target_amount = $pRes['price'] ?? 0;
+            $profStmt->close();
+        }
+        $invStmt->close();
+        
         // Prevent duplicate payments
         $checkStmt = $conn->prepare("SELECT id FROM payments WHERE router_id = ? AND user_id = ? AND payment_month = ? AND payment_year = ?");
         $checkStmt->bind_param("siii", $router_id, $user_id, $month, $year);
@@ -118,15 +136,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         if ($res->num_rows > 0) {
             // Update exist
             $pid = $res->fetch_assoc()['id'];
-            $sql = "UPDATE payments SET amount = ?, payment_date = ?, method = ?, note = ? WHERE id = ?";
+            $sql = "UPDATE payments SET amount = ?, payment_date = ?, method = ?, note = ?, target_amount = ? WHERE id = ?";
             $stmt = $conn->prepare($sql);
-            $stmt->bind_param("dsssi", $amount, $date, $method, $note, $pid);
+            $stmt->bind_param("dsssdi", $amount, $date, $method, $note, $target_amount, $pid);
         } else {
             // Insert new
-            $sql = "INSERT INTO payments (router_id, user_id, amount, payment_date, payment_month, payment_year, method, note) 
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?)";
+            $sql = "INSERT INTO payments (router_id, user_id, amount, payment_date, payment_month, payment_year, method, note, target_amount) 
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)";
             $stmt = $conn->prepare($sql);
-            $stmt->bind_param("sidsiiss", $router_id, $user_id, $amount, $date, $month, $year, $method, $note);
+            $stmt->bind_param("sidsiissd", $router_id, $user_id, $amount, $date, $month, $year, $method, $note, $target_amount);
         }
         $checkStmt->close();
         
@@ -174,8 +192,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $conn->begin_transaction();
         try {
             $checkStmt = $conn->prepare("SELECT id FROM payments WHERE router_id = ? AND user_id = ? AND payment_month = ? AND payment_year = ?");
-            $updStmt = $conn->prepare("UPDATE payments SET amount = ?, payment_date = ?, method = ?, note = ? WHERE id = ?");
-            $insStmt = $conn->prepare("INSERT INTO payments (router_id, user_id, amount, payment_date, payment_month, payment_year, method, note) VALUES (?, ?, ?, ?, ?, ?, ?, ?)");
+            $updStmt = $conn->prepare("UPDATE payments SET amount = ?, payment_date = ?, method = ?, note = ?, target_amount = ? WHERE id = ?");
+            $insStmt = $conn->prepare("INSERT INTO payments (router_id, user_id, amount, payment_date, payment_month, payment_year, method, note, target_amount) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)");
+            $invStmt = $conn->prepare("SELECT amount FROM invoices WHERE user_id = ? AND month = ? AND year = ?");
+            $profStmt = $conn->prepare("SELECT pr.price FROM users u LEFT JOIN ppp_profile_pricing pr ON pr.profile_name = u.profile AND pr.router_id = u.router_id WHERE u.id = ?");
             
             $successCount = 0;
             foreach ($users as $u) {
@@ -197,12 +217,23 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $checkStmt->execute();
                 $res = $checkStmt->get_result();
                 
+                $invStmt->bind_param("iii", $uid, $month, $year);
+                $invStmt->execute();
+                $invRes = $invStmt->get_result();
+                if ($invRes->num_rows > 0) {
+                    $target_amount = $invRes->fetch_assoc()['amount'];
+                } else {
+                    $profStmt->bind_param("i", $uid);
+                    $profStmt->execute();
+                    $target_amount = $profStmt->get_result()->fetch_assoc()['price'] ?? 0;
+                }
+                
                 if ($res->num_rows > 0) {
                     $pid = $res->fetch_assoc()['id'];
-                    $updStmt->bind_param("dsssi", $amt, $date, $method, $note, $pid);
+                    $updStmt->bind_param("dsssdi", $amt, $date, $method, $note, $target_amount, $pid);
                     $updStmt->execute();
                 } else {
-                    $insStmt->bind_param("sidsiiss", $router_id, $uid, $amt, $date, $month, $year, $method, $note);
+                    $insStmt->bind_param("sidsiissd", $router_id, $uid, $amt, $date, $month, $year, $method, $note, $target_amount);
                     $insStmt->execute();
                 }
                 $successCount++;
@@ -211,6 +242,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $checkStmt->close();
             $updStmt->close();
             $insStmt->close();
+            $invStmt->close();
+            $profStmt->close();
             
             $conn->commit();
             log_admin_activity($conn, 'bulk_payment_mark_paid', "Melunasi massal {$successCount} pelanggan periode {$month}/{$year}", (int)($_SESSION['admin_id'] ?? 0));

@@ -37,12 +37,14 @@ if (is_numeric($router_id)) {
     $rLookup = $conn->query("SELECT * FROM mikrotik_routers WHERE (software_id = '$router_id_esc' OR name = '$router_id_esc') LIMIT 1");
     if ($rLookup && $row = $rLookup->fetch_assoc()) {
         $routerInfo = $row;
-        $router_id = $row['id']; // Switch to numeric ID for DB queries
-        $router_id_esc = $conn->real_escape_string($router_id);
     }
 }
 
-$software_id = $routerInfo['software_id'] ?? $router_id;
+// Gunakan software_id jika ada, karena tabel users dan payments menggunakan software_id
+if ($routerInfo && !empty($routerInfo['software_id'])) {
+    $router_id = $routerInfo['software_id'];
+}
+$router_id_esc = $conn->real_escape_string($router_id);
 
 try {
     // Total User (Registered in DB)

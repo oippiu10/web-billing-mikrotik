@@ -198,13 +198,14 @@ try {
 
             // Total
             $cntSQL = "SELECT COUNT(*) as total,
-                              IFNULL(SUM(IFNULL(pr.price, 0)), 0) as total_receivable
+                              IFNULL(SUM(IFNULL(inv.amount, IFNULL(pr.price, 0))), 0) as total_receivable
                        FROM users u
+                       LEFT JOIN invoices inv ON inv.user_id = u.id AND inv.month = ? AND inv.year = ?
                        LEFT JOIN payments p ON p.user_id = u.id AND p.payment_month = ? AND p.payment_year = ? AND p.router_id = u.router_id
                        LEFT JOIN ppp_profile_pricing pr ON pr.profile_name = u.profile AND pr.router_id = u.router_id
                        $whereSQL";
-            $allParams = array_merge([$month, $year], $params);
-            $allTypes  = "ii" . $types;
+            $allParams = array_merge([$month, $year, $month, $year], $params);
+            $allTypes  = "iiii" . $types;
             $cntStmt   = $conn->prepare($cntSQL);
             $cntStmt->bind_param($allTypes, ...$allParams);
             $cntStmt->execute();
@@ -213,19 +214,19 @@ try {
 
             // Data
             $dataSQL = "SELECT u.id, u.username, u.alamat, u.profile, u.tanggal_tagihan,
-                               IFNULL(pr.price, 0) as harga,
+                               IFNULL(inv.amount, IFNULL(pr.price, 0)) as harga,
                                -- Hitung berapa bulan nunggak (cek 6 bulan ke belakang)
-                               (SELECT COUNT(*) FROM (
-                                   SELECT 1 FROM payments p2
+                               (SELECT COUNT(*) FROM payments p2
                                    WHERE p2.user_id = u.id
                                    AND p2.router_id = u.router_id
                                    AND (p2.payment_year * 12 + p2.payment_month) >= (? * 12 + ? - 5)
                                    AND (p2.payment_year * 12 + p2.payment_month) <= (? * 12 + ?)
-                               ) sub) as months_paid,
+                               ) as months_paid,
                                6 - (SELECT COUNT(*) FROM payments p2 WHERE p2.user_id = u.id AND p2.router_id = u.router_id
                                     AND (p2.payment_year * 12 + p2.payment_month) >= (? * 12 + ? - 5)
                                     AND (p2.payment_year * 12 + p2.payment_month) <= (? * 12 + ?)) as months_overdue
                         FROM users u
+                        LEFT JOIN invoices inv ON inv.user_id = u.id AND inv.month = ? AND inv.year = ?
                         LEFT JOIN payments p ON p.user_id = u.id AND p.payment_month = ? AND p.payment_year = ? AND p.router_id = u.router_id
                         LEFT JOIN ppp_profile_pricing pr ON pr.profile_name = u.profile AND pr.router_id = u.router_id
                         $whereSQL
@@ -234,11 +235,11 @@ try {
 
             $dataParams = array_merge(
                 [$year, $month, $year, $month, $year, $month, $year, $month],
-                [$month, $year],
+                [$month, $year, $month, $year],
                 $params,
                 [$perPage, $offset]
             );
-            $dataTypes = "iiiiiiii" . "ii" . $types . "ii";
+            $dataTypes = "iiiiiiii" . "iiii" . $types . "ii";
             $dataStmt = $conn->prepare($dataSQL);
             $dataStmt->bind_param($dataTypes, ...$dataParams);
             $dataStmt->execute();
@@ -296,15 +297,16 @@ try {
             $output = fopen('php://output', 'w');
             fputcsv($output, ['Username', 'Profile', 'WA', 'Alamat', 'Tanggal Tagihan', 'Nominal Piutang']);
 
-            $sql = "SELECT u.username, u.profile, u.wa, u.alamat, u.tanggal_tagihan, IFNULL(pr.price, 0) as harga
+            $sql = "SELECT u.username, u.profile, u.wa, u.alamat, u.tanggal_tagihan, IFNULL(inv.amount, IFNULL(pr.price, 0)) as harga
                     FROM users u
+                    LEFT JOIN invoices inv ON inv.user_id = u.id AND inv.month = ? AND inv.year = ?
                     LEFT JOIN payments p ON p.user_id = u.id AND p.payment_month = ? AND p.payment_year = ? AND p.router_id = u.router_id
                     LEFT JOIN ppp_profile_pricing pr ON pr.profile_name = u.profile AND pr.router_id = u.router_id
                     WHERE " . implode(" AND ", $where) . "
                     ORDER BY u.username ASC";
             $stmt = $conn->prepare($sql);
-            $allParams = array_merge([$month, $year], $params);
-            $allTypes = "ii" . $types;
+            $allParams = array_merge([$month, $year, $month, $year], $params);
+            $allTypes = "iiii" . $types;
             $stmt->bind_param($allTypes, ...$allParams);
             $stmt->execute();
             $result = $stmt->get_result();

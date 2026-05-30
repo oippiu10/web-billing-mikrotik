@@ -206,6 +206,14 @@ CREATE TABLE admin_activity_logs (
 - `payments` - Payment records
 - `odp` - ODP locations
 - `system_logs` - System logs
+- `expenses` - Finance expenses
+- `finance_notes` - Digital finance operational notes
+- `tickets` - Helpdesk ticketing
+- `spk` - Technician Surat Perintah Kerja (SPK)
+- `wa_settings` - WhatsApp Gateway config
+- `wa_queue` - WhatsApp outgoing message queue
+- `wa_history` - WhatsApp two-way chat history
+- `ppp_profile_pricing` - Mikrotik Profile custom pricing
 
 ---
 

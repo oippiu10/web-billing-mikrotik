@@ -36,6 +36,17 @@ if ($router_id !== '') {
     $stmtRouter->close();
 }
 
+// Auto-generate missing invoices for this month/year
+$genSql = "INSERT IGNORE INTO invoices (user_id, router_id, month, year, amount, status)
+           SELECT u.id, u.router_id, ?, ?, IF(u.profile LIKE '%isolir%', 0, IFNULL(pr.price, 0)), IF(u.profile LIKE '%isolir%', 'isolir', 'unpaid')
+           FROM users u
+           LEFT JOIN ppp_profile_pricing pr ON pr.profile_name = u.profile AND pr.router_id = u.router_id
+           WHERE u.router_id = ?";
+$genStmt = $conn->prepare($genSql);
+$genStmt->bind_param("iis", $month, $year, $router_id);
+$genStmt->execute();
+$genStmt->close();
+
 $where = ["u.router_id = ?"];
 $params = [$router_id];
 $types = "s";
@@ -64,20 +75,25 @@ if ($tipe !== '') {
 if ($status === 'paid') {
     $where[] = "p.id IS NOT NULL";
 } elseif ($status === 'unpaid') {
-    $where[] = "p.id IS NULL";
+    $where[] = "p.id IS NULL AND (inv.status IS NULL OR inv.status != 'isolir')";
+} elseif ($status === 'isolir') {
+    $where[] = "inv.status = 'isolir'";
 }
 
 $whereSQL = "WHERE " . implode(" AND ", $where);
 
 // Base tables
 $tables = "users u 
+           LEFT JOIN invoices inv ON inv.user_id = u.id AND inv.month = ? AND inv.year = ? AND inv.router_id = u.router_id
            LEFT JOIN payments p ON p.user_id = u.id AND p.payment_month = ? AND p.payment_year = ? AND p.router_id = u.router_id
            LEFT JOIN ppp_profile_pricing pr ON pr.profile_name = u.profile AND pr.router_id = u.router_id";
 
-// Prepend month and year to params for LEFT JOIN
+// Prepend month and year to params for LEFT JOINs (twice: for invoices and for payments)
 array_unshift($params, $year);
 array_unshift($params, $month);
-$types = "ii" . $types;
+array_unshift($params, $year);
+array_unshift($params, $month);
+$types = "iiii" . $types;
 
 // 1. Total Filtered
 $cntSQL = "SELECT COUNT(*) as total FROM $tables $whereSQL";
@@ -94,8 +110,8 @@ $cntStmt->close();
 $dataSQL = "SELECT u.id as user_id, u.username, u.alamat, u.profile, u.tanggal_tagihan, u.wa, u.tipe_langganan,
                    IFNULL(p.id, u.id) as id, p.id as payment_id, p.amount as paid_amount, p.payment_date as paid_at,
                    p.method, p.note,
-                   IF(p.id IS NOT NULL, 'paid', 'unpaid') as status,
-                   pr.price as harga
+                   IF(p.id IS NOT NULL, 'paid', IFNULL(inv.status, 'unpaid')) as status,
+                   IFNULL(inv.amount, pr.price) as harga
             FROM $tables 
             $whereSQL 
             ORDER BY u.username ASC 
@@ -116,15 +132,15 @@ $dataStmt->close();
 
 // 3. Summary (Static for the whole month, ignoring search/filters)
 $sumWhereSQL = "WHERE u.router_id = ?";
-$sumParams = [$month, $year, $router_id];
-$sumTypes = "iis";
+$sumParams = [$month, $year, $month, $year, $router_id];
+$sumTypes = "iiiis";
 
 $sumSQL = "SELECT 
              SUM(IF(p.id IS NOT NULL, 1, 0)) as total_paid,
-             SUM(IF(p.id IS NULL, 1, 0)) as total_unpaid,
+             SUM(IF(p.id IS NULL AND (inv.status IS NULL OR inv.status != 'isolir'), 1, 0)) as total_unpaid,
              SUM(CASE WHEN p.method != 'titipan' THEN IFNULL(p.amount, 0) ELSE 0 END) as collected,
-             SUM(IF(p.id IS NULL, IFNULL(pr.price, 0), 0)) as receivable,
-             SUM(IFNULL(pr.price, 0)) as target_amount
+             SUM(IF(p.id IS NULL AND (inv.status IS NULL OR inv.status != 'isolir'), IFNULL(inv.amount, IFNULL(pr.price, 0)), 0)) as receivable,
+             SUM(IFNULL(inv.amount, IFNULL(pr.price, 0))) as target_amount
            FROM $tables 
            $sumWhereSQL";
 $sumStmt = $conn->prepare($sumSQL);

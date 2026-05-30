@@ -8,6 +8,11 @@ Project ini awalnya berasal dari template `shadcn-admin`, lalu dikembangkan menj
 
 ## Ringkasan Fitur
 
+### Architecture & Background Workers
+
+- **MikroTik Daemon (`mikrotik-daemon`)**: Proses background (PM2) untuk sinkronisasi real-time (setiap 3 detik) data Active Users, Secrets, Profile Pricing, dan Router Resources.
+- **WhatsApp Gateway (`wa-gateway`)**: Proses background (PM2) untuk pengiriman antrean pesan WhatsApp dan Webhook dua arah (Chat Messenger).
+
 ### Authentication & Security
 
 - Login admin berbasis PHP session/cookie.
@@ -121,6 +126,13 @@ Permission sudah diterapkan pada:
   - profile
 - Export piutang CSV.
 - Role finance/admin dapat mengelola pembayaran.
+- **Digital Notes:** Sistem pencatatan anomali operasional dan follow-up pembayaran yang persisten di Dashboard Keuangan.
+
+### WhatsApp Center & Gateway
+
+- **Full-Duplex Messaging:** Integrasi Webhook untuk menerima dan membalas pesan pelanggan secara real-time seperti aplikasi chat messenger.
+- **Queue System:** Pengiriman pesan massal menggunakan sistem antrean (queue) melalui background worker.
+- **WhatsApp Settings:** Pengaturan API Token dan Custom Webhook URL via UI.
 
 ### ODP & Network Map
 
@@ -200,6 +212,8 @@ html class: privacy-mode
 - MySQL/MariaDB
 - PHP session auth
 - RouterOS API client
+- PM2 (Process Manager) untuk Background Daemons (`mikrotik-daemon`, `wa-gateway`)
+- Node.js (untuk WhatsApp Webhook Gateway)
 - Apache/Laragon `.htaccess`
 
 ---
@@ -229,6 +243,9 @@ api/
   network_lines.php
   web_settings.php
   profile_pricing_operations.php
+  mikrotik_daemon.php
+  wa_operations.php
+  get_system_logs.php
 
 src/
   components/
@@ -428,6 +445,13 @@ GET  /api/auth/verify_session.php
 /api/web_settings.php
 /api/profile_pricing_operations.php
 /api/genieacs_proxy.php
+
+### System Tools & WhatsApp
+
+```txt
+/api/get_system_logs.php
+/api/wa_operations.php
+```
 ```
 
 ---
@@ -461,6 +485,10 @@ GET  /api/auth/verify_session.php
   - bottom status bar
   - popup ODP/pelanggan premium
   - **Integrasi MikroTik Real-Time:** Penarikan langsung data live IP & throughput lalu-lintas data (RX/TX bps) langsung dari router via event `popupopen`, lengkap dengan fallback deteksi nama interface (`<pppoe-username>` dan `pppoe-username`).
+- **MikroTik Daemon (Real-Time Background Sync):** Arsitektur backend baru menggunakan PM2 worker untuk polling data router (Active Users, Profiles, Secrets, Resources) secara asinkron setiap 3 detik, membuat UI dashboard menjadi instan tanpa lag.
+- **WhatsApp Gateway terintegrasi:** Pembuatan sistem chat messenger dua arah (full-duplex) via UI Webhook dan sistem manajemen Queue.
+- **System Diagnostics UI:** Penambahan halaman System Logs dengan fitur Auto-Refresh (3 detik) dan Copy Log untuk memantau PM2 Daemon dan PHP Error secara real-time.
+- **Modernisasi Finance Dashboard:** Implementasi TanStack Table untuk pencarian dan filter tagihan/piutang yang sangat responsif, ditambah dengan resolusi bug sinkronisasi skema database.
 
 ---
 
