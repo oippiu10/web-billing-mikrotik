@@ -13,7 +13,7 @@ import { usePermission } from '@/lib/permissions'
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
 
 export function SystemLogsPage() {
-  const [tab, setTab] = useState<'php' | 'daemon'>('php')
+  const [tab, setTab] = useState<'php'>('php')
   const [autoRefresh, setAutoRefresh] = useState(true)
   const [copied, setCopied] = useState(false)
   const permissions = usePermission()
@@ -97,15 +97,14 @@ export function SystemLogsPage() {
         <div className='flex flex-wrap items-center justify-between gap-2'>
           <div>
             <h2 className='text-2xl font-bold tracking-tight'>Backend System Logs</h2>
-            <p className='text-sm text-muted-foreground'>Pantau error PHP dan aktivitas background daemon secara real-time.</p>
+            <p className='text-sm text-muted-foreground'>Pantau error PHP secara real-time.</p>
           </div>
         </div>
 
-        <Tabs value={tab} onValueChange={(v) => setTab(v as 'php' | 'daemon')} className='flex flex-1 flex-col overflow-hidden rounded-xl border bg-card shadow-sm'>
+        <Tabs value={tab} onValueChange={(v) => setTab(v as 'php')} className='flex flex-1 flex-col overflow-hidden rounded-xl border bg-card shadow-sm'>
           <div className='flex items-center justify-between border-b bg-muted/30 p-2 px-4'>
             <TabsList className='bg-background'>
               <TabsTrigger value='php'>PHP Error Logs</TabsTrigger>
-              <TabsTrigger value='daemon'>Daemon PM2 Logs</TabsTrigger>
             </TabsList>
             <div className='flex gap-2'>
               <Button 
@@ -157,10 +156,6 @@ export function SystemLogsPage() {
           </div>
           
           <TabsContent value='php' className='flex-1 m-0 p-0 overflow-hidden relative'>
-             <LogViewer logs={logs} isLoading={isLoading} scrollRef={scrollRef} />
-          </TabsContent>
-          
-          <TabsContent value='daemon' className='flex-1 m-0 p-0 overflow-hidden relative'>
              <LogViewer logs={logs} isLoading={isLoading} scrollRef={scrollRef} />
           </TabsContent>
         </Tabs>

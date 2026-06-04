@@ -105,7 +105,7 @@ class MikrotikCache
         try {
             $fresh = $fetcher();
             
-            // JANGAN simpan jika fresh adalah null (berarti fetcher sengaja skip karena daemon aktif)
+            // JANGAN simpan jika fresh adalah null (berarti fetcher sengaja skip)
             if ($fresh === null) {
                 $stale = $this->getStale($key);
                 return ['data' => $stale, 'from_cache' => true, 'stale' => true];

@@ -69,20 +69,10 @@ try {
 
     if ($routerInfo) {
         try {
-            // Cek daemon aktif dalam 10 menit terakhir
-            $daemonStatus = $cache->getStale("daemon_status_" . $router_id);
-            $isDaemonRecent = false;
-            if ($daemonStatus) {
-                $lastSync = strtotime($daemonStatus['last_sync'] ?? '2000-01-01');
-                $isDaemonRecent = (time() - $lastSync) < 600;
-            }
-
-            // Fungsi fetch: hanya konek ke MikroTik jika daemon tidak aktif
-            // RouterosAPI sengaja dibuat di dalam closure agar tidak di-instantiate sebelumnya
-            $fetchFromMk = function($command) use ($routerInfo, $isDaemonRecent) {
-                if ($isDaemonRecent) return null; // Daemon aktif — skip direct connect
-
+            // Fungsi fetch: langsung konek ke MikroTik secara on-demand
+            $fetchFromMk = function($command) use ($routerInfo) {
                 $api = new RouterosAPI();
+                $api->timeout = 5;
                 if ($api->connect($routerInfo['host'], $routerInfo['username'], $routerInfo['password'])) {
                     $data = $api->comm($command);
                     $api->disconnect();
@@ -92,9 +82,7 @@ try {
             };
 
             // PPP Active
-            $resActive = $cache->getOrFetch("mt_{$router_id}_ppp_active", 10, function() use ($fetchFromMk, $cache, $router_id) {
-                $stale = $cache->getStale("mt_{$router_id}_ppp_active");
-                if ($stale !== null) return $stale;
+            $resActive = $cache->getOrFetch("mt_{$router_id}_ppp_active", 10, function() use ($fetchFromMk) {
                 return $fetchFromMk('/ppp/active/print') ?? [];
             });
             $allActive = is_array($resActive['data'] ?? null) ? $resActive['data'] : [];
@@ -128,17 +116,13 @@ try {
             $activeSessions = array_slice($allActive, 0, 10);
 
             // PPP Secret
-            $resSecret = $cache->getOrFetch("mt_{$router_id}_ppp_secret", 300, function() use ($fetchFromMk, $cache, $router_id) {
-                $stale = $cache->getStale("mt_{$router_id}_ppp_secret");
-                if ($stale !== null) return $stale;
+            $resSecret = $cache->getOrFetch("mt_{$router_id}_ppp_secret", 300, function() use ($fetchFromMk) {
                 return $fetchFromMk('/ppp/secret/print') ?? [];
             });
             $totalSecrets = count(is_array($resSecret['data'] ?? null) ? $resSecret['data'] : []);
 
             // MikroTik Logs
-            $resLogs = $cache->getOrFetch("mt_{$router_id}_log", 20, function() use ($fetchFromMk, $cache, $router_id) {
-                $stale = $cache->getStale("mt_{$router_id}_log");
-                if ($stale !== null) return $stale;
+            $resLogs = $cache->getOrFetch("mt_{$router_id}_log", 20, function() use ($fetchFromMk) {
                 $all = $fetchFromMk('/log/print');
                 return is_array($all) ? array_slice($all, -500) : [];
             });

@@ -184,70 +184,8 @@ $lockName = "mt_conn_" . md5($host . ':' . $port);
 $conn->query("SELECT GET_LOCK('$lockName', 20)");
 
 try {
-    // 1. Cek apakah daemon aktif (toleransi 5 menit)
-    $daemonStatus = $cache->getStale("daemon_status_{$router_id}");
-    $isDaemonRecent = false;
-    if ($daemonStatus) {
-        $lastSync = strtotime($daemonStatus['last_sync'] ?? '2000-01-01');
-        $diff = time() - $lastSync;
-        $isDaemonRecent = ($diff >= 0 && $diff < 300); // Aktif dalam 5 menit terakhir dan aman dari selisih zona waktu
-    }
-
-    // 2. Jika daemon aktif/baru saja aktif, prioritaskan cache (meskipun stale/expired)
-    // agar tidak membebani MikroTik dengan login/logout.
     $isRealtime = (isset($_GET['ttl']) && $_GET['ttl'] <= 2) || (isset($_GET['direct']) && $_GET['direct'] == 1);
     $forceDirect = isset($_GET['direct']) && $_GET['direct'] == 1;
-
-    // Command yang boleh direct-connect meski daemon aktif (jarang diminta, tidak flood log)
-    // identity: diminta hanya sekali per menit, daemon sudah cache di warm-up
-    // license: sangat jarang, 1x per hari
-    $allowDirectWhenDaemon = in_array($cmd, ['license']);
-
-    if ($isDaemonRecent && !$forceDirect && !$allowDirectWhenDaemon) {
-        $staleData = $cache->getStale($cacheKey);
-        if ($staleData !== null) {
-            if ($cmd === 'ppp_active' && !is_valid_ppp_active_cache($staleData)) {
-                // Cache ppp_active rusak/tertukar. Jangan kirim ke frontend,
-                // karena ini membuat semua pelanggan dianggap offline.
-                $cache->invalidate($cacheKey);
-            } else {
-                if ($cmd === 'ppp_profile') {
-                    $actual_router_id = !empty($software_id) ? $software_id : (string)$router_id;
-                    inject_ppp_profile_price($staleData, $conn, $actual_router_id);
-                }
-                echo json_encode([
-                    'success'    => true,
-                    'cmd'        => $cmd,
-                    'host'       => $host,
-                    'from_cache' => true,
-                    'via_daemon' => true,
-                    'is_stale'   => true,
-                    'realtime'   => $isRealtime,
-                    'time'       => date('Y-m-d H:i:s'),
-                    'data'       => $staleData
-                ], JSON_UNESCAPED_UNICODE);
-                exit;
-            }
-        }
-
-        // Daemon aktif tapi cache belum ada (baru start / warm-up).
-        // Untuk ppp_active, data kosong akan membuat semua pelanggan dianggap offline,
-        // jadi ambil direct sekali sebagai fallback aman.
-        if ($cmd !== 'ppp_active') {
-            echo json_encode([
-                'success'      => true,
-                'cmd'          => $cmd,
-                'host'         => $host,
-                'from_cache'   => false,
-                'via_daemon'   => true,
-                'initializing' => true,
-                'message'      => 'Daemon aktif, menunggu data pertama dari daemon...',
-                'time'         => date('Y-m-d H:i:s'),
-                'data'         => []
-            ], JSON_UNESCAPED_UNICODE);
-            exit;
-        }
-    }
 
 
     $result = $cache->getOrFetch($cacheKey, $ttl, function () use ($host, $port, $user, $pass, $cmdMap, $cmd, $conn, $router_id) {

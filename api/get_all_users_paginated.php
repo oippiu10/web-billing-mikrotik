@@ -91,12 +91,7 @@ if ($routerHost !== '') {
 
     $cache = new MikrotikCache($conn);
 
-    // 1. Cek apakah daemon aktif
-    $isDaemonActive = false;
-    if ($routerInternalId) {
-        $daemonStatus = $cache->get("daemon_status_{$routerInternalId}");
-        $isDaemonActive = ($daemonStatus !== null);
-    }
+
 
     $sharedApi = null;
     $apiCall = function ($cmd) use (&$sharedApi, $routerHost, $routerPort, $routerUser, $routerPass) {
@@ -115,35 +110,11 @@ if ($routerHost !== '') {
         return [];
     };
 
-    // 1. Cek apakah daemon aktif dalam 10 menit terakhir (toleransi stale/expired cache)
-    $daemonStatus = $cache->getStale("daemon_status_{$routerInternalId}");
-    $isDaemonRecent = false;
-    if ($daemonStatus) {
-        $lastSync = strtotime($daemonStatus['last_sync'] ?? '2000-01-01');
-        $isDaemonRecent = (time() - $lastSync) < 600;
-    }
-
-    $fetchWithDaemon = function ($key, $ttl, $cmd) use ($cache, $isDaemonRecent, $apiCall) {
-        // SELALU gunakan cache stale jika tersedia untuk menghindari direct connect & log flood ke MikroTik
-        $stale = $cache->getStale($key);
-        if ($stale !== null) {
-            return ['data' => $stale, 'from_cache' => true, 'stale' => true];
-        }
-
-        if ($isDaemonRecent) {
-            // Cache belum ada sama sekali di database & daemon sedang start
-            return ['data' => [], 'from_cache' => false, 'via_daemon' => true, 'initializing' => true];
-        }
-
-        // Sebagai benteng pertahanan terakhir jika cache benar-benar kosong 100%, baru konek langsung
-        return $cache->getOrFetch($key, $ttl, function () use ($apiCall, $cmd) {
-            return $apiCall($cmd);
-        });
-    };
-
-    $sRes = $fetchWithDaemon("mt_{$routerInternalId}_ppp_secret", 300, '/ppp/secret/print');
-    $aRes = $fetchWithDaemon("mt_{$routerInternalId}_ppp_active", 30, '/ppp/active/print');
-    $pRes = $fetchWithDaemon("mt_{$routerInternalId}_ppp_profile", 600, '/ppp/profile/print');
+    // Semua data diambil langsung secara on-demand via cache
+    $forceDirect = isset($_GET['force_refresh']) && $_GET['force_refresh'] === 'true';
+    $sRes = $cache->getOrFetch("mt_{$routerInternalId}_ppp_secret", 300, function() use ($apiCall) { return $apiCall('/ppp/secret/print'); }, $forceDirect);
+    $aRes = $cache->getOrFetch("mt_{$routerInternalId}_ppp_active", 30, function() use ($apiCall) { return $apiCall('/ppp/active/print'); }, $forceDirect);
+    $pRes = $cache->getOrFetch("mt_{$routerInternalId}_ppp_profile", 600, function() use ($apiCall) { return $apiCall('/ppp/profile/print'); }, $forceDirect);
 
     if ($sharedApi instanceof RouterosAPI) {
         $sharedApi->disconnect();

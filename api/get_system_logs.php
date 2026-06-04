@@ -9,8 +9,7 @@ $action = $_GET['action'] ?? 'read';
 $type = $_GET['type'] ?? 'php';
 
 $logFiles = [
-    'php' => __DIR__ . '/error.log',
-    'daemon' => __DIR__ . '/daemon.log'
+    'php' => __DIR__ . '/error.log'
 ];
 
 if (!isset($logFiles[$type])) {

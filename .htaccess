@@ -1,12 +1,12 @@
 # Security hardening: block direct access to development/debug PHP scripts.
 # Keep production API endpoints available, but prevent accidental data/credential leaks.
-<FilesMatch "^(debug|dump|test|check|diagnose|create).*(\.php)$|.*(debug|test).*(\.php)$">
+<FilesMatch "^(debug|dump|create).*(\.php)$|.*(debug).*(\.php)$">
     Require all denied
 </FilesMatch>
 
 # Apache 2.2 fallback
 <IfModule !mod_authz_core.c>
-    <FilesMatch "^(debug|dump|test|check|diagnose|create).*(\.php)$|.*(debug|test).*(\.php)$">
+    <FilesMatch "^(debug|dump|create).*(\.php)$|.*(debug).*(\.php)$">
         Deny from all
     </FilesMatch>
 </IfModule>

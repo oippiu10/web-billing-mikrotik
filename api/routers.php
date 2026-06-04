@@ -99,6 +99,8 @@ try {
             $port     = intval($input['port'] ?? 8728);
             $username = $input['username'] ?? 'admin';
             $password = $input['password'] ?? '';
+            $lat      = isset($input['lat']) && $input['lat'] !== '' ? floatval($input['lat']) : null;
+            $lng      = isset($input['lng']) && $input['lng'] !== '' ? floatval($input['lng']) : null;
 
             // Otomatis ambil Software ID dari MikroTik
             $software_id = fetchSoftwareId($host, $port, $username, $password);
@@ -124,7 +126,7 @@ try {
                 // Router sudah ada → update nama, credentials, software_id
                 $existingId = $dupRow['id'];
                 $updStmt = $conn->prepare("UPDATE mikrotik_routers SET name=?, username=?, password=?, software_id=?, lat=?, lng=? WHERE id=?");
-                $updStmt->bind_param("ssssddi", $name, $username, $password, $software_id, $input['lat'], $input['lng'], $existingId);
+                $updStmt->bind_param("ssssddi", $name, $username, $password, $software_id, $lat, $lng, $existingId);
                 $updStmt->execute();
                 $updStmt->close();
 
@@ -149,7 +151,7 @@ try {
             $isActive    = ($count == 0) ? 1 : 0;
 
             $stmt = $conn->prepare("INSERT INTO mikrotik_routers (name, host, port, username, password, software_id, is_active, lat, lng) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)");
-            $stmt->bind_param("ssisssidd", $name, $host, $port, $username, $password, $software_id, $isActive, $input['lat'], $input['lng']);
+            $stmt->bind_param("ssisssidd", $name, $host, $port, $username, $password, $software_id, $isActive, $lat, $lng);
             $stmt->execute();
             $newId = $conn->insert_id;
 
@@ -183,6 +185,8 @@ try {
             $port     = intval($input['port'] ?? 8728);
             $username = $input['username'] ?? 'admin';
             $password = $input['password'] ?? '';
+            $lat      = isset($input['lat']) && $input['lat'] !== '' ? floatval($input['lat']) : null;
+            $lng      = isset($input['lng']) && $input['lng'] !== '' ? floatval($input['lng']) : null;
 
             // Ambil password lama jika tidak diisi
             $oldRow = $conn->prepare("SELECT password, software_id FROM mikrotik_routers WHERE id = ?");
@@ -213,10 +217,10 @@ try {
 
             if (!empty($password)) {
                 $stmt = $conn->prepare("UPDATE mikrotik_routers SET name=?, host=?, port=?, username=?, password=?, software_id=?, lat=?, lng=? WHERE id=?");
-                $stmt->bind_param("ssisssddi", $name, $host, $port, $username, $finalPass, $software_id, $input['lat'], $input['lng'], $id);
+                $stmt->bind_param("ssisssddi", $name, $host, $port, $username, $finalPass, $software_id, $lat, $lng, $id);
             } else {
                 $stmt = $conn->prepare("UPDATE mikrotik_routers SET name=?, host=?, port=?, username=?, software_id=?, lat=?, lng=? WHERE id=?");
-                $stmt->bind_param("ssissddi", $name, $host, $port, $username, $software_id, $input['lat'], $input['lng'], $id);
+                $stmt->bind_param("ssissddi", $name, $host, $port, $username, $software_id, $lat, $lng, $id);
             }
             $stmt->execute();
 
