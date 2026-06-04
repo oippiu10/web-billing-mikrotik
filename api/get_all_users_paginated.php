@@ -157,9 +157,11 @@ if ($routerHost !== '') {
 $secretMap = [];
 $totalDisabled = 0;
 foreach ($mtSecrets as $sec) {
-    $secretMap[$sec['name']] = $sec;
-    if (($sec['disabled'] ?? 'false') === 'true') {
-        $totalDisabled++;
+    if (isset($sec['name'])) {
+        $secretMap[$sec['name']] = $sec;
+        if (($sec['disabled'] ?? 'false') === 'true') {
+            $totalDisabled++;
+        }
     }
 }
 $activeMap = [];

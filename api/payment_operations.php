@@ -216,20 +216,28 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $checkStmt->bind_param("siii", $router_id, $uid, $month, $year);
                 $checkStmt->execute();
                 $res = $checkStmt->get_result();
+                $checkData = $res ? $res->fetch_assoc() : null;
+                if ($res) $res->free();
                 
                 $invStmt->bind_param("iii", $uid, $month, $year);
                 $invStmt->execute();
                 $invRes = $invStmt->get_result();
-                if ($invRes->num_rows > 0) {
-                    $target_amount = $invRes->fetch_assoc()['amount'];
+                $invData = $invRes ? $invRes->fetch_assoc() : null;
+                if ($invRes) $invRes->free();
+                
+                if ($invData) {
+                    $target_amount = $invData['amount'];
                 } else {
                     $profStmt->bind_param("i", $uid);
                     $profStmt->execute();
-                    $target_amount = $profStmt->get_result()->fetch_assoc()['price'] ?? 0;
+                    $profRes = $profStmt->get_result();
+                    $profData = $profRes ? $profRes->fetch_assoc() : null;
+                    if ($profRes) $profRes->free();
+                    $target_amount = $profData['price'] ?? 0;
                 }
                 
-                if ($res->num_rows > 0) {
-                    $pid = $res->fetch_assoc()['id'];
+                if ($checkData) {
+                    $pid = $checkData['id'];
                     $updStmt->bind_param("dsssdi", $amt, $date, $method, $note, $target_amount, $pid);
                     $updStmt->execute();
                 } else {

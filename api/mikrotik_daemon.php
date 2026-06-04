@@ -186,7 +186,7 @@ while (true) {
             }
 
             // 4. Slow Loop: Secrets, Profiles, Identity & Internet Check (Every 30s)
-            if ($loops % 3 == 0) {
+            if ($loops % 30 == 0) {
                 daemonLog("Syncing Secrets/Profiles & Ping for $host via persistent connection...");
                 $secrets = $api->comm('/ppp/secret/print');
                 if (is_array($secrets)) {
