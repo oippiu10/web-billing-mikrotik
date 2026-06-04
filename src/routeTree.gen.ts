@@ -75,6 +75,9 @@ import { Route as AuthenticatedCustomersImportExportRouteImport } from './routes
 import { Route as AuthenticatedCustomersByProfileRouteImport } from './routes/_authenticated/customers/by-profile'
 import { Route as AuthenticatedAutomationWhatsappCenterRouteImport } from './routes/_authenticated/automation/whatsapp-center'
 
+const AuthenticatedSystemToolsUpdateLazyRouteImport = createFileRoute(
+  '/_authenticated/system-tools/update',
+)()
 const AuthenticatedSystemToolsLogsLazyRouteImport = createFileRoute(
   '/_authenticated/system-tools/logs',
 )()
@@ -279,6 +282,16 @@ const AuthenticatedAcsIndexRoute = AuthenticatedAcsIndexRouteImport.update({
   path: '/acs/',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
+const AuthenticatedSystemToolsUpdateLazyRoute =
+  AuthenticatedSystemToolsUpdateLazyRouteImport.update({
+    id: '/system-tools/update',
+    path: '/system-tools/update',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any).lazy(() =>
+    import('./routes/_authenticated/system-tools/update.lazy').then(
+      (d) => d.Route,
+    ),
+  )
 const AuthenticatedSystemToolsLogsLazyRoute =
   AuthenticatedSystemToolsLogsLazyRouteImport.update({
     id: '/system-tools/logs',
@@ -479,6 +492,7 @@ export interface FileRoutesByFullPath {
   '/clerk/sign-up': typeof ClerkauthSignUpRoute
   '/clerk/user-management': typeof ClerkAuthenticatedUserManagementRoute
   '/system-tools/logs': typeof AuthenticatedSystemToolsLogsLazyRoute
+  '/system-tools/update': typeof AuthenticatedSystemToolsUpdateLazyRoute
   '/acs/': typeof AuthenticatedAcsIndexRoute
   '/apps/': typeof AuthenticatedAppsIndexRoute
   '/automation/': typeof AuthenticatedAutomationIndexRoute
@@ -541,6 +555,7 @@ export interface FileRoutesByTo {
   '/clerk/sign-up': typeof ClerkauthSignUpRoute
   '/clerk/user-management': typeof ClerkAuthenticatedUserManagementRoute
   '/system-tools/logs': typeof AuthenticatedSystemToolsLogsLazyRoute
+  '/system-tools/update': typeof AuthenticatedSystemToolsUpdateLazyRoute
   '/acs': typeof AuthenticatedAcsIndexRoute
   '/apps': typeof AuthenticatedAppsIndexRoute
   '/automation': typeof AuthenticatedAutomationIndexRoute
@@ -608,6 +623,7 @@ export interface FileRoutesById {
   '/clerk/(auth)/sign-up': typeof ClerkauthSignUpRoute
   '/clerk/_authenticated/user-management': typeof ClerkAuthenticatedUserManagementRoute
   '/_authenticated/system-tools/logs': typeof AuthenticatedSystemToolsLogsLazyRoute
+  '/_authenticated/system-tools/update': typeof AuthenticatedSystemToolsUpdateLazyRoute
   '/_authenticated/acs/': typeof AuthenticatedAcsIndexRoute
   '/_authenticated/apps/': typeof AuthenticatedAppsIndexRoute
   '/_authenticated/automation/': typeof AuthenticatedAutomationIndexRoute
@@ -673,6 +689,7 @@ export interface FileRouteTypes {
     | '/clerk/sign-up'
     | '/clerk/user-management'
     | '/system-tools/logs'
+    | '/system-tools/update'
     | '/acs/'
     | '/apps/'
     | '/automation/'
@@ -735,6 +752,7 @@ export interface FileRouteTypes {
     | '/clerk/sign-up'
     | '/clerk/user-management'
     | '/system-tools/logs'
+    | '/system-tools/update'
     | '/acs'
     | '/apps'
     | '/automation'
@@ -801,6 +819,7 @@ export interface FileRouteTypes {
     | '/clerk/(auth)/sign-up'
     | '/clerk/_authenticated/user-management'
     | '/_authenticated/system-tools/logs'
+    | '/_authenticated/system-tools/update'
     | '/_authenticated/acs/'
     | '/_authenticated/apps/'
     | '/_authenticated/automation/'
@@ -1107,6 +1126,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedAcsIndexRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
+    '/_authenticated/system-tools/update': {
+      id: '/_authenticated/system-tools/update'
+      path: '/system-tools/update'
+      fullPath: '/system-tools/update'
+      preLoaderRoute: typeof AuthenticatedSystemToolsUpdateLazyRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
     '/_authenticated/system-tools/logs': {
       id: '/_authenticated/system-tools/logs'
       path: '/system-tools/logs'
@@ -1340,6 +1366,7 @@ interface AuthenticatedRouteRouteChildren {
   AuthenticatedPppoeProfilesRoute: typeof AuthenticatedPppoeProfilesRoute
   AuthenticatedPppoeSecretsRoute: typeof AuthenticatedPppoeSecretsRoute
   AuthenticatedSystemToolsLogsLazyRoute: typeof AuthenticatedSystemToolsLogsLazyRoute
+  AuthenticatedSystemToolsUpdateLazyRoute: typeof AuthenticatedSystemToolsUpdateLazyRoute
   AuthenticatedAcsIndexRoute: typeof AuthenticatedAcsIndexRoute
   AuthenticatedAppsIndexRoute: typeof AuthenticatedAppsIndexRoute
   AuthenticatedAutomationIndexRoute: typeof AuthenticatedAutomationIndexRoute
@@ -1385,6 +1412,8 @@ const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedPppoeProfilesRoute: AuthenticatedPppoeProfilesRoute,
   AuthenticatedPppoeSecretsRoute: AuthenticatedPppoeSecretsRoute,
   AuthenticatedSystemToolsLogsLazyRoute: AuthenticatedSystemToolsLogsLazyRoute,
+  AuthenticatedSystemToolsUpdateLazyRoute:
+    AuthenticatedSystemToolsUpdateLazyRoute,
   AuthenticatedAcsIndexRoute: AuthenticatedAcsIndexRoute,
   AuthenticatedAppsIndexRoute: AuthenticatedAppsIndexRoute,
   AuthenticatedAutomationIndexRoute: AuthenticatedAutomationIndexRoute,

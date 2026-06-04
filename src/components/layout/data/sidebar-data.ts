@@ -31,6 +31,7 @@ import {
   MessageSquare,
 } from 'lucide-react'
 import { type SidebarData } from '../types'
+import packageJson from '../../../../package.json'
 
 export const sidebarData: SidebarData = {
   user: {
@@ -42,7 +43,7 @@ export const sidebarData: SidebarData = {
     {
       name: 'MikroTik Monitor',
       logo: Command,
-      plan: 'Professional',
+      plan: `v${packageJson.version}`,
     },
   ],
   navGroups: [
@@ -300,6 +301,10 @@ export const sidebarData: SidebarData = {
             {
               title: 'System Logs',
               url: '/system-tools/logs',
+            },
+            {
+              title: 'System Update',
+              url: '/system-tools/update',
             },
           ],
         },

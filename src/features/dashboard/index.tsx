@@ -25,6 +25,7 @@ import { ActivePPP } from './components/active-ppp'
 import { RecentLogs } from './components/recent-logs'
 import { Users, DollarSign, Activity, AlertCircle, RefreshCw, TrendingUp, UserCheck, LayoutDashboard } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
+import packageJson from '../../../package.json'
 import {
   Popover,
   PopoverContent,
@@ -178,7 +179,12 @@ export function Dashboard() {
               </div>
               <span className="text-[10px] font-bold uppercase tracking-[0.2em] text-muted-foreground">Main Overview</span>
             </div>
-            <h1 className='text-4xl font-black tracking-tighter uppercase'>Dashboard</h1>
+            <div className='flex items-center gap-3'>
+              <h1 className='text-4xl font-black tracking-tighter uppercase'>Dashboard</h1>
+              <Badge variant='secondary' className='bg-primary/10 text-primary hover:bg-primary/20 border-primary/20 text-sm py-1'>
+                v{packageJson.version}
+              </Badge>
+            </div>
             <p className="text-muted-foreground text-sm font-medium mt-1">
               Selamat datang kembali. Berikut adalah ringkasan performa router <span className="text-primary font-bold">{activeRouter?.name}</span> hari ini.
             </p>
@@ -219,7 +225,7 @@ export function Dashboard() {
           <TabsContent value='overview' className='space-y-4'>
             <div className='grid gap-4 sm:grid-cols-2 lg:grid-cols-4'>
               {/* Revenue Card - Emerald */}
-              <Card className='relative overflow-hidden border-none bg-gradient-to-br from-emerald-500 to-teal-600 text-white shadow-xl shadow-emerald-500/20'>
+              <Card className='relative overflow-hidden border-none bg-linear-to-br from-emerald-500 to-teal-600 text-white shadow-xl shadow-emerald-500/20'>
                 <CardHeader className='flex flex-row items-center justify-between space-y-0 pb-2 relative z-10'>
                   <CardTitle className='text-[10px] font-bold uppercase tracking-widest opacity-80'>
                     Revenue (Bulan Ini)
@@ -239,7 +245,7 @@ export function Dashboard() {
               </Card>
 
               {/* Total Secret - Purple */}
-              <Card className='relative overflow-hidden border-none bg-gradient-to-br from-purple-500 to-violet-600 text-white shadow-xl shadow-purple-500/20'>
+              <Card className='relative overflow-hidden border-none bg-linear-to-br from-purple-500 to-violet-600 text-white shadow-xl shadow-purple-500/20'>
                 <CardHeader className='flex flex-row items-center justify-between space-y-0 pb-2 relative z-10'>
                   <CardTitle className='text-[10px] font-bold uppercase tracking-widest opacity-80'>Total Secret</CardTitle>
                   <Users className='h-4 w-4 opacity-80' />
@@ -256,7 +262,7 @@ export function Dashboard() {
               </Card>
 
               {/* Online Users - Blue */}
-              <Card className='relative overflow-hidden border-none bg-gradient-to-br from-blue-500 to-indigo-600 text-white shadow-xl shadow-blue-500/20'>
+              <Card className='relative overflow-hidden border-none bg-linear-to-br from-blue-500 to-indigo-600 text-white shadow-xl shadow-blue-500/20'>
                 <CardHeader className='flex flex-row items-center justify-between space-y-0 pb-2 relative z-10'>
                   <CardTitle className='text-[10px] font-bold uppercase tracking-widest opacity-80'>
                     Online Users
@@ -276,7 +282,7 @@ export function Dashboard() {
               </Card>
 
               {/* Pending Payments - Orange */}
-              <Card className='relative overflow-hidden border-none bg-gradient-to-br from-orange-500 to-amber-600 text-white shadow-xl shadow-orange-500/20'>
+              <Card className='relative overflow-hidden border-none bg-linear-to-br from-orange-500 to-amber-600 text-white shadow-xl shadow-orange-500/20'>
                 <CardHeader className='flex flex-row items-center justify-between space-y-0 pb-2 relative z-10'>
                   <CardTitle className='text-[10px] font-bold uppercase tracking-widest opacity-80'>
                     Belum Bayar
