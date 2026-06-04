@@ -21,53 +21,51 @@ if ($action === 'history') {
     exit();
 }
 
-// --- API Cek Update ---
-if ($action === 'check') {
+// --- API Changelog Lengkap ---
+if ($action === 'changelog_full') {
     header('Content-Type: application/json');
     
-    // Sinkronisasi dengan GitHub
+    // Sinkronisasi dengan GitHub untuk mendapatkan info terbaru
     $fetchCmd = "cd " . escapeshellarg($cwd) . " && git fetch origin 2>&1";
     exec($fetchCmd, $fetchOutput, $fetchCode);
 
-    if ($fetchCode !== 0) {
-        echo json_encode([
-            'success' => false, 
-            'message' => 'Gagal menghubungi GitHub. Periksa koneksi internet server Anda.',
-            'error' => implode("\n", $fetchOutput)
-        ]);
-        exit();
+    // 1. Ambil komit masa depan (Upcoming)
+    $upcomingOutput = [];
+    exec("cd " . escapeshellarg($cwd) . " && git log HEAD..origin/main --oneline 2>&1", $upcomingOutput, $upcomingCode);
+
+    $upcoming = [];
+    if ($upcomingCode === 0) {
+        foreach ($upcomingOutput as $line) {
+            if (trim($line) !== '') {
+                $parts = explode(' ', $line, 2);
+                if (count($parts) >= 2) {
+                    $upcoming[] = ['hash' => $parts[0], 'message' => $parts[1]];
+                }
+            }
+        }
     }
 
-    // Cek selisih komit antara lokal (HEAD) dan remote (origin/main)
-    $logCmd = "cd " . escapeshellarg($cwd) . " && git log HEAD..origin/main --oneline 2>&1";
-    exec($logCmd, $logOutput, $logCode);
+    // 2. Ambil komit masa lalu (Past)
+    $pastOutput = [];
+    exec("cd " . escapeshellarg($cwd) . " && git log HEAD -n 30 --oneline 2>&1", $pastOutput, $pastCode);
 
-    if ($logCode !== 0) {
-         echo json_encode([
-            'success' => false, 
-            'message' => 'Gagal membaca riwayat perubahan dari Git.',
-            'error' => implode("\n", $logOutput)
-        ]);
-        exit();
-    }
-
-    $commits = [];
-    foreach ($logOutput as $line) {
-        if (trim($line) !== '') {
-            $parts = explode(' ', $line, 2);
-            if (count($parts) >= 2) {
-                $commits[] = [
-                    'hash' => $parts[0],
-                    'message' => $parts[1]
-                ];
+    $past = [];
+    if ($pastCode === 0) {
+        foreach ($pastOutput as $line) {
+            if (trim($line) !== '') {
+                $parts = explode(' ', $line, 2);
+                if (count($parts) >= 2) {
+                    $past[] = ['hash' => $parts[0], 'message' => $parts[1]];
+                }
             }
         }
     }
 
     echo json_encode([
         'success' => true,
-        'has_update' => count($commits) > 0,
-        'commits' => $commits
+        'has_update' => count($upcoming) > 0,
+        'upcoming' => $upcoming,
+        'past' => $past
     ]);
     exit();
 }
@@ -97,6 +95,9 @@ if ($action === 'update') {
 
     sendLog("[*] 🚀 Menginisiasi proses instalasi pembaruan...");
 
+    // Tangkap HEAD sebelum pull
+    $oldHead = trim(shell_exec("cd " . escapeshellarg($cwd) . " && git rev-parse HEAD 2>&1"));
+
     // 1. GIT PULL
     sendLog("[*] Mengunduh kode terbaru dari repositori GitHub...");
     $cmdGit = "cd " . escapeshellarg($cwd) . " && git pull origin main 2>&1";
@@ -115,6 +116,23 @@ if ($action === 'update') {
         exit();
     }
     sendLog("[*] ✅ Download source code selesai.");
+
+    // Tangkap HEAD setelah pull dan ambil riwayat commit
+    $newHead = trim(shell_exec("cd " . escapeshellarg($cwd) . " && git rev-parse HEAD 2>&1"));
+    $changelogOutput = [];
+    if ($oldHead && $newHead && $oldHead !== $newHead && !str_contains($oldHead, 'fatal')) {
+        exec("cd " . escapeshellarg($cwd) . " && git log $oldHead..$newHead --oneline 2>&1", $changelogOutput);
+    }
+    
+    // Ambil versi terbaru dari package.json
+    $newVersion = 'unknown';
+    $pkgPath = $cwd . '/package.json';
+    if (file_exists($pkgPath)) {
+        $pkg = json_decode(file_get_contents($pkgPath), true);
+        if (isset($pkg['version'])) {
+            $newVersion = $pkg['version'];
+        }
+    }
 
     // 2. NPM BUILD
     sendLog("[*] Memulai kompilasi aset antarmuka (UI)...");
@@ -137,17 +155,25 @@ if ($action === 'update') {
     $npmStatus = pclose($handleNpm);
 
     // Save history function
-    function saveHistory($status, $details) {
+    function saveHistory($status, $details, $changelog = [], $version = null) {
         global $historyFile;
         $history = [];
         if (file_exists($historyFile)) {
             $history = json_decode(file_get_contents($historyFile), true) ?: [];
         }
-        array_unshift($history, [
+        $entry = [
             'date' => date('Y-m-d H:i:s'),
             'status' => $status,
             'details' => $details
-        ]);
+        ];
+        if (!empty($changelog)) {
+            $entry['changelog'] = $changelog;
+        }
+        if ($version) {
+            $entry['version'] = $version;
+        }
+
+        array_unshift($history, $entry);
         // Simpan hanya 30 riwayat terakhir
         $history = array_slice($history, 0, 30);
         file_put_contents($historyFile, json_encode($history, JSON_PRETTY_PRINT));
@@ -156,10 +182,12 @@ if ($action === 'update') {
     if ($npmStatus === 0) {
         sendLog("[*] ✅ Kompilasi frontend berhasil!");
         sendLog("[*] 🎉 SYSTEM UPDATE SELESAI. Website siap digunakan.", true);
-        saveHistory('success', 'Sistem diperbarui ke versi terbaru.');
+        
+        $details = $newVersion !== 'unknown' ? "Sistem diperbarui ke versi v$newVersion" : 'Sistem diperbarui ke versi terbaru dari GitHub.';
+        saveHistory('success', $details, $changelogOutput, $newVersion);
     } else {
         sendLog("[!] ❌ GAGAL: Terjadi error saat proses build kompilasi.", true);
-        saveHistory('error', 'Gagal membuild kode frontend (NPM Error).');
+        saveHistory('error', 'Gagal membuild kode frontend (NPM Error).', $changelogOutput, $newVersion);
     }
     exit();
 }
