@@ -40,12 +40,17 @@ if ($router_id !== '') {
 $genSql = "INSERT IGNORE INTO invoices (user_id, router_id, month, year, amount, status)
            SELECT u.id, u.router_id, ?, ?, IF(u.profile LIKE '%isolir%', 0, IFNULL(pr.price, 0)), IF(u.profile LIKE '%isolir%', 'isolir', 'unpaid')
            FROM users u
-           LEFT JOIN ppp_profile_pricing pr ON pr.profile_name = u.profile AND pr.router_id = u.router_id
+           LEFT JOIN ppp_profile_pricing pr ON pr.profile_name COLLATE utf8mb4_unicode_ci = u.profile COLLATE utf8mb4_unicode_ci AND pr.router_id = u.router_id
            WHERE u.router_id = ?";
 $genStmt = $conn->prepare($genSql);
-$genStmt->bind_param("iis", $month, $year, $router_id);
-$genStmt->execute();
-$genStmt->close();
+if (!$genStmt) {
+    // Jika prepare gagal, skip auto-generate (tidak fatal)
+    error_log("get_all_payments: genStmt prepare failed: " . $conn->error);
+} else {
+    $genStmt->bind_param("iis", $month, $year, $router_id);
+    $genStmt->execute();
+    $genStmt->close();
+}
 
 $where = ["u.router_id = ?"];
 $params = [$router_id];
@@ -86,7 +91,7 @@ $whereSQL = "WHERE " . implode(" AND ", $where);
 $tables = "users u 
            LEFT JOIN invoices inv ON inv.user_id = u.id AND inv.month = ? AND inv.year = ? AND inv.router_id = u.router_id
            LEFT JOIN payments p ON p.user_id = u.id AND p.payment_month = ? AND p.payment_year = ? AND p.router_id = u.router_id
-           LEFT JOIN ppp_profile_pricing pr ON pr.profile_name = u.profile AND pr.router_id = u.router_id";
+           LEFT JOIN ppp_profile_pricing pr ON pr.profile_name COLLATE utf8mb4_unicode_ci = u.profile COLLATE utf8mb4_unicode_ci AND pr.router_id = u.router_id";
 
 // Prepend month and year to params for LEFT JOINs (twice: for invoices and for payments)
 array_unshift($params, $year);
@@ -98,8 +103,12 @@ $types = "iiii" . $types;
 // 1. Total Filtered
 $cntSQL = "SELECT COUNT(*) as total FROM $tables $whereSQL";
 $cntStmt = $conn->prepare($cntSQL);
+if (!$cntStmt) {
+    error_log("get_all_payments: cntStmt prepare failed: " . $conn->error);
+    echo json_encode(['success' => false, 'message' => 'Database query error: ' . $conn->error]);
+    exit;
+}
 if ($types) {
-    // bind_param requires references in some versions, but ...$params works in PHP 5.6+
     $cntStmt->bind_param($types, ...$params);
 }
 $cntStmt->execute();

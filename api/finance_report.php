@@ -62,7 +62,7 @@ try {
                         IFNULL(SUM(CASE WHEN p.id IS NULL THEN IFNULL(pr.price, 0) ELSE 0 END), 0) as receivable
                     FROM users u
                     LEFT JOIN payments p ON p.user_id = u.id AND p.payment_month = ? AND p.payment_year = ? AND p.router_id = u.router_id
-                    LEFT JOIN ppp_profile_pricing pr ON pr.profile_name = u.profile AND pr.router_id = u.router_id
+                    LEFT JOIN ppp_profile_pricing pr ON pr.profile_name COLLATE utf8mb4_unicode_ci = u.profile COLLATE utf8mb4_unicode_ci AND pr.router_id = u.router_id
                     WHERE u.router_id = ?
                 ");
                 $stmt->bind_param("iis", $m, $y, $router_id);
@@ -106,7 +106,7 @@ try {
                     IFNULL(MAX(pr.price), 0) as price_per_user
                 FROM users u
                 LEFT JOIN payments p ON p.user_id = u.id AND p.payment_month = ? AND p.payment_year = ? AND p.router_id = u.router_id
-                LEFT JOIN ppp_profile_pricing pr ON pr.profile_name = u.profile AND pr.router_id = u.router_id
+                LEFT JOIN ppp_profile_pricing pr ON pr.profile_name COLLATE utf8mb4_unicode_ci = u.profile COLLATE utf8mb4_unicode_ci AND pr.router_id = u.router_id
                 WHERE u.router_id = ? AND u.profile IS NOT NULL AND u.profile != ''
                 GROUP BY u.profile
                 ORDER BY revenue DESC
@@ -133,7 +133,7 @@ try {
                 FROM users u
                 LEFT JOIN odp o ON u.odp_id = o.id
                 LEFT JOIN payments p ON p.user_id = u.id AND p.payment_month = ? AND p.payment_year = ? AND p.router_id = u.router_id
-                LEFT JOIN ppp_profile_pricing pr ON pr.profile_name = u.profile AND pr.router_id = u.router_id
+                LEFT JOIN ppp_profile_pricing pr ON pr.profile_name COLLATE utf8mb4_unicode_ci = u.profile COLLATE utf8mb4_unicode_ci AND pr.router_id = u.router_id
                 WHERE u.router_id = ?
                 GROUP BY u.odp_id
                 ORDER BY revenue DESC, receivable DESC
@@ -202,11 +202,14 @@ try {
                        FROM users u
                        LEFT JOIN invoices inv ON inv.user_id = u.id AND inv.month = ? AND inv.year = ?
                        LEFT JOIN payments p ON p.user_id = u.id AND p.payment_month = ? AND p.payment_year = ? AND p.router_id = u.router_id
-                       LEFT JOIN ppp_profile_pricing pr ON pr.profile_name = u.profile AND pr.router_id = u.router_id
+                       LEFT JOIN ppp_profile_pricing pr ON pr.profile_name COLLATE utf8mb4_unicode_ci = u.profile COLLATE utf8mb4_unicode_ci AND pr.router_id = u.router_id
                        $whereSQL";
             $allParams = array_merge([$month, $year, $month, $year], $params);
             $allTypes  = "iiii" . $types;
             $cntStmt   = $conn->prepare($cntSQL);
+            if (!$cntStmt) {
+                throw new Exception('prepare() failed: ' . $conn->error);
+            }
             $cntStmt->bind_param($allTypes, ...$allParams);
             $cntStmt->execute();
             $cnt = $cntStmt->get_result()->fetch_assoc();
@@ -301,7 +304,7 @@ try {
                     FROM users u
                     LEFT JOIN invoices inv ON inv.user_id = u.id AND inv.month = ? AND inv.year = ?
                     LEFT JOIN payments p ON p.user_id = u.id AND p.payment_month = ? AND p.payment_year = ? AND p.router_id = u.router_id
-                    LEFT JOIN ppp_profile_pricing pr ON pr.profile_name = u.profile AND pr.router_id = u.router_id
+                    LEFT JOIN ppp_profile_pricing pr ON pr.profile_name COLLATE utf8mb4_unicode_ci = u.profile COLLATE utf8mb4_unicode_ci AND pr.router_id = u.router_id
                     WHERE " . implode(" AND ", $where) . "
                     ORDER BY u.username ASC";
             $stmt = $conn->prepare($sql);
