@@ -38,7 +38,7 @@ import { printThermal, printInvoice } from '../utils/print-templates'
 export interface BillingColumnsContext {
   permissions: any
   selectedRows: Set<number>
-  toggleSelectRow: (id: number) => void
+  toggleSelectRow: (row: any) => void
   toggleSelectAll: (checked: boolean) => void
   setHistoryUser: (user: any) => void
   setPaymentCardUser: (user: any) => void
@@ -68,7 +68,7 @@ export const getBillingColumns = (ctx: BillingColumnsContext): ColumnDef<any>[] 
       cell: ({ row }) => (
         <Checkbox
           checked={ctx.selectedRows.has(row.original.user_id)}
-          onCheckedChange={() => ctx.toggleSelectRow(row.original.user_id)}
+          onCheckedChange={() => ctx.toggleSelectRow(row.original)}
           aria-label="Select row"
         />
       ),

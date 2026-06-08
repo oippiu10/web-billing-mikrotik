@@ -137,6 +137,12 @@ export function FinanceBilling() {
 
   // Selection states
   const [selectedRows, setSelectedRows] = useState<Set<number>>(new Set())
+  const [selectedUsersMap, setSelectedUsersMap] = useState<Map<number, any>>(new Map())
+
+  const clearSelection = useCallback(() => {
+    setSelectedRows(new Set())
+    setSelectedUsersMap(new Map())
+  }, [])
 
   // Paid dialog
   const [paidDialog, setPaidDialog] = useState<any>(null)
@@ -249,7 +255,7 @@ export function FinanceBilling() {
 
   const bulkMarkPaid = useMutation({
     mutationFn: async () => {
-      const usersToPay = (data?.data || []).filter((r: any) => selectedRows.has(r.user_id) && r.status !== 'paid')
+      const usersToPay = Array.from(selectedUsersMap.values()).filter((u: any) => u.status !== 'paid')
       if (usersToPay.length === 0) return { success: false, message: 'Tidak ada data valid untuk dilunasi' }
       
       const payload = {
@@ -263,7 +269,7 @@ export function FinanceBilling() {
         users: usersToPay.map((u: any) => ({
           user_id: u.user_id,
           username: u.username,
-          amount: parseFloat(u.harga || 0)
+          amount: u.harga
         }))
       }
       const res = await api.post('/payment_operations.php', payload)
@@ -272,7 +278,7 @@ export function FinanceBilling() {
     onSuccess: (d) => {
       if (d.success) {
         toast.success(d.message || 'Pembayaran massal berhasil!')
-        setSelectedRows(new Set())
+        clearSelection()
         setBulkPaidDialog(false)
         queryClient.invalidateQueries({ queryKey: ['billing'] })
         queryClient.invalidateQueries({ queryKey: ['receivable'] })
@@ -325,20 +331,61 @@ export function FinanceBilling() {
 
   const toggleSelectAll = useCallback(() => {
     const tableData = data?.data || []
-    setSelectedRows(prev => {
-      if (prev.size === tableData.length && tableData.length > 0) {
-        return new Set()
-      }
-      return new Set(tableData.map((r: any) => r.user_id))
-    })
-  }, [data?.data])
+    const allVisibleSelected = tableData.length > 0 && tableData.every((r: any) => selectedRows.has(r.user_id))
+    
+    if (allVisibleSelected) {
+      setSelectedRows(prev => {
+        const newSet = new Set(prev)
+        tableData.forEach((r: any) => newSet.delete(r.user_id))
+        return newSet
+      })
+      setSelectedUsersMap(prev => {
+        const newMap = new Map(prev)
+        tableData.forEach((r: any) => newMap.delete(r.user_id))
+        return newMap
+      })
+    } else {
+      setSelectedRows(prev => {
+        const newSet = new Set(prev)
+        tableData.forEach((r: any) => newSet.add(r.user_id))
+        return newSet
+      })
+      setSelectedUsersMap(prev => {
+        const newMap = new Map(prev)
+        tableData.forEach((r: any) => {
+          newMap.set(r.user_id, {
+            user_id: r.user_id,
+            username: r.username,
+            harga: parseFloat(r.harga || 0),
+            status: r.status
+          })
+        })
+        return newMap
+      })
+    }
+  }, [data?.data, selectedRows])
 
-  const toggleSelectRow = useCallback((userId: number) => {
+  const toggleSelectRow = useCallback((row: any) => {
+    const userId = row.user_id
     setSelectedRows(prev => {
       const newSet = new Set(prev)
       if (newSet.has(userId)) newSet.delete(userId)
       else newSet.add(userId)
       return newSet
+    })
+    setSelectedUsersMap(prev => {
+      const newMap = new Map(prev)
+      if (newMap.has(userId)) {
+        newMap.delete(userId)
+      } else {
+        newMap.set(userId, {
+          user_id: userId,
+          username: row.username,
+          harga: parseFloat(row.harga || 0),
+          status: row.status
+        })
+      }
+      return newMap
     })
   }, [])
 
@@ -881,7 +928,7 @@ export function FinanceBilling() {
                 variant="ghost" 
                 size="sm" 
                 className="text-slate-300 hover:text-white hover:bg-white/10 dark:text-slate-600 dark:hover:text-slate-900 dark:hover:bg-black/5"
-                onClick={() => setSelectedRows(new Set())}
+                onClick={clearSelection}
               >
                 Batal
               </Button>
@@ -890,7 +937,7 @@ export function FinanceBilling() {
                 size="sm" 
                 className="bg-transparent border-slate-600 text-slate-300 hover:text-white hover:bg-slate-800 dark:border-slate-300/50 dark:text-slate-600 dark:hover:text-slate-900 dark:hover:bg-slate-200"
                 onClick={() => {
-                  const usersToPrint = (data?.data || []).filter((r: any) => selectedRows.has(r.user_id))
+                  const usersToPrint = Array.from(selectedUsersMap.values())
                   printBulkThermal(usersToPrint, month, year)
                 }}
               >
@@ -901,7 +948,7 @@ export function FinanceBilling() {
                 size="sm" 
                 className="bg-transparent border-slate-600 text-slate-300 hover:text-white hover:bg-slate-800 dark:border-slate-300/50 dark:text-slate-600 dark:hover:text-slate-900 dark:hover:bg-slate-200"
                 onClick={() => {
-                  const usersToPrint = (data?.data || []).filter((r: any) => selectedRows.has(r.user_id))
+                  const usersToPrint = Array.from(selectedUsersMap.values())
                   printBulkInvoice(usersToPrint, month, year)
                 }}
               >
