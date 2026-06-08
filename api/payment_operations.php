@@ -191,57 +191,71 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
         $conn->begin_transaction();
         try {
+            // Deklarasikan variabel yang akan di-bind
+            $uid = 0;
+            $amt = 0.0;
+            $pid = 0;
+            $target_amount = 0.0;
+
             $checkStmt = $conn->prepare("SELECT id FROM payments WHERE router_id = ? AND user_id = ? AND payment_month = ? AND payment_year = ?");
+            $checkStmt->bind_param("siii", $router_id, $uid, $month, $year);
+
             $updStmt = $conn->prepare("UPDATE payments SET amount = ?, payment_date = ?, method = ?, note = ?, target_amount = ? WHERE id = ?");
+            $updStmt->bind_param("dsssdi", $amt, $date, $method, $note, $target_amount, $pid);
+
             $insStmt = $conn->prepare("INSERT INTO payments (router_id, user_id, amount, payment_date, payment_month, payment_year, method, note, target_amount) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)");
+            $insStmt->bind_param("sidsiissd", $router_id, $uid, $amt, $date, $month, $year, $method, $note, $target_amount);
+
             $invStmt = $conn->prepare("SELECT amount FROM invoices WHERE user_id = ? AND month = ? AND year = ?");
+            $invStmt->bind_param("iii", $uid, $month, $year);
+
             $profStmt = $conn->prepare("SELECT pr.price FROM users u LEFT JOIN ppp_profile_pricing pr ON pr.profile_name = u.profile AND pr.router_id = u.router_id WHERE u.id = ?");
+            $profStmt->bind_param("i", $uid);
             
             $successCount = 0;
             foreach ($users as $u) {
-                $uid = intval($u['user_id'] ?? 0);
-                $amt = floatval($u['amount'] ?? 0);
+                $current_uid = intval($u['user_id'] ?? 0);
+                $current_amt = floatval($u['amount'] ?? 0);
                 
-                if (!$uid && !empty($u['username'])) {
+                if (!$current_uid && !empty($u['username'])) {
                     $uStmt = $conn->prepare("SELECT id FROM users WHERE username = ? AND router_id = ?");
                     $uStmt->bind_param("ss", $u['username'], $router_id);
                     $uStmt->execute();
                     $uRes = $uStmt->get_result()->fetch_assoc();
-                    $uid = $uRes['id'] ?? 0;
+                    $current_uid = $uRes['id'] ?? 0;
                     $uStmt->close();
                 }
                 
-                if (!$uid) continue;
+                if (!$current_uid) continue;
                 
-                $checkStmt->bind_param("siii", $router_id, $uid, $month, $year);
+                // Assign nilai ke variabel yang di-bind
+                $uid = $current_uid;
+                $amt = $current_amt;
+                
                 $checkStmt->execute();
                 $res = $checkStmt->get_result();
                 $checkData = $res ? $res->fetch_assoc() : null;
                 if ($res) $res->free();
                 
-                $invStmt->bind_param("iii", $uid, $month, $year);
                 $invStmt->execute();
                 $invRes = $invStmt->get_result();
                 $invData = $invRes ? $invRes->fetch_assoc() : null;
                 if ($invRes) $invRes->free();
                 
                 if ($invData) {
-                    $target_amount = $invData['amount'];
+                    $target_amount = floatval($invData['amount']);
                 } else {
-                    $profStmt->bind_param("i", $uid);
                     $profStmt->execute();
                     $profRes = $profStmt->get_result();
                     $profData = $profRes ? $profRes->fetch_assoc() : null;
                     if ($profRes) $profRes->free();
-                    $target_amount = $profData['price'] ?? 0;
+                    $target_amount = floatval($profData['price'] ?? 0);
                 }
                 
                 if ($checkData) {
-                    $pid = $checkData['id'];
-                    $updStmt->bind_param("dsssdi", $amt, $date, $method, $note, $target_amount, $pid);
+                    $pid = intval($checkData['id']);
                     $updStmt->execute();
                 } else {
-                    $insStmt->bind_param("sidsiissd", $router_id, $uid, $amt, $date, $month, $year, $method, $note, $target_amount);
                     $insStmt->execute();
                 }
                 $successCount++;
