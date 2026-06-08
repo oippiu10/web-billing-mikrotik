@@ -255,7 +255,11 @@ export function FinanceBilling() {
 
   const bulkMarkPaid = useMutation({
     mutationFn: async () => {
+      console.log('bulkMarkPaid: selectedUsersMap size =', selectedUsersMap.size)
+      console.log('bulkMarkPaid: selectedUsersMap keys =', Array.from(selectedUsersMap.keys()))
+      console.log('bulkMarkPaid: selectedUsersMap values =', Array.from(selectedUsersMap.values()))
       const usersToPay = Array.from(selectedUsersMap.values()).filter((u: any) => u.status !== 'paid')
+      console.log('bulkMarkPaid: usersToPay setelah difilter =', usersToPay)
       if (usersToPay.length === 0) return { success: false, message: 'Tidak ada data valid untuk dilunasi' }
       
       const payload = {
@@ -272,6 +276,7 @@ export function FinanceBilling() {
           amount: u.harga
         }))
       }
+      console.log('bulkMarkPaid: mengirim payload =', payload)
       const res = await api.post('/payment_operations.php', payload)
       return res.data
     },
@@ -367,10 +372,12 @@ export function FinanceBilling() {
 
   const toggleSelectRow = useCallback((row: any) => {
     const userId = row.user_id
+    console.log('toggleSelectRow: dipanggil untuk user_id =', userId, 'row =', row)
     setSelectedRows(prev => {
       const newSet = new Set(prev)
       if (newSet.has(userId)) newSet.delete(userId)
       else newSet.add(userId)
+      console.log('toggleSelectRow: selectedRows baru =', Array.from(newSet))
       return newSet
     })
     setSelectedUsersMap(prev => {
@@ -385,6 +392,7 @@ export function FinanceBilling() {
           status: row.status
         })
       }
+      console.log('toggleSelectRow: selectedUsersMap baru =', Array.from(newMap.values()))
       return newMap
     })
   }, [])
