@@ -58,6 +58,7 @@ $results[] = runSQL($conn, 'payments', "
         `payment_year` smallint(4) NOT NULL,
         `method` varchar(50) DEFAULT 'cash',
         `note` text DEFAULT NULL,
+        `target_amount` decimal(15,2) DEFAULT NULL,
         `created_by` int(11) DEFAULT NULL,
         `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
         PRIMARY KEY (`id`),
@@ -422,6 +423,7 @@ $results[] = runSQL($conn, 'admin_activity_logs', "
 // ─── 18. Tabel USERS (Alters) ─────────────────────────────────────────────────────
 $results[] = ensureColumnExists($conn, 'users', 'odp_id', 'int(11) DEFAULT NULL');
 $results[] = ensureColumnExists($conn, 'users', 'tipe_langganan', "varchar(20) DEFAULT 'pascabayar'");
+$results[] = ensureColumnExists($conn, 'payments', 'target_amount', 'decimal(15,2) DEFAULT NULL');
 
 // ─── Cek semua tabel yang ada ─────────────────────────────────────────────────
 $check = $conn->query("SHOW TABLES");
