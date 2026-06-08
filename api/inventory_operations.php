@@ -25,6 +25,15 @@ function ensure_inventory_tables(mysqli $conn) {
         INDEX idx_router_category (router_id, category)
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
 
+    // Migrasi otomatis: tambahkan kolom yang mungkin belum ada di tabel lama
+    $cols = [];
+    $res = $conn->query("SHOW COLUMNS FROM inventory");
+    if ($res) { while ($r = $res->fetch_assoc()) $cols[] = $r['Field']; }
+    if (!in_array('price', $cols))       $conn->query("ALTER TABLE inventory ADD COLUMN price DECIMAL(15,2) NOT NULL DEFAULT 0 AFTER stock");
+    if (!in_array('unit', $cols))        $conn->query("ALTER TABLE inventory ADD COLUMN unit VARCHAR(30) NOT NULL DEFAULT 'pcs' AFTER stock");
+    if (!in_array('description', $cols)) $conn->query("ALTER TABLE inventory ADD COLUMN description TEXT NULL AFTER price");
+    if (!in_array('updated_at', $cols))  $conn->query("ALTER TABLE inventory ADD COLUMN updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP");
+
     $conn->query("CREATE TABLE IF NOT EXISTS inventory_movements (
         id INT AUTO_INCREMENT PRIMARY KEY,
         router_id INT NOT NULL DEFAULT 0,
