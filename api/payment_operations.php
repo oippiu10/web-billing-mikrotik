@@ -177,6 +177,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             echo json_encode(['success' => false, 'message' => 'Missing payment ID']);
         }
     } elseif ($action === 'bulk_mark_paid') {
+        file_put_contents(__DIR__ . '/debug_bulk.txt', json_encode($data, JSON_PRETTY_PRINT));
         $users = $data['users'] ?? []; // array of { username, user_id, amount }
         $month = intval($data['month'] ?? date('n'));
         $year = intval($data['year'] ?? date('Y'));
